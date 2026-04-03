@@ -737,13 +737,13 @@
             try { return JSON.parse(saved); } catch(e) {}
         }
         return {
-            apiKey: "",
+            apiKey: "AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E",
             authDomain: "einkaufsliste-98199.firebaseapp.com",
             databaseURL: "https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app",
             projectId: "einkaufsliste-98199",
-            storageBucket: "einkaufsliste-98199.appspot.com",
-            messagingSenderId: "",
-            appId: ""
+            storageBucket: "einkaufsliste-98199.firebasestorage.app",
+            messagingSenderId: "411877213047",
+            appId: "1:411877213047:web:f04e3b9b98a8d97120d772"
         };
     };
 
@@ -1524,7 +1524,7 @@
     // ═══════════════════════════════════════════════════════
     function SettingsModal({ onClose }) {
         const saved = localStorage.getItem('tw-bau-firebase');
-        const initial = saved ? JSON.parse(saved) : { apiKey: '', authDomain: 'einkaufsliste-98199.firebaseapp.com', databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app', projectId: 'einkaufsliste-98199', storageBucket: 'einkaufsliste-98199.appspot.com', messagingSenderId: '', appId: '' };
+        const initial = saved ? JSON.parse(saved) : { apiKey: 'AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E', authDomain: 'einkaufsliste-98199.firebaseapp.com', databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app', projectId: 'einkaufsliste-98199', storageBucket: 'einkaufsliste-98199.firebasestorage.app', messagingSenderId: '411877213047', appId: '1:411877213047:web:f04e3b9b98a8d97120d772' };
         const [config, setConfig] = useState(initial);
         const upd = (k, v) => setConfig(p => ({ ...p, [k]: v }));
 
