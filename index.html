@@ -1305,7 +1305,7 @@
     // ═══════════════════════════════════════════════════════
     // KOMPONENTE: WARTE-BILDSCHIRM
     // ═══════════════════════════════════════════════════════
-    function WaitingApproval({ lang }) {
+    function WaitingApproval({ lang, onReset }) {
         return (
             <div className="waiting-screen fade-in">
                 <div className="waiting-icon">⏳</div>
@@ -1313,6 +1313,15 @@
                 <p className="waiting-text">{t('auth.waitingText', lang)}</p>
                 <p style={{ color: 'var(--color-text-dim)', marginTop: 24, fontSize: 13 }}>{t('auth.contact', lang)}</p>
                 <div className="spinner" style={{ marginTop: 32 }}></div>
+                {onReset && (
+                    <button onClick={onReset} style={{
+                        marginTop: 40, padding: '10px 24px', background: 'rgba(255,255,255,0.1)',
+                        border: '1px solid rgba(255,255,255,0.2)', borderRadius: 10, color: 'var(--color-text-dim)',
+                        fontSize: 12, cursor: 'pointer'
+                    }}>
+                        🔄 Erneut registrieren
+                    </button>
+                )}
             </div>
         );
     }
@@ -2448,11 +2457,55 @@
         const setScreen = (screen) => setAppState(p => ({ ...p, screen }));
         const setLanguage = (lang) => setAppState(p => ({ ...p, language: lang, screen: 'register' }));
 
-        const handleRegister = (form) => {
-            // In Firebase speichern (Demo: direkt zu waiting)
-            console.log('Registration:', form);
-            setAppState(p => ({ ...p, screen: 'waiting', role: 'worker' }));
+        // ── REGISTRIERUNG: In Firebase speichern ──
+        const handleRegister = async (form) => {
+            try {
+                if (isFirebaseConfigured() && firebaseAuth) {
+                    // Anonym anmelden
+                    var cred = await firebaseAuth.signInAnonymously();
+                    var uid = cred.user.uid;
+                    // Profil in Firebase speichern
+                    var profileData = {
+                        name: (form.firstName || '') + ' ' + (form.lastName || ''),
+                        vorname: form.firstName || '',
+                        nachname: form.lastName || '',
+                        telefon: form.phone || '',
+                        mobil: form.mobile || '',
+                        email: form.email || '',
+                        adresse: (form.street || '') + ', ' + (form.zip || '') + ' ' + (form.city || ''),
+                        registriertAm: new Date().toISOString()
+                    };
+                    await firebaseDB.ref('users/' + uid + '/profile').set(profileData);
+                    await firebaseDB.ref('users/' + uid + '/approved').set(false);
+                    await firebaseDB.ref('users/' + uid + '/role').set('worker');
+                    await firebaseDB.ref('users/' + uid + '/language').set(appState.language || 'de');
+                    console.log('✅ Registrierung gespeichert, UID:', uid);
+                    setAppState(p => ({ ...p, screen: 'waiting', role: 'worker', userId: uid }));
+                } else {
+                    console.warn('Firebase nicht konfiguriert — Demo-Modus');
+                    setAppState(p => ({ ...p, screen: 'waiting', role: 'worker' }));
+                }
+            } catch(err) {
+                console.error('Registrierung Fehler:', err);
+                alert('Registrierung fehlgeschlagen: ' + err.message);
+            }
         };
+
+        // ── FREIGABE-LISTENER: Prüft ob Admin die Freigabe erteilt hat ──
+        useEffect(() => {
+            if (appState.screen !== 'waiting' || !appState.userId) return;
+            if (!isFirebaseConfigured() || !firebaseDB) return;
+
+            console.log('Warte auf Freigabe für UID:', appState.userId);
+            var ref = firebaseDB.ref('users/' + appState.userId + '/approved');
+            var handler = ref.on('value', (snap) => {
+                if (snap.val() === true) {
+                    console.log('✅ Freigabe erteilt!');
+                    setAppState(p => ({ ...p, screen: 'app', approved: true }));
+                }
+            });
+            return () => ref.off('value', handler);
+        }, [appState.screen, appState.userId]);
 
         // ── ROUTING ──
         // Admin-Modus: URL-Parameter ?admin=true oder localStorage
@@ -2477,7 +2530,10 @@
             case 'register':
                 return <Registration lang={appState.language} onSubmit={handleRegister} onBack={() => setScreen('language')} />;
             case 'waiting':
-                return <WaitingApproval lang={appState.language} />;
+                return <WaitingApproval lang={appState.language} onReset={() => {
+                    localStorage.removeItem('tw-bau-state');
+                    setAppState({ screen: 'language', language: null, role: null, userId: null, approved: false });
+                }} />;
             case 'app':
                 return <MobileApp userId={appState.userId} language={appState.language} />;
             default:
