@@ -2423,6 +2423,17 @@
     // HAUPT-APP (Router + Auth Flow)
     // ═══════════════════════════════════════════════════════
     function App() {
+        // ── RESET: ?reset in URL löscht den gespeicherten State ──
+        useEffect(() => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('reset')) {
+                localStorage.removeItem('tw-bau-state');
+                localStorage.removeItem('tw-bau-admin');
+                localStorage.removeItem('tw_firebase_config_baustelle');
+                window.location.href = window.location.pathname;
+            }
+        }, []);
+
         // App-State
         const [appState, setAppState] = useState(() => {
             const saved = localStorage.getItem('tw-bau-state');
