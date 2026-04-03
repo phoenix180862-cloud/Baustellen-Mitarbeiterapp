@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TW Baustellen-App — Thomas Willwacher Fliesenlegermeister e.K.</title>
+    
+    <!-- PWA -->
+    <meta name="theme-color" content="#2D3436">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TW Bau">
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- React + Babel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    
+    <!-- Global Error Handler -->
+    <script>
+    window.onerror = function(msg, url, line) {
+        console.error('App Error:', msg, 'Line:', line);
+        var d = document.getElementById('crash-info');
+        if (!d) {
+            d = document.createElement('div');
+            d.id = 'crash-info';
+            d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#2D3436;color:#F5A623;border:2px solid #F5A623;border-radius:12px;z-index:99999;font-family:monospace;font-size:13px;max-height:80vh;overflow:auto;';
+            document.body.appendChild(d);
+        }
+        d.innerHTML = '<b>⚠️ Fehler:</b> ' + msg + '<br><b>Zeile:</b> ' + line +
+            '<br><button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#F5A623;color:#2D3436;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Schließen</button>';
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // PWA SERVICE WORKER (Inline-Registrierung)
+    // ═══════════════════════════════════════════════════════
+    if ('serviceWorker' in navigator) {
+        var swCode = 'var CACHE="tw-bau-v1";' +
+            'var URLS=["/"];' +
+            'self.addEventListener("install",function(e){e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll(URLS)}))});' +
+            'self.addEventListener("fetch",function(e){e.respondWith(caches.match(e.request).then(function(r){return r||fetch(e.request).then(function(res){return caches.open(CACHE).then(function(c){c.put(e.request,res.clone());return res})})}))});';
+        var swBlob = new Blob([swCode], { type: 'application/javascript' });
+        var swUrl = URL.createObjectURL(swBlob);
+        navigator.serviceWorker.register(swUrl).then(function() {
+            console.log('✅ Service Worker registriert (PWA ready)');
+        }).catch(function(e) {
+            console.log('SW Registrierung übersprungen:', e.message);
+        });
+    }
+    </script>
+
+    <style>
+    /* ═══════════════════════════════════════════════════════ */
+    /* TW BAUSTELLEN-APP — CSS                                */
+    /* ═══════════════════════════════════════════════════════ */
+    
+    :root {
+        --color-primary: #2D3436;
+        --color-primary-light: #3d4a4d;
+        --color-accent: #F5A623;
+        --color-accent-hover: #e69a1e;
+        --color-bg: #1a2332;
+        --color-bg-card: #243447;
+        --color-bg-input: #1e2d3d;
+        --color-text: #e0e6ed;
+        --color-text-dim: #8899aa;
+        --color-success: #4CAF50;
+        --color-danger: #F44336;
+        --color-info: #2196F3;
+        --color-warning: #FF9800;
+        --color-online: #4CAF50;
+        --color-offline: #F44336;
+        --color-away: #FF9800;
+        --color-vacation: #2196F3;
+        --color-sick: #FF5722;
+        --color-pending: #2196F3;
+        --color-weekend: #1e2d3d;
+        --color-holiday: #37474F;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --shadow: 0 4px 20px rgba(0,0,0,0.3);
+        --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+        --transition: all 0.3s ease;
+        --font: 'Nunito', sans-serif;
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+        font-family: var(--font);
+        background: var(--color-bg);
+        color: var(--color-text);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+        overflow-x: hidden;
+    }
+    
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--color-bg); }
+    ::-webkit-scrollbar-thumb { background: var(--color-primary-light); border-radius: 3px; }
+    
+    /* ── Loading Spinner ── */
+    .spinner {
+        width: 40px; height: 40px;
+        border: 4px solid var(--color-bg-card);
+        border-top-color: var(--color-accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    /* ── Buttons ── */
+    .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 12px 24px; border: none; border-radius: var(--radius-sm);
+        font-family: var(--font); font-size: 15px; font-weight: 700;
+        cursor: pointer; transition: var(--transition);
+        text-decoration: none;
+    }
+    .btn-primary { background: var(--color-accent); color: var(--color-primary); }
+    .btn-primary:hover { background: var(--color-accent-hover); transform: translateY(-1px); }
+    .btn-secondary { background: var(--color-bg-card); color: var(--color-text); border: 1px solid var(--color-primary-light); }
+    .btn-secondary:hover { background: var(--color-primary-light); }
+    .btn-success { background: var(--color-success); color: white; }
+    .btn-danger { background: var(--color-danger); color: white; }
+    .btn-sm { padding: 8px 16px; font-size: 13px; }
+    .btn-lg { padding: 16px 32px; font-size: 17px; }
+    .btn-block { width: 100%; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    
+    /* ── Cards ── */
+    .card {
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+    }
+    
+    /* ── Inputs ── */
+    .input-field {
+        width: 100%; padding: 12px 16px;
+        background: var(--color-bg-input); color: var(--color-text);
+        border: 1px solid var(--color-primary-light);
+        border-radius: var(--radius-sm);
+        font-family: var(--font); font-size: 15px;
+        transition: var(--transition);
+    }
+    .input-field:focus { outline: none; border-color: var(--color-accent); }
+    .input-field::placeholder { color: var(--color-text-dim); }
+    
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--color-text-dim); font-weight: 600; }
+    
+    /* ── Status Dots ── */
+    .status-dot {
+        width: 12px; height: 12px; border-radius: 50%;
+        display: inline-block;
+    }
+    .status-dot.online { background: var(--color-online); box-shadow: 0 0 8px var(--color-online); }
+    .status-dot.offline { background: var(--color-offline); }
+    .status-dot.away { background: var(--color-away); }
+    .status-dot.vacation { background: var(--color-vacation); }
+    .status-dot.sick { background: var(--color-sick); }
+    .status-dot.pending { background: var(--color-pending); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    
+    /* ── Badge ── */
+    .badge {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 20px; height: 20px; padding: 0 6px;
+        background: var(--color-danger); color: white;
+        border-radius: 10px; font-size: 11px; font-weight: 700;
+    }
+    
+    /* ══════════════════════════════════════════════════ */
+    /* LAYOUT: DASHBOARD (Desktop/Büro-PC)              */
+    /* ══════════════════════════════════════════════════ */
+    .dashboard-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+    .dashboard-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 32px;
+        background: var(--color-primary);
+        border-bottom: 3px solid var(--color-accent);
+    }
+    .dashboard-header h1 {
+        font-size: 20px; font-weight: 800;
+        color: var(--color-accent);
+    }
+    .dashboard-header-actions {
+        display: flex; align-items: center; gap: 16px;
+    }
+    .dashboard-body {
+        flex: 1; padding: 24px 32px;
+    }
+    
+    /* ── Employee Grid ── */
+    .employee-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+        margin-bottom: 32px;
+    }
+    .employee-card {
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+        padding: 20px;
+        cursor: pointer;
+        transition: var(--transition);
+        border: 2px solid transparent;
+    }
+    .employee-card:hover {
+        border-color: var(--color-accent);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+    }
+    .employee-card-header {
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 12px;
+    }
+    .employee-card-name {
+        font-size: 16px; font-weight: 700;
+    }
+    .employee-card-project {
+        font-size: 13px; color: var(--color-text-dim);
+    }
+    .employee-card-time {
+        font-size: 12px; color: var(--color-text-dim);
+        margin-top: 4px;
+    }
+    
+    /* ── Mirror View ── */
+    .mirror-container {
+        display: flex; gap: 24px;
+        height: calc(100vh - 140px);
+    }
+    .mirror-phone {
+        width: 375px;
+        min-width: 375px;
+        height: 667px;
+        border: 3px solid var(--color-primary-light);
+        border-radius: 32px;
+        overflow: hidden;
+        background: var(--color-bg);
+        box-shadow: var(--shadow);
+    }
+    .mirror-sidebar {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+    }
+    .admin-toolbar {
+        display: flex; flex-wrap: wrap; gap: 8px;
+        padding: 16px;
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+    }
+    .activity-log {
+        flex: 1;
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+        padding: 16px;
+        overflow-y: auto;
+    }
+    .activity-log-item {
+        padding: 8px 0;
+        border-bottom: 1px solid var(--color-bg);
+        font-size: 13px;
+    }
+    .activity-log-item:last-child { border-bottom: none; }
+    .activity-log-time {
+        color: var(--color-text-dim);
+        font-size: 11px;
+        margin-right: 8px;
+    }
+    
+    /* ── Notification Bell ── */
+    .notification-bell {
+        position: relative;
+        cursor: pointer;
+        font-size: 24px;
+    }
+    .notification-bell .badge {
+        position: absolute;
+        top: -6px; right: -6px;
+    }
+    
+    /* ── Approval Cards ── */
+    .approval-section {
+        margin-bottom: 24px;
+    }
+    .approval-card {
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+        padding: 16px;
+        border-left: 4px solid var(--color-pending);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+    .approval-info { flex: 1; }
+    .approval-actions { display: flex; gap: 8px; }
+    
+    /* ── Recent Events ── */
+    .events-section {
+        margin-bottom: 24px;
+    }
+    .event-item {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--color-bg-card);
+        font-size: 14px;
+    }
+    .event-time { color: var(--color-text-dim); font-size: 12px; min-width: 50px; }
+    
+    /* ══════════════════════════════════════════════════ */
+    /* LAYOUT: MOBILE APP (Mitarbeiter-Handy)           */
+    /* ══════════════════════════════════════════════════ */
+    .mobile-container {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        max-width: 500px;
+        margin: 0 auto;
+    }
+    .mobile-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 16px;
+        padding-top: calc(12px + var(--safe-top));
+        background: var(--color-primary);
+        border-bottom: 2px solid var(--color-accent);
+    }
+    .mobile-header h2 {
+        font-size: 16px; font-weight: 700;
+        color: var(--color-accent);
+    }
+    .mobile-body {
+        flex: 1;
+        padding: 16px;
+        padding-bottom: 80px;
+        overflow-y: auto;
+    }
+    .mobile-nav {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        display: flex;
+        justify-content: space-around;
+        background: var(--color-primary);
+        border-top: 2px solid var(--color-accent);
+        padding: 8px 0;
+        padding-bottom: calc(8px + var(--safe-bottom));
+        z-index: 100;
+    }
+    .nav-item {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 2px; padding: 4px 8px;
+        color: var(--color-text-dim); font-size: 10px; font-weight: 600;
+        cursor: pointer; transition: var(--transition);
+        text-decoration: none;
+        border: none; background: none;
+    }
+    .nav-item.active, .nav-item:hover {
+        color: var(--color-accent);
+    }
+    .nav-icon { font-size: 22px; }
+    
+    /* ── Module Menu Grid ── */
+    .module-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        padding: 8px 0;
+    }
+    .module-tile {
+        background: var(--color-bg-card);
+        border-radius: var(--radius);
+        padding: 24px 16px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+        border: 2px solid transparent;
+    }
+    .module-tile:hover, .module-tile:active {
+        border-color: var(--color-accent);
+        transform: scale(1.02);
+    }
+    .module-tile-icon { font-size: 36px; margin-bottom: 8px; }
+    .module-tile-label { font-size: 13px; font-weight: 700; }
+    
+    /* ── Language Selector ── */
+    .language-screen {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        min-height: 100vh; padding: 32px;
+        text-align: center;
+    }
+    .language-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px; margin-top: 32px;
+        max-width: 400px; width: 100%;
+    }
+    .language-btn {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 8px; padding: 20px;
+        background: var(--color-bg-card);
+        border: 2px solid transparent;
+        border-radius: var(--radius);
+        cursor: pointer; transition: var(--transition);
+        color: var(--color-text); font-family: var(--font);
+    }
+    .language-btn:hover { border-color: var(--color-accent); }
+    .language-flag { font-size: 40px; }
+    .language-name { font-size: 14px; font-weight: 700; }
+    
+    /* ── Registration Form ── */
+    .register-screen {
+        min-height: 100vh; padding: 32px;
+        max-width: 500px; margin: 0 auto;
+    }
+    .register-screen h2 {
+        text-align: center; margin-bottom: 24px;
+        color: var(--color-accent); font-size: 22px;
+    }
+    
+    /* ── Waiting Screen ── */
+    .waiting-screen {
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        min-height: 100vh; padding: 32px;
+        text-align: center;
+    }
+    .waiting-icon { font-size: 80px; margin-bottom: 24px; }
+    .waiting-text { font-size: 18px; max-width: 400px; line-height: 1.6; }
+    
+    /* ══════════════════════════════════════════════════ */
+    /* SECTION HEADERS                                   */
+    /* ══════════════════════════════════════════════════ */
+    .section-title {
+        font-size: 16px; font-weight: 800;
+        color: var(--color-text);
+        margin-bottom: 16px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .section-title-icon { color: var(--color-accent); }
+    
+    /* ── Document Upload Modal ── */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+    }
+    .modal-content {
+        background: var(--color-bg);
+        border-radius: var(--radius);
+        padding: 24px;
+        max-width: 500px; width: 90%;
+        max-height: 90vh; overflow-y: auto;
+        box-shadow: var(--shadow);
+    }
+    .modal-header {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    .modal-header h3 { font-size: 18px; color: var(--color-accent); }
+    .modal-close {
+        background: none; border: none; color: var(--color-text-dim);
+        font-size: 24px; cursor: pointer;
+    }
+    
+    /* ── Drop Zone ── */
+    .drop-zone {
+        border: 2px dashed var(--color-primary-light);
+        border-radius: var(--radius);
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+    .drop-zone:hover, .drop-zone.active {
+        border-color: var(--color-accent);
+        background: rgba(245,166,35,0.05);
+    }
+    .drop-zone-icon { font-size: 40px; margin-bottom: 8px; }
+    .drop-zone-text { font-size: 14px; color: var(--color-text-dim); }
+    
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: STUNDENZETTEL                              */
+    /* ══════════════════════════════════════════════════ */
+    .timesheet-form { display: flex; flex-direction: column; gap: 12px; }
+    .timesheet-header {
+        background: var(--color-bg-card); border-radius: var(--radius);
+        padding: 16px; text-align: center; border-bottom: 3px solid var(--color-accent);
+    }
+    .timesheet-header h3 { font-size: 14px; color: var(--color-accent); margin-bottom: 4px; }
+    .timesheet-header p { font-size: 11px; color: var(--color-text-dim); }
+    .time-row {
+        display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;
+    }
+    .material-tag {
+        display: inline-flex; align-items: center; gap: 4px;
+        background: var(--color-bg); padding: 4px 10px;
+        border-radius: 20px; font-size: 12px; margin: 2px;
+    }
+    .photo-thumbs {
+        display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .photo-thumb {
+        width: 60px; height: 60px; border-radius: var(--radius-sm);
+        background: var(--color-bg); display: flex; align-items: center;
+        justify-content: center; font-size: 24px; cursor: pointer;
+        border: 1px dashed var(--color-primary-light);
+    }
+    .voice-btn {
+        width: 44px; height: 44px; border-radius: 50%;
+        background: var(--color-accent); border: none;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 20px; cursor: pointer; transition: var(--transition);
+    }
+    .voice-btn.active { background: var(--color-danger); animation: pulse 1s infinite; }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: MONATSKALENDER                            */
+    /* ══════════════════════════════════════════════════ */
+    .month-calendar { margin-top: 12px; }
+    .month-nav {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 16px;
+    }
+    .month-nav h3 { font-size: 16px; color: var(--color-accent); }
+    .month-nav button { background: none; border: none; color: var(--color-text); font-size: 20px; cursor: pointer; padding: 4px 12px; }
+    .weekday-header {
+        display: grid; grid-template-columns: repeat(7, 1fr);
+        text-align: center; font-size: 11px; font-weight: 700;
+        color: var(--color-text-dim); margin-bottom: 4px;
+    }
+    .day-grid {
+        display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+    }
+    .day-cell {
+        aspect-ratio: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        border-radius: var(--radius-sm); font-size: 13px; font-weight: 700;
+        cursor: pointer; transition: var(--transition); gap: 2px;
+        background: var(--color-bg-card); position: relative;
+    }
+    .day-cell:hover { border: 1px solid var(--color-accent); }
+    .day-cell.empty { background: transparent; cursor: default; }
+    .day-cell.empty:hover { border: none; }
+    .day-cell.weekend { background: var(--color-weekend); opacity: 0.6; cursor: default; }
+    .day-cell.weekend:hover { border: none; }
+    .day-cell.today { border: 2px solid var(--color-accent); }
+    .day-cell.done { background: rgba(76,175,80,0.2); }
+    .day-cell.vacation { background: rgba(33,150,243,0.2); }
+    .day-cell.sick { background: rgba(244,67,54,0.2); }
+    .day-hours { font-size: 9px; color: var(--color-text-dim); }
+    .day-status { font-size: 8px; position: absolute; top: 2px; right: 2px; }
+    .month-summary {
+        margin-top: 16px; padding: 12px; background: var(--color-bg-card);
+        border-radius: var(--radius); font-size: 13px;
+    }
+    .summary-row {
+        display: flex; justify-content: space-between; padding: 4px 0;
+    }
+    .summary-row span:last-child { font-weight: 700; color: var(--color-accent); }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: FOTOS                                     */
+    /* ══════════════════════════════════════════════════ */
+    .photo-grid {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    }
+    .photo-card {
+        aspect-ratio: 1; background: var(--color-bg-card);
+        border-radius: var(--radius-sm); display: flex;
+        align-items: center; justify-content: center;
+        font-size: 32px; cursor: pointer; overflow: hidden;
+        transition: var(--transition); position: relative;
+    }
+    .photo-card:hover { transform: scale(1.03); }
+    .photo-card-meta {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        background: rgba(0,0,0,0.7); padding: 4px 8px;
+        font-size: 10px;
+    }
+    .photo-actions {
+        display: flex; gap: 8px; margin-bottom: 16px;
+    }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: BAUSTELLENORDNER                          */
+    /* ══════════════════════════════════════════════════ */
+    .project-list { display: flex; flex-direction: column; gap: 12px; }
+    .project-card {
+        background: var(--color-bg-card); border-radius: var(--radius);
+        padding: 16px; cursor: pointer; transition: var(--transition);
+        border-left: 4px solid var(--color-accent);
+    }
+    .project-card:hover { transform: translateX(4px); }
+    .project-card h4 { font-size: 15px; margin-bottom: 4px; }
+    .project-card p { font-size: 12px; color: var(--color-text-dim); }
+    .folder-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .folder-item {
+        display: flex; align-items: center; gap: 10px;
+        padding: 12px; background: var(--color-bg-card);
+        border-radius: var(--radius-sm); cursor: pointer;
+        transition: var(--transition);
+    }
+    .folder-item:hover { background: var(--color-primary-light); }
+    .folder-icon { font-size: 24px; }
+    .folder-name { font-size: 14px; }
+    .folder-access { font-size: 10px; color: var(--color-text-dim); }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: KALENDER                                  */
+    /* ══════════════════════════════════════════════════ */
+    .calendar-view { overflow-x: auto; }
+    .gantt-row {
+        display: flex; align-items: center; min-height: 36px;
+        border-bottom: 1px solid var(--color-bg);
+    }
+    .gantt-label {
+        min-width: 120px; font-size: 12px; font-weight: 600;
+        padding: 4px 8px; white-space: nowrap;
+    }
+    .gantt-bar-container { flex: 1; display: flex; gap: 1px; }
+    .gantt-cell {
+        width: 20px; height: 28px; border-radius: 2px;
+    }
+    .gantt-cell.work { background: var(--color-success); }
+    .gantt-cell.vacation { background: var(--color-info); }
+    .gantt-cell.sick { background: var(--color-danger); }
+    .gantt-cell.weekend { background: var(--color-weekend); }
+    .gantt-cell.empty { background: transparent; }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: PRIVATER BEREICH                          */
+    /* ══════════════════════════════════════════════════ */
+    .private-section {
+        background: var(--color-bg-card); border-radius: var(--radius);
+        padding: 16px; margin-bottom: 16px;
+    }
+    .private-section h4 {
+        font-size: 14px; color: var(--color-accent);
+        margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
+    }
+    .private-row {
+        display: flex; justify-content: space-between;
+        padding: 6px 0; font-size: 13px;
+        border-bottom: 1px solid var(--color-bg);
+    }
+    .private-row:last-child { border-bottom: none; }
+    .private-row span:first-child { color: var(--color-text-dim); }
+    .private-row span:last-child { font-weight: 700; }
+
+    /* ══════════════════════════════════════════════════ */
+    /* MODULE: CHAT                                      */
+    /* ══════════════════════════════════════════════════ */
+    .chat-container { display: flex; flex-direction: column; height: calc(100vh - 200px); }
+    .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+    .chat-bubble {
+        max-width: 80%; padding: 10px 14px;
+        border-radius: 16px; font-size: 14px; line-height: 1.4;
+    }
+    .chat-bubble.sent {
+        align-self: flex-end; background: var(--color-accent);
+        color: var(--color-primary); border-bottom-right-radius: 4px;
+    }
+    .chat-bubble.received {
+        align-self: flex-start; background: var(--color-bg-card);
+        border-bottom-left-radius: 4px;
+    }
+    .chat-bubble-time { font-size: 10px; opacity: 0.7; margin-top: 4px; }
+    .chat-input-bar {
+        display: flex; gap: 8px; padding: 8px 0;
+    }
+    .chat-input-bar input { flex: 1; }
+
+    /* ══════════════════════════════════════════════════ */
+    /* ANIMATIONS                                        */
+    /* ══════════════════════════════════════════════════ */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(40px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .slide-up { animation: slideUp 0.5s ease-out; }
+    
+    /* ══════════════════════════════════════════════════ */
+    /* RESPONSIVE                                        */
+    /* ══════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+        .dashboard-header { padding: 12px 16px; }
+        .dashboard-body { padding: 16px; }
+        .employee-grid { grid-template-columns: 1fr; }
+        .mirror-container { flex-direction: column; height: auto; }
+        .mirror-phone { width: 100%; min-width: auto; height: 500px; }
+    }
+    </style>
+</head>
+<body>
+    <div id="app-root"></div>
+    <script type="text/babel">
+    // ═══════════════════════════════════════════════════════
+    // FIREBASE KONFIGURATION (aus localStorage oder Defaults)
+    // ═══════════════════════════════════════════════════════
+    // SETUP: Firebase-Credentials werden über das Einstellungs-
+    // Menü im Dashboard eingegeben und in localStorage gespeichert.
+    // Alternativ: Werte direkt hier eintragen.
+    const getFirebaseConfig = () => {
+        const saved = localStorage.getItem('tw-bau-firebase');
+        if (saved) {
+            try { return JSON.parse(saved); } catch(e) {}
+        }
+        return {
+            apiKey: "",
+            authDomain: "einkaufsliste-98199.firebaseapp.com",
+            databaseURL: "https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "einkaufsliste-98199",
+            storageBucket: "einkaufsliste-98199.appspot.com",
+            messagingSenderId: "",
+            appId: ""
+        };
+    };
+
+    const FIREBASE_CONFIG = getFirebaseConfig();
+    const isFirebaseConfigured = () => FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.length > 10;
+    
+    // Firebase initialisieren (nur wenn konfiguriert)
+    let firebaseApp = null;
+    let firebaseAuth = null;
+    let firebaseDB = null;
+    let firebaseStorage = null;
+    
+    try {
+        if (isFirebaseConfigured()) {
+            firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+            firebaseAuth = firebase.auth();
+            firebaseDB = firebase.database();
+            firebaseStorage = firebase.storage();
+            console.log('✅ Firebase initialisiert mit Projekt:', FIREBASE_CONFIG.projectId);
+        } else {
+            console.warn('⚠️ Firebase nicht konfiguriert — Demo-Modus aktiv. Öffne Dashboard → ⚙️ Einstellungen');
+        }
+    } catch(e) {
+        console.error('Firebase Init Fehler:', e);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // i18n — MEHRSPRACHIGKEIT (7 Sprachen)
+    // ═══════════════════════════════════════════════════════
+    const LANGUAGES = [
+        { code: 'de', name: 'Deutsch', flag: '🇩🇪', native: 'Deutsch' },
+        { code: 'cs', name: 'Tschechisch', flag: '🇨🇿', native: 'Čeština' },
+        { code: 'sk', name: 'Slowakisch', flag: '🇸🇰', native: 'Slovenčina' },
+        { code: 'en', name: 'Englisch', flag: '🇬🇧', native: 'English' },
+        { code: 'es', name: 'Spanisch', flag: '🇪🇸', native: 'Español' },
+        { code: 'fr', name: 'Französisch', flag: '🇫🇷', native: 'Français' },
+        { code: 'pl', name: 'Polnisch', flag: '🇵🇱', native: 'Polski' },
+    ];
+
+    const TRANSLATIONS = {
+        de: {
+            app: { title: 'TW Baustellen-App', subtitle: 'Thomas Willwacher Fliesenlegermeister e.K.' },
+            auth: {
+                selectLanguage: 'Sprache wählen', register: 'Anmelden',
+                firstName: 'Vorname', lastName: 'Nachname', street: 'Straße + Nr.',
+                zip: 'PLZ', city: 'Ort', phone: 'Telefon', mobile: 'Mobil', email: 'E-Mail',
+                requestApproval: 'Freigabe anfordern',
+                waitingTitle: 'Bitte warten',
+                waitingText: 'Ihre Anmeldung wird geprüft. Bitte warten Sie auf die Freigabe durch die Firmenleitung.',
+                contact: 'Bei Fragen: Tel. 02681-XXXXXX'
+            },
+            nav: {
+                home: 'Start', photos: 'Fotos', timesheet: 'Stunden',
+                monthly: 'Monat', chat: 'Chat', profile: 'Profil'
+            },
+            modules: {
+                projects: 'Baustellen', calendar: 'Kalender', photos: 'Fotos',
+                timesheet: 'Stundenzettel', monthly: 'Monatskalender', private: 'Mein Bereich',
+                chat: 'Nachrichten', documents: 'Dokumente'
+            },
+            dashboard: {
+                title: 'DASHBOARD', activeApps: 'Aktive Mitarbeiter-Apps',
+                pendingApprovals: 'Wartende Freigaben', recentEvents: 'Letzte Eingänge',
+                openApp: 'Öffnen', approve: 'Freigeben', reject: 'Ablehnen',
+                details: 'Details', back: 'Zurück zum Dashboard',
+                uploadDoc: 'Dokument hochladen', sendMessage: 'Nachricht senden',
+                createTemplate: 'Stundenzettel-Vorlage', appSettings: 'App-Einstellungen',
+                since: 'Seit', offline: 'Offline', onVacation: 'URLAUB', onSick: 'KRANK',
+                mirrorView: 'Spiegelansicht', activityLog: 'Aktivitäts-Log',
+                adminToolbar: 'Admin-Werkzeuge'
+            },
+            common: { save: 'Speichern', cancel: 'Abbrechen', close: 'Schließen', delete: 'Löschen', edit: 'Bearbeiten', loading: 'Laden...' }
+        },
+        cs: {
+            app: { title: 'TW Stavební App', subtitle: 'Thomas Willwacher Fliesenlegermeister e.K.' },
+            auth: {
+                selectLanguage: 'Vyberte jazyk', register: 'Registrace',
+                firstName: 'Jméno', lastName: 'Příjmení', street: 'Ulice + č.',
+                zip: 'PSČ', city: 'Město', phone: 'Telefon', mobile: 'Mobil', email: 'E-mail',
+                requestApproval: 'Požádat o schválení',
+                waitingTitle: 'Prosím čekejte',
+                waitingText: 'Vaše registrace se ověřuje. Prosím čekejte na schválení vedením firmy.',
+                contact: 'Dotazy: Tel. 02681-XXXXXX'
+            },
+            nav: { home: 'Domů', photos: 'Fotky', timesheet: 'Hodiny', monthly: 'Měsíc', chat: 'Zprávy', profile: 'Profil' },
+            modules: {
+                projects: 'Stavby', calendar: 'Kalendář', photos: 'Fotky',
+                timesheet: 'Pracovní výkaz', monthly: 'Měsíční přehled', private: 'Můj prostor',
+                chat: 'Zprávy', documents: 'Dokumenty'
+            },
+            dashboard: { title: 'ŘÍDICÍ PANEL' },
+            common: { save: 'Uložit', cancel: 'Zrušit', close: 'Zavřít', delete: 'Smazat', edit: 'Upravit', loading: 'Načítání...' }
+        },
+        sk: {
+            app: { title: 'TW Stavebná App', subtitle: 'Thomas Willwacher Fliesenlegermeister e.K.' },
+            auth: {
+                selectLanguage: 'Vyberte jazyk', register: 'Registrácia',
+                firstName: 'Meno', lastName: 'Priezvisko', street: 'Ulica + č.',
+                zip: 'PSČ', city: 'Mesto', phone: 'Telefón', mobile: 'Mobil', email: 'E-mail',
+                requestApproval: 'Požiadať o schválenie',
+                waitingTitle: 'Prosím čakajte',
+                waitingText: 'Vaša registrácia sa overuje. Prosím čakajte na schválenie vedením firmy.',
+                contact: 'Otázky: Tel. 02681-XXXXXX'
+            },
+            nav: { home: 'Domov', photos: 'Fotky', timesheet: 'Hodiny', monthly: 'Mesiac', chat: 'Správy', profile: 'Profil' },
+            modules: {
+                projects: 'Stavby', calendar: 'Kalendár', photos: 'Fotky',
+                timesheet: 'Pracovný výkaz', monthly: 'Mesačný prehľad', private: 'Môj priestor',
+                chat: 'Správy', documents: 'Dokumenty'
+            },
+            dashboard: { title: 'RIADIACI PANEL' },
+            common: { save: 'Uložiť', cancel: 'Zrušiť', close: 'Zavrieť', delete: 'Vymazať', edit: 'Upraviť', loading: 'Načítava sa...' }
+        },
+        en: {
+            app: { title: 'TW Construction App', subtitle: 'Thomas Willwacher Tiling Master' },
+            auth: {
+                selectLanguage: 'Select language', register: 'Register',
+                firstName: 'First name', lastName: 'Last name', street: 'Street + No.',
+                zip: 'Postal code', city: 'City', phone: 'Phone', mobile: 'Mobile', email: 'Email',
+                requestApproval: 'Request approval',
+                waitingTitle: 'Please wait',
+                waitingText: 'Your registration is being reviewed. Please wait for approval by management.',
+                contact: 'Questions: Tel. 02681-XXXXXX'
+            },
+            nav: { home: 'Home', photos: 'Photos', timesheet: 'Hours', monthly: 'Month', chat: 'Messages', profile: 'Profile' },
+            modules: {
+                projects: 'Sites', calendar: 'Calendar', photos: 'Photos',
+                timesheet: 'Timesheet', monthly: 'Monthly Record', private: 'My Area',
+                chat: 'Messages', documents: 'Documents'
+            },
+            dashboard: { title: 'DASHBOARD' },
+            common: { save: 'Save', cancel: 'Cancel', close: 'Close', delete: 'Delete', edit: 'Edit', loading: 'Loading...' }
+        },
+        es: {
+            app: { title: 'TW App de Obra', subtitle: 'Thomas Willwacher Maestro Alicatador' },
+            auth: {
+                selectLanguage: 'Seleccionar idioma', register: 'Registrarse',
+                firstName: 'Nombre', lastName: 'Apellido', street: 'Calle + Nº',
+                zip: 'Código postal', city: 'Ciudad', phone: 'Teléfono', mobile: 'Móvil', email: 'Email',
+                requestApproval: 'Solicitar aprobación',
+                waitingTitle: 'Por favor espere',
+                waitingText: 'Su registro está siendo revisado. Por favor espere la aprobación de la dirección.',
+                contact: 'Preguntas: Tel. 02681-XXXXXX'
+            },
+            nav: { home: 'Inicio', photos: 'Fotos', timesheet: 'Horas', monthly: 'Mes', chat: 'Mensajes', profile: 'Perfil' },
+            modules: {
+                projects: 'Obras', calendar: 'Calendario', photos: 'Fotos',
+                timesheet: 'Parte de horas', monthly: 'Registro mensual', private: 'Mi espacio',
+                chat: 'Mensajes', documents: 'Documentos'
+            },
+            dashboard: { title: 'PANEL DE CONTROL' },
+            common: { save: 'Guardar', cancel: 'Cancelar', close: 'Cerrar', delete: 'Eliminar', edit: 'Editar', loading: 'Cargando...' }
+        },
+        fr: {
+            app: { title: 'TW App Chantier', subtitle: 'Thomas Willwacher Maître Carreleur' },
+            auth: {
+                selectLanguage: 'Choisir la langue', register: "S'inscrire",
+                firstName: 'Prénom', lastName: 'Nom', street: 'Rue + N°',
+                zip: 'Code postal', city: 'Ville', phone: 'Téléphone', mobile: 'Mobile', email: 'Email',
+                requestApproval: "Demander l'approbation",
+                waitingTitle: 'Veuillez patienter',
+                waitingText: "Votre inscription est en cours de vérification. Veuillez attendre l'approbation de la direction.",
+                contact: 'Questions: Tél. 02681-XXXXXX'
+            },
+            nav: { home: 'Accueil', photos: 'Photos', timesheet: 'Heures', monthly: 'Mois', chat: 'Messages', profile: 'Profil' },
+            modules: {
+                projects: 'Chantiers', calendar: 'Calendrier', photos: 'Photos',
+                timesheet: 'Feuille de temps', monthly: 'Relevé mensuel', private: 'Mon espace',
+                chat: 'Messages', documents: 'Documents'
+            },
+            dashboard: { title: 'TABLEAU DE BORD' },
+            common: { save: 'Enregistrer', cancel: 'Annuler', close: 'Fermer', delete: 'Supprimer', edit: 'Modifier', loading: 'Chargement...' }
+        },
+        pl: {
+            app: { title: 'TW Aplikacja Budowlana', subtitle: 'Thomas Willwacher Mistrz Glazurnik' },
+            auth: {
+                selectLanguage: 'Wybierz język', register: 'Rejestracja',
+                firstName: 'Imię', lastName: 'Nazwisko', street: 'Ulica + Nr',
+                zip: 'Kod pocztowy', city: 'Miasto', phone: 'Telefon', mobile: 'Komórka', email: 'Email',
+                requestApproval: 'Poproś o zatwierdzenie',
+                waitingTitle: 'Proszę czekać',
+                waitingText: 'Twoja rejestracja jest weryfikowana. Proszę czekać na zatwierdzenie przez kierownictwo.',
+                contact: 'Pytania: Tel. 02681-XXXXXX'
+            },
+            nav: { home: 'Start', photos: 'Zdjęcia', timesheet: 'Godziny', monthly: 'Miesiąc', chat: 'Wiadomości', profile: 'Profil' },
+            modules: {
+                projects: 'Budowy', calendar: 'Kalendarz', photos: 'Zdjęcia',
+                timesheet: 'Karta pracy', monthly: 'Zestawienie miesięczne', private: 'Moja strefa',
+                chat: 'Wiadomości', documents: 'Dokumenty'
+            },
+            dashboard: { title: 'PANEL STEROWANIA' },
+            common: { save: 'Zapisz', cancel: 'Anuluj', close: 'Zamknij', delete: 'Usuń', edit: 'Edytuj', loading: 'Ładowanie...' }
+        }
+    };
+
+    // Übersetzungs-Helper mit Fallback auf Deutsch
+    function t(key, lang) {
+        const keys = key.split('.');
+        let val = TRANSLATIONS[lang || 'de'];
+        for (const k of keys) {
+            val = val && val[k];
+            if (!val) break;
+        }
+        if (!val) {
+            // Fallback: Deutsch
+            val = TRANSLATIONS.de;
+            for (const k of keys) {
+                val = val && val[k];
+                if (!val) break;
+            }
+        }
+        return val || key;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // DEMO-DATEN (wenn Firebase nicht konfiguriert)
+    // ═══════════════════════════════════════════════════════
+    const DEMO_EMPLOYEES = [
+        { id: 'emp-001', firstName: 'Miroslav', lastName: 'Novák', language: 'cs', approved: true, online: true, lastSeen: Date.now(), currentProject: 'Hallenbad Altenkirchen', role: 'worker' },
+        { id: 'emp-002', firstName: 'Carlos', lastName: 'García', language: 'es', approved: true, online: true, lastSeen: Date.now() - 300000, currentProject: 'Hallenbad Altenkirchen', role: 'worker' },
+        { id: 'emp-003', firstName: 'Paweł', lastName: 'Kowalski', language: 'pl', approved: true, online: false, lastSeen: Date.now() - 840000, currentProject: 'Kita Nister', role: 'worker' },
+        { id: 'emp-004', firstName: 'Jean', lastName: 'Schmidt', language: 'de', approved: true, online: true, lastSeen: Date.now() - 120000, currentProject: 'BBS Montabaur', role: 'worker' },
+        { id: 'emp-005', firstName: 'Lukáš', lastName: 'Müller', language: 'sk', approved: true, online: false, lastSeen: 0, currentProject: null, role: 'worker', status: 'vacation', vacationUntil: '2026-04-15' },
+    ];
+
+    const DEMO_PENDING = [
+        { id: 'pend-001', firstName: 'Tomáš', lastName: 'Dvořák', language: 'cs', mobile: '0176-12345678', registeredAt: '02.04.2026', approved: false }
+    ];
+
+    const DEMO_EVENTS = [
+        { time: '09:42', text: 'M. Novák hat Stundenzettel eingereicht', type: 'timesheet' },
+        { time: '09:38', text: 'C. García hat 3 Fotos hochgeladen', type: 'photo' },
+        { time: '08:15', text: 'P. Kowalski hat Urlaub beantragt (22.-26.04.)', type: 'vacation' },
+        { time: '07:12', text: 'M. Novák hat App geöffnet', type: 'login' },
+        { time: '07:05', text: 'C. García hat App geöffnet', type: 'login' },
+    ];
+
+    const DEMO_PROJECTS = [
+        { id: 'proj-001', name: 'Hallenbad Altenkirchen', customer: 'VG Altenkirchen', address: 'Bahnhofstr. 12, 57610 Altenkirchen', status: 'active', color: '#4CAF50' },
+        { id: 'proj-002', name: 'BBS Montabaur', customer: 'Kreis Westerwaldkreis', address: 'Schulstr. 1, 56410 Montabaur', status: 'active', color: '#2196F3' },
+        { id: 'proj-003', name: 'Kita Nister', customer: 'VG Hachenburg', address: 'Hauptstr. 5, 56472 Nister', status: 'active', color: '#FF9800' },
+    ];
+
+    const DEMO_FOLDERS = [
+        { name: '02_LV_Angebot', icon: '📋', access: 'Lesen' },
+        { name: '05_Fotos', icon: '📸', access: 'Lesen + Schreiben' },
+        { name: '06_Stundenzettel', icon: '📝', access: 'Lesen + Schreiben' },
+        { name: '07_Schriftverkehr', icon: '✉️', access: 'Lesen' },
+        { name: '08_Pläne', icon: '📐', access: 'Lesen' },
+        { name: '09_Protokolle', icon: '📄', access: 'Lesen + Schreiben' },
+    ];
+
+    const DEMO_PHOTOS = [
+        { id: 'p1', room: '1.04 Bad', time: '09:38', emoji: '🪞' },
+        { id: 'p2', room: '1.04 Bad', time: '09:37', emoji: '🚿' },
+        { id: 'p3', room: '1.05 WC', time: '09:35', emoji: '🚽' },
+        { id: 'p4', room: 'EG Flur', time: '08:50', emoji: '🏗️' },
+        { id: 'p5', room: 'EG Flur', time: '08:48', emoji: '🧱' },
+        { id: 'p6', room: null, time: '08:30', emoji: '📦' },
+    ];
+
+    const DEMO_MONTHLY = {
+        year: 2026, month: 4,
+        days: {
+            1: { start: '07:00', end: '16:30', breakMin: 30, hours: 9, desc: 'Wandfliesen Bad 1.OG', project: 'Hallenbad AK', status: 'done' },
+            2: { start: '07:00', end: '16:30', breakMin: 30, hours: 9, desc: 'Abdichtung Dusche EG', project: 'Hallenbad AK', status: 'done' },
+            3: { start: '07:00', end: '16:00', breakMin: 30, hours: 8.5, desc: 'Bodenfliesen Bad EG', project: 'Hallenbad AK', status: 'done' },
+            4: { start: '07:30', end: '16:30', breakMin: 30, hours: 8.5, desc: 'Fliesen Gruppenraum', project: 'Kita Nister', status: 'done' },
+            7: { start: '07:00', end: '16:30', breakMin: 30, hours: 9, desc: 'Fugenarbeiten Bad', project: 'Hallenbad AK', status: 'done' },
+            8: { start: '07:00', end: '16:30', breakMin: 30, hours: 9, desc: 'Wandfliesen Umkleide', project: 'Hallenbad AK', status: 'done' },
+            9: { start: '07:00', end: '15:30', breakMin: 30, hours: 8, desc: 'Sockelleisten Flur', project: 'Hallenbad AK', status: 'done' },
+        },
+        vacation: [22, 23, 24, 25],
+    };
+
+    const DEMO_CHAT = [
+        { id: 1, text: 'Guten Morgen! Bitte heute Detailpunkte im Bad EG beachten.', sender: 'admin', time: '07:15' },
+        { id: 2, text: 'Dobré ráno! Rozumím, podívám se na to.', sender: 'worker', time: '07:18', translation: 'Guten Morgen! Verstehe, ich schaue mir das an.' },
+        { id: 3, text: 'Dichtband ist im Lager nachbestellt. Kommt morgen.', sender: 'admin', time: '09:30' },
+        { id: 4, text: 'Děkuji za informaci.', sender: 'worker', time: '09:32', translation: 'Danke für die Info.' },
+    ];
+
+    const DEMO_MATERIALS = [
+        { cat: 'Kleber', items: [
+            { id: 'K01', name: 'Flexkleber C2TE', unit: 'kg' },
+            { id: 'K02', name: 'Fließbettmörtel C2F', unit: 'kg' },
+            { id: 'K03', name: 'Schnellkleber', unit: 'kg' },
+        ]},
+        { cat: 'Fugenmörtel', items: [
+            { id: 'F01', name: 'Zementfuge CG2', unit: 'kg' },
+            { id: 'F02', name: 'Flexfuge CG2WA', unit: 'kg' },
+        ]},
+        { cat: 'Abdichtung', items: [
+            { id: 'A01', name: 'Flüssigfolie', unit: 'kg' },
+            { id: 'A02', name: 'Dichtband 120mm', unit: 'lfm' },
+            { id: 'A03', name: 'Dichtmanschette DN50', unit: 'Stück' },
+            { id: 'A04', name: 'Dichtmanschette DN100', unit: 'Stück' },
+            { id: 'A05', name: 'Verbundabdichtung (Bahn)', unit: 'm²' },
+            { id: 'A06', name: 'Innenecken', unit: 'Stück' },
+            { id: 'A07', name: 'Außenecken', unit: 'Stück' },
+        ]},
+        { cat: 'Grundierung', items: [
+            { id: 'G01', name: 'Tiefengrund', unit: 'Liter' },
+            { id: 'G02', name: 'Haftgrund', unit: 'Liter' },
+        ]},
+        { cat: 'Entkopplung', items: [
+            { id: 'E01', name: 'Entkopplungsmatte', unit: 'm²' },
+            { id: 'E02', name: 'Entkopplungsbahn', unit: 'lfm' },
+        ]},
+        { cat: 'Profile/Zubehör', items: [
+            { id: 'P01', name: 'Abschlussprofil Alu', unit: 'lfm' },
+            { id: 'P02', name: 'Eckschutzprofil', unit: 'lfm' },
+            { id: 'P03', name: 'Dehnungsprofil', unit: 'lfm' },
+            { id: 'P04', name: 'Silikon', unit: 'Kartusche' },
+            { id: 'P05', name: 'Fliesenkreuze', unit: 'Beutel' },
+        ]},
+        { cat: 'Fliesen/Platten', items: [
+            { id: 'T01', name: 'Bodenfliesen', unit: 'm²' },
+            { id: 'T02', name: 'Wandfliesen', unit: 'm²' },
+            { id: 'T03', name: 'Mosaikfliesen', unit: 'm²' },
+            { id: 'T04', name: 'Großformat >60cm', unit: 'm²' },
+            { id: 'T05', name: 'Sockelleisten', unit: 'lfm' },
+        ]},
+        { cat: 'Sonstiges', items: [
+            { id: 'S01', name: 'Estrich-Ausgleich', unit: 'kg' },
+            { id: 'S02', name: 'Schnellestrich', unit: 'kg' },
+        ]},
+    ];
+
+    // ═══════════════════════════════════════════════════════
+    // FIREBASE ECHTZEIT-SERVICE LAYER
+    // ═══════════════════════════════════════════════════════
+    // Hub-and-Spoke Architektur:
+    // - ALLE Daten fließen NUR über Firebase (zentraler Hub)
+    // - Dashboard (Admin) kann ALLE Daten lesen/schreiben
+    // - Mitarbeiter-Apps können NUR EIGENE Daten lesen/schreiben
+    // - KEINE direkte Verbindung zwischen Apps möglich
+    //
+    // Firebase Security Rules (in Firebase Console eintragen):
+    // {
+    //   "rules": {
+    //     "users": {
+    //       "$uid": {
+    //         ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+    //         ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    //       }
+    //     },
+    //     "monthlyRecords": {
+    //       "$uid": {
+    //         ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+    //         ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    //       }
+    //     },
+    //     "private": {
+    //       "$uid": {
+    //         ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
+    //         ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    //       }
+    //     },
+    //     "projects": {
+    //       ".read": "root.child('users').child(auth.uid).child('approved').val() === true",
+    //       "$projectId": {
+    //         "documents": { ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'" },
+    //         "templates": { ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'" },
+    //         ".write": "root.child('users').child(auth.uid).child('approved').val() === true"
+    //       }
+    //     },
+    //     "dashboard": {
+    //       ".read": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
+    //       "activeApps": {
+    //         "$uid": { ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'" }
+    //       }
+    //     }
+    //   }
+    // }
+    
+    const FirebaseService = {
+        // ── Benutzer registrieren ──
+        async registerUser(email, password, profileData) {
+            if (!firebaseAuth) return { success: false, error: 'Firebase nicht konfiguriert' };
+            try {
+                const cred = await firebaseAuth.createUserWithEmailAndPassword(email, password);
+                await firebaseDB.ref('users/' + cred.user.uid + '/profile').set(profileData);
+                await firebaseDB.ref('users/' + cred.user.uid + '/approved').set(false);
+                await firebaseDB.ref('users/' + cred.user.uid + '/role').set('worker');
+                return { success: true, uid: cred.user.uid };
+            } catch(e) { return { success: false, error: e.message }; }
+        },
+
+        // ── Echtzeit-Listener: Mitarbeiter-Status ──
+        onEmployeesChanged(callback) {
+            if (!firebaseDB) return () => {};
+            const ref = firebaseDB.ref('users');
+            ref.on('value', snap => callback(snap.val() || {}));
+            return () => ref.off('value');
+        },
+
+        // ── Echtzeit-Listener: Freigabe-Status (für Wartebildschirm) ──
+        onApprovalChanged(uid, callback) {
+            if (!firebaseDB) return () => {};
+            const ref = firebaseDB.ref('users/' + uid + '/approved');
+            ref.on('value', snap => callback(snap.val()));
+            return () => ref.off('value');
+        },
+
+        // ── Monatsabrechnung speichern ──
+        async saveDayEntry(uid, year, month, day, data) {
+            if (!firebaseDB) { console.log('DEMO: saveDayEntry', { uid, year, month, day, data }); return; }
+            await firebaseDB.ref(`monthlyRecords/${uid}/${year}/${String(month).padStart(2,'0')}/${String(day).padStart(2,'0')}`).set(data);
+        },
+
+        // ── Stundenzettel speichern ──
+        async saveTimesheet(projectId, data) {
+            if (!firebaseDB) { console.log('DEMO: saveTimesheet', { projectId, data }); return; }
+            const ref = firebaseDB.ref(`projects/${projectId}/timesheets`).push();
+            await ref.set({ ...data, createdAt: firebase.database.ServerValue.TIMESTAMP });
+        },
+
+        // ── Dokument-Upload ──
+        async uploadDocument(projectId, file, metadata) {
+            if (!firebaseStorage) { console.log('DEMO: uploadDocument', { projectId, file: file.name, metadata }); return; }
+            const path = `projects/${projectId}/documents/${Date.now()}_${file.name}`;
+            const ref = firebaseStorage.ref(path);
+            await ref.put(file);
+            const url = await ref.getDownloadURL();
+            await firebaseDB.ref(`projects/${projectId}/documents`).push().set({ ...metadata, url, uploadedAt: firebase.database.ServerValue.TIMESTAMP });
+            return url;
+        },
+
+        // ── Online-Status tracken (Mitarbeiter) ──
+        trackPresence(uid) {
+            if (!firebaseDB) return;
+            const connRef = firebaseDB.ref('.info/connected');
+            const statusRef = firebaseDB.ref(`dashboard/activeApps/${uid}`);
+            connRef.on('value', snap => {
+                if (snap.val() === true) {
+                    statusRef.set({ online: true, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+                    statusRef.onDisconnect().update({ online: false, lastSeen: firebase.database.ServerValue.TIMESTAMP });
+                }
+            });
+        },
+
+        // ── Mitarbeiter freischalten ──
+        async approveUser(uid) {
+            if (!firebaseDB) { console.log('DEMO: approveUser', uid); return; }
+            await firebaseDB.ref('users/' + uid + '/approved').set(true);
+        },
+
+        // ── Mitarbeiter sperren ──
+        async rejectUser(uid) {
+            if (!firebaseDB) { console.log('DEMO: rejectUser', uid); return; }
+            await firebaseDB.ref('users/' + uid + '/approved').set(false);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // SPRACHEINGABE — Web Speech API Wrapper
+    // ═══════════════════════════════════════════════════════
+    const VoiceService = {
+        recognition: null,
+        isSupported: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+        
+        start(langCode, onResult, onEnd) {
+            if (!this.isSupported) { alert('Spracheingabe nicht unterstützt'); return; }
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.recognition = new SpeechRec();
+            const langMap = { de: 'de-DE', cs: 'cs-CZ', sk: 'sk-SK', en: 'en-GB', es: 'es-ES', fr: 'fr-FR', pl: 'pl-PL' };
+            this.recognition.lang = langMap[langCode] || 'de-DE';
+            this.recognition.continuous = true;
+            this.recognition.interimResults = true;
+            this.recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                onResult(transcript);
+            };
+            this.recognition.onend = () => { if (onEnd) onEnd(); };
+            this.recognition.onerror = (e) => { console.error('Voice error:', e.error); if (onEnd) onEnd(); };
+            this.recognition.start();
+        },
+
+        stop() {
+            if (this.recognition) { this.recognition.stop(); this.recognition = null; }
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════
+    // REACT HOOKS & STATE MANAGEMENT
+    // ═══════════════════════════════════════════════════════
+    const { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } = React;
+
+    // App-weiter State Context
+    const AppContext = createContext(null);
+
+    function useApp() {
+        return useContext(AppContext);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: SPRACHAUSWAHL
+    // ═══════════════════════════════════════════════════════
+    function LanguageSelect({ onSelect }) {
+        return (
+            <div className="language-screen fade-in">
+                <div style={{ fontSize: 60, marginBottom: 16 }}>🏗️</div>
+                <h1 style={{ color: 'var(--color-accent)', fontSize: 24, marginBottom: 8 }}>TW Baustellen-App</h1>
+                <p style={{ color: 'var(--color-text-dim)', fontSize: 14 }}>Thomas Willwacher Fliesenlegermeister e.K.</p>
+                <div className="language-grid">
+                    {LANGUAGES.map(lang => (
+                        <button key={lang.code} className="language-btn" onClick={() => onSelect(lang.code)}>
+                            <span className="language-flag">{lang.flag}</span>
+                            <span className="language-name">{lang.native}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: REGISTRIERUNG
+    // ═══════════════════════════════════════════════════════
+    function Registration({ lang, onSubmit, onBack }) {
+        const [form, setForm] = useState({ firstName: '', lastName: '', street: '', zip: '', city: '', phone: '', mobile: '', email: '' });
+        const update = (k, v) => setForm(p => ({ ...p, [k]: v }));
+        const fields = ['firstName', 'lastName', 'street', 'zip', 'city', 'phone', 'mobile', 'email'];
+        const required = ['firstName', 'lastName', 'street', 'zip', 'city', 'mobile', 'email'];
+        const isValid = required.every(k => form[k].trim());
+
+        return (
+            <div className="register-screen slide-up">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 16 }}>← {t('auth.selectLanguage', lang)}</button>
+                <h2>📋 {t('auth.register', lang)}</h2>
+                {fields.map(k => (
+                    <div className="form-group" key={k}>
+                        <label className="form-label">{t('auth.' + k, lang)} {required.includes(k) ? '*' : ''}</label>
+                        <input className="input-field" type={k === 'email' ? 'email' : 'text'}
+                            value={form[k]} onChange={e => update(k, e.target.value)}
+                            placeholder={t('auth.' + k, lang)} />
+                    </div>
+                ))}
+                <button className="btn btn-primary btn-block btn-lg" disabled={!isValid}
+                    onClick={() => onSubmit(form)}>
+                    {t('auth.requestApproval', lang)}
+                </button>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: WARTE-BILDSCHIRM
+    // ═══════════════════════════════════════════════════════
+    function WaitingApproval({ lang }) {
+        return (
+            <div className="waiting-screen fade-in">
+                <div className="waiting-icon">⏳</div>
+                <h2 style={{ color: 'var(--color-accent)', marginBottom: 16 }}>{t('auth.waitingTitle', lang)}</h2>
+                <p className="waiting-text">{t('auth.waitingText', lang)}</p>
+                <p style={{ color: 'var(--color-text-dim)', marginTop: 24, fontSize: 13 }}>{t('auth.contact', lang)}</p>
+                <div className="spinner" style={{ marginTop: 32 }}></div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: DASHBOARD — MITARBEITER-KARTE
+    // ═══════════════════════════════════════════════════════
+    function EmployeeCard({ employee, onClick }) {
+        const getStatusClass = () => {
+            if (employee.status === 'vacation') return 'vacation';
+            if (employee.status === 'sick') return 'sick';
+            if (employee.online) return 'online';
+            const minAgo = (Date.now() - employee.lastSeen) / 60000;
+            if (minAgo < 5) return 'online';
+            if (minAgo < 15) return 'away';
+            return 'offline';
+        };
+
+        const getStatusText = () => {
+            if (employee.status === 'vacation') return `URLAUB bis ${employee.vacationUntil}`;
+            if (employee.status === 'sick') return 'KRANK';
+            if (employee.online) {
+                const since = new Date(employee.lastSeen);
+                return `Seit ${String(since.getHours()).padStart(2,'0')}:${String(since.getMinutes()).padStart(2,'0')}`;
+            }
+            const minAgo = Math.round((Date.now() - employee.lastSeen) / 60000);
+            return `Offline ${minAgo}m`;
+        };
+
+        const lang = LANGUAGES.find(l => l.code === employee.language);
+
+        return (
+            <div className="employee-card" onClick={() => onClick(employee)}>
+                <div className="employee-card-header">
+                    <span className={`status-dot ${getStatusClass()}`}></span>
+                    <div>
+                        <div className="employee-card-name">
+                            {lang?.flag} {employee.firstName} {employee.lastName}
+                        </div>
+                        <div className="employee-card-project">
+                            {employee.currentProject || '—'}
+                        </div>
+                        <div className="employee-card-time">{getStatusText()}</div>
+                    </div>
+                </div>
+                <button className="btn btn-primary btn-sm btn-block">
+                    📱 Öffnen
+                </button>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: DASHBOARD — FREIGABE-KARTE
+    // ═══════════════════════════════════════════════════════
+    function ApprovalCard({ person, onApprove, onReject }) {
+        const lang = LANGUAGES.find(l => l.code === person.language);
+        return (
+            <div className="approval-card fade-in">
+                <div className="approval-info">
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                        🔵 {person.firstName} {person.lastName}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>
+                        Registriert: {person.registeredAt} | Sprache: {lang?.native} {lang?.flag} | Mobil: {person.mobile}
+                    </div>
+                </div>
+                <div className="approval-actions">
+                    <button className="btn btn-success btn-sm" onClick={() => onApprove(person)}>✅ Freigeben</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => onReject(person)}>❌ Ablehnen</button>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: DASHBOARD — SPIEGELANSICHT (Mirror View)
+    // ═══════════════════════════════════════════════════════
+    function MirrorView({ employee, onBack }) {
+        const [showUploadModal, setShowUploadModal] = useState(false);
+        const lang = LANGUAGES.find(l => l.code === employee.language);
+
+        return (
+            <div className="fade-in">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+                    <button className="btn btn-secondary btn-sm" onClick={onBack}>← Zurück</button>
+                    <h2 style={{ flex: 1 }}>
+                        {lang?.flag} {employee.firstName} {employee.lastName}
+                        <span style={{ fontSize: 14, color: 'var(--color-text-dim)', marginLeft: 8 }}>({lang?.native})</span>
+                    </h2>
+                </div>
+
+                <div className="mirror-container">
+                    {/* ── Admin Toolbar + Activity Log ── */}
+                    <div className="mirror-sidebar">
+                        <div className="admin-toolbar">
+                            <div className="section-title" style={{ width: '100%', marginBottom: 8 }}>
+                                <span className="section-title-icon">🛠️</span> Admin-Werkzeuge
+                            </div>
+                            <button className="btn btn-primary btn-sm" onClick={() => setShowUploadModal(true)}>📄 Dokument hochladen</button>
+                            <button className="btn btn-secondary btn-sm">📋 Stundenzettel-Vorlage</button>
+                            <button className="btn btn-secondary btn-sm">💬 Nachricht senden</button>
+                            <button className="btn btn-secondary btn-sm">📎 Datei anhängen</button>
+                            <button className="btn btn-secondary btn-sm">🔧 App-Einstellungen</button>
+                        </div>
+                        <div className="activity-log">
+                            <div className="section-title">
+                                <span className="section-title-icon">📋</span> Aktivitäts-Log
+                            </div>
+                            {DEMO_EVENTS.filter(e => e.text.includes(employee.firstName.charAt(0) + '.') || e.text.includes(employee.lastName)).length > 0 ?
+                                DEMO_EVENTS.filter(e => e.text.includes(employee.firstName.charAt(0) + '.')).map((ev, i) => (
+                                    <div className="activity-log-item" key={i}>
+                                        <span className="activity-log-time">{ev.time}</span>
+                                        {ev.text}
+                                    </div>
+                                )) :
+                                <div style={{ color: 'var(--color-text-dim)', fontSize: 13, padding: 16 }}>
+                                    Keine Aktivitäten für heute
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    {/* ── Handy-Spiegel ── */}
+                    <div className="mirror-phone">
+                        <MobileApp
+                            userId={employee.id}
+                            language={employee.language}
+                            isAdminMirror={true}
+                            employeeName={`${employee.firstName} ${employee.lastName}`}
+                        />
+                    </div>
+                </div>
+
+                {/* ── Upload Modal ── */}
+                {showUploadModal && (
+                    <UploadModal
+                        employee={employee}
+                        onClose={() => setShowUploadModal(false)}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: UPLOAD MODAL
+    // ═══════════════════════════════════════════════════════
+    function UploadModal({ employee, onClose }) {
+        const [category, setCategory] = useState('zeichnung');
+        const [project, setProject] = useState(DEMO_PROJECTS[0]?.id || '');
+        const [note, setNote] = useState('');
+        const [file, setFile] = useState(null);
+
+        const categories = [
+            { value: 'zeichnung', label: 'Zeichnung / Plan' },
+            { value: 'anweisung', label: 'Arbeitsanweisung' },
+            { value: 'aufmass', label: 'Aufmaß-Unterlage' },
+            { value: 'sicherheit', label: 'Sicherheitsunterweisung' },
+            { value: 'sonstiges', label: 'Sonstiges' },
+        ];
+
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <h3>📄 Dokument hochladen für: {employee.firstName} {employee.lastName}</h3>
+                        <button className="modal-close" onClick={onClose}>✕</button>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Baustelle</label>
+                        <select className="input-field" value={project} onChange={e => setProject(e.target.value)}>
+                            {DEMO_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Kategorie</label>
+                        {categories.map(c => (
+                            <label key={c.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', cursor: 'pointer' }}>
+                                <input type="radio" name="category" value={c.value}
+                                    checked={category === c.value} onChange={() => setCategory(c.value)} />
+                                {c.label}
+                            </label>
+                        ))}
+                    </div>
+                    <div className="form-group">
+                        <div className="drop-zone" onClick={() => document.getElementById('file-input')?.click()}>
+                            <div className="drop-zone-icon">📂</div>
+                            <div className="drop-zone-text">
+                                {file ? file.name : 'Datei hierher ziehen oder klicken'}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginTop: 4 }}>
+                                PDF, DWG, JPG, PNG, DOCX, XLSX
+                            </div>
+                        </div>
+                        <input id="file-input" type="file" style={{ display: 'none' }}
+                            accept=".pdf,.dwg,.jpg,.jpeg,.png,.docx,.xlsx"
+                            onChange={e => setFile(e.target.files[0])} />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Anmerkung (optional)</label>
+                        <textarea className="input-field" rows={3} value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="z.B. Bitte Detailpunkte beachten!" />
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                        <button className="btn btn-secondary" onClick={onClose}>❌ Abbrechen</button>
+                        <button className="btn btn-primary" disabled={!file}>📤 Hochladen & Senden</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: EINSTELLUNGEN (Firebase Setup + App Config)
+    // ═══════════════════════════════════════════════════════
+    function SettingsModal({ onClose }) {
+        const saved = localStorage.getItem('tw-bau-firebase');
+        const initial = saved ? JSON.parse(saved) : { apiKey: '', authDomain: 'einkaufsliste-98199.firebaseapp.com', databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app', projectId: 'einkaufsliste-98199', storageBucket: 'einkaufsliste-98199.appspot.com', messagingSenderId: '', appId: '' };
+        const [config, setConfig] = useState(initial);
+        const upd = (k, v) => setConfig(p => ({ ...p, [k]: v }));
+
+        const handleSave = () => {
+            localStorage.setItem('tw-bau-firebase', JSON.stringify(config));
+            alert('✅ Firebase-Konfiguration gespeichert! App wird neu geladen...');
+            window.location.reload();
+        };
+
+        const handleReset = () => {
+            if (confirm('Alle App-Daten löschen und zurücksetzen?')) {
+                localStorage.clear();
+                window.location.reload();
+            }
+        };
+
+        const fields = [
+            { key: 'apiKey', label: 'API Key *', placeholder: 'AIzaSy...' },
+            { key: 'authDomain', label: 'Auth Domain', placeholder: 'projekt-id.firebaseapp.com' },
+            { key: 'databaseURL', label: 'Database URL', placeholder: 'https://projekt-id-default-rtdb...' },
+            { key: 'projectId', label: 'Project ID', placeholder: 'einkaufsliste-98199' },
+            { key: 'storageBucket', label: 'Storage Bucket', placeholder: 'projekt-id.appspot.com' },
+            { key: 'appId', label: 'App ID', placeholder: '1:000:web:xxx' },
+        ];
+
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 550 }}>
+                    <div className="modal-header">
+                        <h3>⚙️ Einstellungen</h3>
+                        <button className="modal-close" onClick={onClose}>✕</button>
+                    </div>
+                    
+                    {/* Firebase Status */}
+                    <div className="card" style={{ marginBottom: 16, padding: 12, borderLeft: isFirebaseConfigured() ? '4px solid var(--color-success)' : '4px solid var(--color-warning)' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                            {isFirebaseConfigured() ? '✅ Firebase verbunden' : '⚠️ Firebase nicht konfiguriert (Demo-Modus)'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-dim)' }}>
+                            {isFirebaseConfigured() ? `Projekt: ${FIREBASE_CONFIG.projectId}` : 'Bitte Firebase-Credentials eintragen für Echtzeit-Sync'}
+                        </div>
+                    </div>
+
+                    {/* Firebase Config */}
+                    <div style={{ marginBottom: 16 }}>
+                        <div className="section-title" style={{ fontSize: 14 }}>
+                            <span className="section-title-icon">🔥</span> Firebase-Konfiguration
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--color-text-dim)', marginBottom: 12 }}>
+                            Firebase Console: <a href="https://console.firebase.google.com" target="_blank" style={{ color: 'var(--color-accent)' }}>console.firebase.google.com</a>
+                            → Projekt "einkaufsliste-98199" → Projekteinstellungen → Allgemein → Firebase SDK
+                        </div>
+                        {fields.map(f => (
+                            <div className="form-group" key={f.key} style={{ marginBottom: 8 }}>
+                                <label className="form-label" style={{ fontSize: 11 }}>{f.label}</label>
+                                <input className="input-field" style={{ fontSize: 13, padding: '8px 12px' }}
+                                    value={config[f.key]} onChange={e => upd(f.key, e.target.value)}
+                                    placeholder={f.placeholder} />
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Hub-and-Spoke Info */}
+                    <div className="card" style={{ marginBottom: 16, padding: 12, fontSize: 12 }}>
+                        <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--color-accent)' }}>🔒 Sicherheits-Architektur</div>
+                        <div style={{ color: 'var(--color-text-dim)', lineHeight: 1.6 }}>
+                            <b>Hub-and-Spoke:</b> Alle Daten fließen NUR über Firebase (Hub). Apps können NICHT direkt miteinander kommunizieren.<br/>
+                            <b>Datenisolierung:</b> Jeder Mitarbeiter sieht NUR seine eigenen Daten. Admin sieht alles.<br/>
+                            <b>Security Rules:</b> In Firebase Console → Realtime Database → Regeln eintragen (siehe README.md)
+                        </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-danger btn-sm" onClick={handleReset}>🗑️ Reset</button>
+                        <button className="btn btn-secondary" onClick={onClose} style={{ marginLeft: 'auto' }}>Abbrechen</button>
+                        <button className="btn btn-primary" onClick={handleSave}>💾 Speichern & Neuladen</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: DASHBOARD — HAUPTANSICHT (Schaltzentrale)
+    // ═══════════════════════════════════════════════════════
+    function Dashboard() {
+        const [selectedEmployee, setSelectedEmployee] = useState(null);
+        const [showSettings, setShowSettings] = useState(false);
+        const [employees] = useState(DEMO_EMPLOYEES);
+        const [pending] = useState(DEMO_PENDING);
+        const [events] = useState(DEMO_EVENTS);
+        const [notifCount] = useState(3);
+
+        if (selectedEmployee) {
+            return <MirrorView employee={selectedEmployee} onBack={() => setSelectedEmployee(null)} />;
+        }
+
+        return (
+            <div className="dashboard-container">
+                {/* ── Header ── */}
+                <div className="dashboard-header">
+                    <h1>🏗️ TW BAUSTELLEN-APP DASHBOARD</h1>
+                    <div className="dashboard-header-actions">
+                        {!isFirebaseConfigured() && (
+                            <span style={{ fontSize: 12, color: 'var(--color-warning)', cursor: 'pointer' }} onClick={() => setShowSettings(true)}>
+                                ⚠️ Demo-Modus
+                            </span>
+                        )}
+                        <div className="notification-bell">
+                            🔔
+                            {notifCount > 0 && <span className="badge">{notifCount}</span>}
+                        </div>
+                        <button className="btn btn-secondary btn-sm" onClick={() => setShowSettings(true)}>⚙️</button>
+                    </div>
+                </div>
+
+                <div className="dashboard-body">
+                    {/* ── Aktive Mitarbeiter ── */}
+                    <div className="section-title">
+                        <span className="section-title-icon">📱</span>
+                        AKTIVE MITARBEITER-APPS
+                    </div>
+                    <div className="employee-grid">
+                        {employees.map(emp => (
+                            <EmployeeCard key={emp.id} employee={emp} onClick={setSelectedEmployee} />
+                        ))}
+                    </div>
+
+                    {/* ── Wartende Freigaben ── */}
+                    {pending.length > 0 && (
+                        <div className="approval-section">
+                            <div className="section-title">
+                                <span className="section-title-icon">⏳</span>
+                                WARTENDE FREIGABEN: {pending.length}
+                            </div>
+                            {pending.map(p => (
+                                <ApprovalCard key={p.id} person={p}
+                                    onApprove={(p) => alert(`✅ ${p.firstName} ${p.lastName} freigeschaltet!`)}
+                                    onReject={(p) => alert(`❌ ${p.firstName} ${p.lastName} abgelehnt.`)}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* ── Letzte Eingänge ── */}
+                    <div className="events-section">
+                        <div className="section-title">
+                            <span className="section-title-icon">📨</span>
+                            LETZTE EINGÄNGE
+                        </div>
+                        {events.map((ev, i) => (
+                            <div className="event-item" key={i}>
+                                <span className="event-time">{ev.time}</span>
+                                <span>
+                                    {ev.type === 'timesheet' && '📝'}
+                                    {ev.type === 'photo' && '📸'}
+                                    {ev.type === 'vacation' && '🏖️'}
+                                    {ev.type === 'login' && '📱'}
+                                </span>
+                                <span>{ev.text}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: BAUSTELLENORDNER
+    // ═══════════════════════════════════════════════════════
+    function ModuleProjects({ lang, onBack }) {
+        const [selectedProject, setSelectedProject] = useState(null);
+        if (selectedProject) {
+            return (
+                <div className="fade-in">
+                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedProject(null)} style={{ marginBottom: 12 }}>← {t('modules.projects', lang)}</button>
+                    <h3 style={{ color: 'var(--color-accent)', marginBottom: 16 }}>{selectedProject.name}</h3>
+                    <p style={{ fontSize: 12, color: 'var(--color-text-dim)', marginBottom: 16 }}>{selectedProject.customer} — {selectedProject.address}</p>
+                    <div className="folder-list">
+                        {DEMO_FOLDERS.map((f, i) => (
+                            <div className="folder-item" key={i}>
+                                <span className="folder-icon">{f.icon}</span>
+                                <div>
+                                    <div className="folder-name">{f.name}</div>
+                                    <div className="folder-access">{f.access}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">📁</span> {t('modules.projects', lang)}</div>
+                <div className="project-list">
+                    {DEMO_PROJECTS.map(p => (
+                        <div className="project-card" key={p.id} style={{ borderLeftColor: p.color }} onClick={() => setSelectedProject(p)}>
+                            <h4>{p.name}</h4>
+                            <p>{p.customer}</p>
+                            <p>{p.address}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: FOTOS (mit Raum-Zuordnung + Kamera)
+    // ═══════════════════════════════════════════════════════
+    function ModulePhotos({ lang, onBack }) {
+        const [showRoomPopup, setShowRoomPopup] = useState(false);
+        const [photos, setPhotos] = useState(DEMO_PHOTOS);
+        const [filter, setFilter] = useState('all');
+
+        const takePhoto = () => setShowRoomPopup(true);
+
+        const savePhoto = (roomNr, roomName) => {
+            const room = roomNr && roomName ? `${roomNr} ${roomName}` : roomNr || roomName || null;
+            const now = new Date();
+            setPhotos(prev => [{ id: 'p' + Date.now(), room, time: `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`, emoji: '📷' }, ...prev]);
+        };
+
+        const rooms = [...new Set(photos.map(p => p.room).filter(Boolean))];
+        const filtered = filter === 'all' ? photos : photos.filter(p => p.room === filter);
+
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">📸</span> {t('modules.photos', lang)} ({photos.length})</div>
+                <div className="photo-actions">
+                    <button className="btn btn-primary btn-sm" onClick={takePhoto}>📷 Foto aufnehmen</button>
+                    <button className="btn btn-secondary btn-sm" onClick={takePhoto}>🖼️ Aus Galerie</button>
+                </div>
+                {rooms.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                        <button className={`btn btn-sm ${filter === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter('all')}>Alle</button>
+                        {rooms.map(r => (
+                            <button key={r} className={`btn btn-sm ${filter === r ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter(r)}>{r}</button>
+                        ))}
+                    </div>
+                )}
+                <div className="photo-grid">
+                    {filtered.map(p => (
+                        <div className="photo-card" key={p.id}>
+                            <span>{p.emoji}</span>
+                            <div className="photo-card-meta">
+                                <div>{p.room || 'Ohne Raum'}</div>
+                                <div>{p.time}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                {showRoomPopup && <RoomAssignPopup onClose={() => setShowRoomPopup(false)} onSave={savePhoto} />}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: MATERIAL-POPUP (Fliesenleger-Katalog)
+    // ═══════════════════════════════════════════════════════
+    function MaterialPopup({ onClose, onSelect, selected }) {
+        const [search, setSearch] = useState('');
+        const [openCat, setOpenCat] = useState(null);
+        const [items, setItems] = useState(selected || []);
+
+        const filtered = search ? DEMO_MATERIALS.map(cat => ({
+            ...cat,
+            items: cat.items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+        })).filter(cat => cat.items.length > 0) : DEMO_MATERIALS;
+
+        const toggleItem = (item) => {
+            setItems(prev => {
+                const exists = prev.find(i => i.id === item.id);
+                if (exists) return prev.filter(i => i.id !== item.id);
+                return [...prev, { ...item, amount: '' }];
+            });
+        };
+
+        const setAmount = (id, amount) => {
+            setItems(prev => prev.map(i => i.id === id ? { ...i, amount } : i));
+        };
+
+        const isSelected = (id) => items.some(i => i.id === id);
+
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh' }}>
+                    <div className="modal-header">
+                        <h3>📦 Material auswählen</h3>
+                        <button className="modal-close" onClick={onClose}>✕</button>
+                    </div>
+                    <div className="form-group">
+                        <input className="input-field" placeholder="🔍 Suchen..." value={search} onChange={e => setSearch(e.target.value)} />
+                    </div>
+                    <div style={{ maxHeight: '50vh', overflowY: 'auto' }}>
+                        {filtered.map((cat, ci) => (
+                            <div key={ci} style={{ marginBottom: 8 }}>
+                                <div onClick={() => setOpenCat(openCat === ci ? null : ci)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', background: 'var(--color-bg-card)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontWeight: 700, fontSize: 14 }}>
+                                    <span>{openCat === ci || search ? '▾' : '▸'}</span>
+                                    <span>{cat.cat}</span>
+                                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--color-text-dim)' }}>{cat.items.length}</span>
+                                </div>
+                                {(openCat === ci || search) && (
+                                    <div style={{ padding: '4px 0 4px 12px' }}>
+                                        {cat.items.map(item => (
+                                            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--color-bg)', fontSize: 13 }}>
+                                                <button onClick={() => toggleItem(item)} style={{
+                                                    width: 28, height: 28, borderRadius: 6,
+                                                    border: isSelected(item.id) ? '2px solid var(--color-success)' : '2px solid var(--color-primary-light)',
+                                                    background: isSelected(item.id) ? 'rgba(76,175,80,0.2)' : 'transparent',
+                                                    color: isSelected(item.id) ? 'var(--color-success)' : 'var(--color-text-dim)',
+                                                    cursor: 'pointer', fontWeight: 700, fontSize: 14,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                                }}>
+                                                    {isSelected(item.id) ? '✓' : '+'}
+                                                </button>
+                                                <span style={{ flex: 1 }}>{item.name}</span>
+                                                {isSelected(item.id) && (
+                                                    <input type="text" placeholder="Menge"
+                                                        value={items.find(i => i.id === item.id)?.amount || ''}
+                                                        onChange={e => setAmount(item.id, e.target.value)}
+                                                        style={{ width: 60, padding: '4px 8px', background: 'var(--color-bg-input)', border: '1px solid var(--color-primary-light)', borderRadius: 4, color: 'var(--color-text)', fontSize: 12, textAlign: 'right' }}
+                                                    />
+                                                )}
+                                                <span style={{ fontSize: 11, color: 'var(--color-text-dim)', minWidth: 40 }}>{item.unit}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--color-primary-light)' }}>
+                        <span style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>Ausgewählt: {items.length} Positionen</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => { onSelect(items); onClose(); }}>
+                            ✅ Übernehmen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: FOTO RAUM-ZUORDNUNG POPUP
+    // ═══════════════════════════════════════════════════════
+    function RoomAssignPopup({ onClose, onSave }) {
+        const [roomNr, setRoomNr] = useState('');
+        const [roomName, setRoomName] = useState('');
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+                    <div className="modal-header">
+                        <h3>📸 Raum zuordnen</h3>
+                        <button className="modal-close" onClick={onClose}>✕</button>
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 60, margin: '16px 0' }}>📷</div>
+                    <div className="form-group">
+                        <label className="form-label">Raumnummer (z.B. 1.04)</label>
+                        <input className="input-field" value={roomNr} onChange={e => setRoomNr(e.target.value)} placeholder="1.04" />
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Raumbezeichnung (z.B. Bad)</label>
+                        <input className="input-field" value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="Bad" />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <button className="btn btn-primary btn-block" onClick={() => { onSave(roomNr, roomName); onClose(); }}>💾 Speichern</button>
+                        <button className="btn btn-secondary btn-block" onClick={() => { onSave('', ''); onClose(); }}>📸 Ohne Zuordnung speichern</button>
+                        <button className="btn btn-danger btn-block btn-sm" onClick={onClose}>🗑️ Verwerfen</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: STUNDENZETTEL (mit Material-Popup + Spracheingabe)
+    // ═══════════════════════════════════════════════════════
+    function ModuleTimesheet({ lang, onBack, employeeName }) {
+        const [isRecording, setIsRecording] = useState(false);
+        const [showMaterialPopup, setShowMaterialPopup] = useState(false);
+        const [materials, setMaterials] = useState([
+            { id: 'A01', name: 'Flüssigfolie', amount: '5,0', unit: 'kg' },
+            { id: 'A02', name: 'Dichtband 120mm', amount: '12,0', unit: 'lfm' },
+            { id: 'A03', name: 'Dichtmanschette DN50', amount: '1', unit: 'Stück' },
+        ]);
+        const [description, setDescription] = useState('Abdichtungsarbeiten im Duschbereich EG, Raum 1.04. Flüssigfolie 2-lagig aufgetragen, Dichtband an Wandanschlüsse und Bodeneinlauf eingebaut.');
+        const [timeFrom, setTimeFrom] = useState('07:00');
+        const [timeTo, setTimeTo] = useState('16:30');
+        const [breakMin, setBreakMin] = useState(30);
+        const today = new Date();
+        const dateStr = `${String(today.getDate()).padStart(2,'0')}.${String(today.getMonth()+1).padStart(2,'0')}.${today.getFullYear()}`;
+        
+        // Stunden berechnen
+        const calcHours = () => {
+            const [fH, fM] = timeFrom.split(':').map(Number);
+            const [tH, tM] = timeTo.split(':').map(Number);
+            const total = (tH * 60 + tM - fH * 60 - fM - breakMin) / 60;
+            return Math.max(0, total).toFixed(1);
+        };
+
+        const toggleVoice = () => {
+            if (isRecording) {
+                VoiceService.stop();
+                setIsRecording(false);
+            } else {
+                setIsRecording(true);
+                VoiceService.start(lang, (text) => setDescription(text), () => setIsRecording(false));
+            }
+        };
+
+        const handleSave = () => {
+            const data = { date: dateStr, timeFrom, timeTo, breakMinutes: breakMin, totalHours: parseFloat(calcHours()), description, materials, photos: [], status: 'submitted' };
+            FirebaseService.saveTimesheet('proj-001', data);
+            alert('✅ Stundenzettel gespeichert!');
+        };
+
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="timesheet-header">
+                    <h3>THOMAS WILLWACHER</h3>
+                    <p>Fliesenlegermeister e.K. · Flurweg 14a · 56472 Nisterau</p>
+                </div>
+                <div className="card" style={{ marginTop: 12, padding: 16 }}>
+                    <h4 style={{ color: 'var(--color-accent)', marginBottom: 12, textAlign: 'center', letterSpacing: 2 }}>S T U N D E N N A C H W E I S</h4>
+                    <div className="timesheet-form">
+                        <div className="form-group"><label className="form-label">Datum</label><input className="input-field" type="text" value={dateStr} readOnly /></div>
+                        <div className="form-group"><label className="form-label">Baustelle</label>
+                            <select className="input-field">{DEMO_PROJECTS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                        </div>
+                        <div className="time-row">
+                            <div className="form-group"><label className="form-label">Von</label><input className="input-field" type="time" value={timeFrom} onChange={e => setTimeFrom(e.target.value)} /></div>
+                            <div className="form-group"><label className="form-label">Bis</label><input className="input-field" type="time" value={timeTo} onChange={e => setTimeTo(e.target.value)} /></div>
+                            <div className="form-group"><label className="form-label">Pause (Min)</label><input className="input-field" type="number" value={breakMin} onChange={e => setBreakMin(Number(e.target.value))} /></div>
+                        </div>
+                        <div style={{ textAlign: 'center', fontSize: 16, color: 'var(--color-accent)', fontWeight: 800, padding: '8px 0' }}>
+                            Gesamtstunden: {calcHours()} Std.
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>Arbeitsbeschreibung</span>
+                                <button className={`voice-btn ${isRecording ? 'active' : ''}`} onClick={toggleVoice} title="Spracheingabe">
+                                    {isRecording ? '⏹️' : '🎤'}
+                                </button>
+                            </label>
+                            <textarea className="input-field" rows={4} value={description} onChange={e => setDescription(e.target.value)} />
+                            {isRecording && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>🔴 Aufnahme läuft...</div>}
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Material ({materials.length} Positionen)</label>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                                {materials.map((m, i) => (
+                                    <span className="material-tag" key={i}>
+                                        {m.name}{m.amount ? `: ${m.amount} ${m.unit}` : ''}
+                                        <button onClick={() => setMaterials(prev => prev.filter((_, j) => j !== i))}
+                                            style={{ background: 'none', border: 'none', color: 'var(--color-danger)', cursor: 'pointer', marginLeft: 4, fontSize: 12 }}>✕</button>
+                                    </span>
+                                ))}
+                            </div>
+                            <button className="btn btn-secondary btn-sm btn-block" onClick={() => setShowMaterialPopup(true)}>📦 Material auswählen</button>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Fotos (2/8)</label>
+                            <div className="photo-thumbs">
+                                <div className="photo-thumb">🖼️</div>
+                                <div className="photo-thumb">🖼️</div>
+                                <div className="photo-thumb" style={{ borderColor: 'var(--color-accent)', color: 'var(--color-accent)' }}>+</div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <button className="btn btn-primary btn-block" onClick={handleSave}>💾 Speichern</button>
+                            <button className="btn btn-secondary" style={{ whiteSpace: 'nowrap' }}>📄 PDF</button>
+                        </div>
+                    </div>
+                </div>
+                {showMaterialPopup && (
+                    <MaterialPopup
+                        onClose={() => setShowMaterialPopup(false)}
+                        onSelect={setMaterials}
+                        selected={materials}
+                    />
+                )}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: MONATSKALENDER (mit Tageseintrag-Modal)
+    // ═══════════════════════════════════════════════════════
+    function ModuleMonthly({ lang, onBack }) {
+        const [currentMonth, setCurrentMonth] = useState(3);
+        const [currentYear] = useState(2026);
+        const [selectedDay, setSelectedDay] = useState(null);
+        const [dayEntries, setDayEntries] = useState(DEMO_MONTHLY.days);
+        const monthNames = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+        const weekdays = { de: ['Mo','Di','Mi','Do','Fr','Sa','So'], cs: ['Po','Út','St','Čt','Pá','So','Ne'], en: ['Mo','Tu','We','Th','Fr','Sa','Su'], es: ['Lu','Ma','Mi','Ju','Vi','Sá','Do'], fr: ['Lu','Ma','Me','Je','Ve','Sa','Di'], sk: ['Po','Ut','St','Št','Pi','So','Ne'], pl: ['Pn','Wt','Śr','Cz','Pt','So','Nd'] };
+        const wDays = weekdays[lang] || weekdays.de;
+
+        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+        const firstDayOfWeek = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
+        const today = new Date();
+        const isToday = (d) => today.getDate() === d && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+        const isWeekend = (d) => { const dow = (new Date(currentYear, currentMonth, d).getDay() + 6) % 7; return dow >= 5; };
+        const vacDays = DEMO_MONTHLY.vacation;
+
+        let totalHours = 0; let workedDays = 0;
+        Object.values(dayEntries).forEach(d => { totalHours += d.hours; workedDays++; });
+
+        const handleDayClick = (d) => { if (!isWeekend(d)) setSelectedDay(d); };
+
+        const saveDayEntry = (data) => {
+            setDayEntries(prev => ({ ...prev, [selectedDay]: { ...data, status: 'done' } }));
+            FirebaseService.saveDayEntry('emp-001', currentYear, currentMonth + 1, selectedDay, data);
+            setSelectedDay(null);
+        };
+
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">📊</span> {t('modules.monthly', lang)}</div>
+                <div className="month-calendar">
+                    <div className="month-nav">
+                        <button onClick={() => setCurrentMonth(p => Math.max(0, p-1))}>◀</button>
+                        <h3>{monthNames[currentMonth]} {currentYear}</h3>
+                        <button onClick={() => setCurrentMonth(p => Math.min(11, p+1))}>▶</button>
+                    </div>
+                    <div className="weekday-header">{wDays.map(d => <div key={d}>{d}</div>)}</div>
+                    <div className="day-grid">
+                        {Array.from({ length: firstDayOfWeek }, (_, i) => <div className="day-cell empty" key={`e${i}`} />)}
+                        {Array.from({ length: daysInMonth }, (_, i) => {
+                            const d = i + 1;
+                            const dayData = dayEntries[d];
+                            const isVac = vacDays.includes(d);
+                            let cls = 'day-cell';
+                            if (isWeekend(d)) cls += ' weekend';
+                            else if (isVac) cls += ' vacation';
+                            else if (dayData) cls += ' done';
+                            if (isToday(d)) cls += ' today';
+                            return (
+                                <div className={cls} key={d} onClick={() => handleDayClick(d)}>
+                                    <span>{d}</span>
+                                    {dayData && <span className="day-hours">{dayData.hours}h</span>}
+                                    {dayData && <span className="day-status">✅</span>}
+                                    {isVac && <span className="day-status">🏖️</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="month-summary">
+                        <div className="summary-row"><span>Arbeitstage</span><span>22</span></div>
+                        <div className="summary-row"><span>Erfasst</span><span>{workedDays}</span></div>
+                        <div className="summary-row"><span>Offen</span><span>{Math.max(0, 22 - workedDays - vacDays.length)}</span></div>
+                        <div className="summary-row"><span>Urlaub</span><span>{vacDays.length}</span></div>
+                        <div className="summary-row"><span>Stunden gesamt</span><span>{totalHours.toFixed(1)} Std.</span></div>
+                        <div className="summary-row"><span>⌀ pro Tag</span><span>{workedDays ? (totalHours / workedDays).toFixed(1) : '—'} Std.</span></div>
+                    </div>
+                </div>
+                {selectedDay && (
+                    <DayEntryModal day={selectedDay} month={currentMonth + 1} year={currentYear} lang={lang}
+                        existing={dayEntries[selectedDay]} onSave={saveDayEntry} onClose={() => setSelectedDay(null)} />
+                )}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: TAGESEINTRAG MODAL (Monatsabrechnung)
+    // ═══════════════════════════════════════════════════════
+    function DayEntryModal({ day, month, year, lang, existing, onSave, onClose }) {
+        const [startTime, setStartTime] = useState(existing?.start || '07:00');
+        const [endTime, setEndTime] = useState(existing?.end || '16:30');
+        const [breakMin, setBreakMin] = useState(existing?.breakMin || 30);
+        const [desc, setDesc] = useState(existing?.desc || '');
+        const [project, setProject] = useState(existing?.project || DEMO_PROJECTS[0]?.name || '');
+        const [isRecording, setIsRecording] = useState(false);
+
+        const calcHours = () => {
+            const [fH, fM] = startTime.split(':').map(Number);
+            const [tH, tM] = endTime.split(':').map(Number);
+            return Math.max(0, (tH * 60 + tM - fH * 60 - fM - breakMin) / 60);
+        };
+
+        const validate = () => {
+            if (!desc.trim()) return 'Bitte Leistung beschreiben';
+            if (calcHours() <= 0) return 'Arbeitsende muss nach Arbeitsbeginn liegen';
+            if (calcHours() > 12) return 'Maximale Arbeitszeit: 12 Stunden';
+            if (calcHours() > 6 && breakMin < 30) return 'Bei >6 Stunden mind. 30 Min. Pause';
+            return null;
+        };
+
+        const toggleVoice = () => {
+            if (isRecording) { VoiceService.stop(); setIsRecording(false); }
+            else { setIsRecording(true); VoiceService.start(lang, (t) => setDesc(t), () => setIsRecording(false)); }
+        };
+
+        const handleSave = () => {
+            const err = validate();
+            if (err) { alert('⚠️ ' + err); return; }
+            onSave({ start: startTime, end: endTime, breakMin, hours: calcHours(), desc, project, descriptionLang: lang });
+        };
+
+        const dayName = new Date(year, month - 1, day).toLocaleDateString('de-DE', { weekday: 'long' });
+
+        return (
+            <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-header">
+                        <h3>📅 {dayName}, {day}.{String(month).padStart(2,'0')}.{year}</h3>
+                        <button className="modal-close" onClick={onClose}>✕</button>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Baustelle</label>
+                        <select className="input-field" value={project} onChange={e => setProject(e.target.value)}>
+                            {DEMO_PROJECTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div className="time-row">
+                        <div className="form-group"><label className="form-label">Beginn</label><input className="input-field" type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Ende</label><input className="input-field" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Pause</label><input className="input-field" type="number" value={breakMin} onChange={e => setBreakMin(Number(e.target.value))} /></div>
+                    </div>
+                    <div style={{ textAlign: 'center', fontSize: 16, color: 'var(--color-accent)', fontWeight: 800, padding: '8px 0' }}>
+                        {calcHours().toFixed(1)} Stunden
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Ausgeführte Leistung</span>
+                            <button className={`voice-btn ${isRecording ? 'active' : ''}`} onClick={toggleVoice} style={{ width: 36, height: 36, fontSize: 16 }}>
+                                {isRecording ? '⏹️' : '🎤'}
+                            </button>
+                        </label>
+                        <textarea className="input-field" rows={4} value={desc} onChange={e => setDesc(e.target.value)} placeholder="Beschreibung der Arbeit..." />
+                        {isRecording && <div style={{ fontSize: 11, color: 'var(--color-danger)', marginTop: 4 }}>🔴 Spracheingabe aktiv ({LANGUAGES.find(l => l.code === lang)?.native})...</div>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button className="btn btn-secondary" onClick={onClose}>❌</button>
+                        <button className="btn btn-primary btn-block" onClick={handleSave}>💾 Speichern</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: KALENDER (Mitarbeiter + Baustellen)
+    // ═══════════════════════════════════════════════════════
+    function ModuleCalendar({ lang, onBack }) {
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">📅</span> {t('modules.calendar', lang)}</div>
+                <div className="calendar-view">
+                    <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginBottom: 8 }}>April 2026</div>
+                    {/* Mitarbeiter-Zeilen */}
+                    {DEMO_EMPLOYEES.slice(0, 3).map(emp => (
+                        <div className="gantt-row" key={emp.id}>
+                            <div className="gantt-label">{LANGUAGES.find(l=>l.code===emp.language)?.flag} {emp.firstName.charAt(0)}. {emp.lastName}</div>
+                            <div className="gantt-bar-container">
+                                {Array.from({ length: 30 }, (_, i) => {
+                                    const dow = (new Date(2026, 3, i + 1).getDay() + 6) % 7;
+                                    const isWE = dow >= 5;
+                                    const isVac = emp.id === 'emp-005' || (emp.id === 'emp-001' && i >= 21 && i <= 24);
+                                    let cls = 'gantt-cell';
+                                    if (isWE) cls += ' weekend';
+                                    else if (isVac) cls += ' vacation';
+                                    else cls += ' work';
+                                    return <div className={cls} key={i} title={`${i+1}. April`} />;
+                                })}
+                            </div>
+                        </div>
+                    ))}
+                    <div style={{ height: 8 }} />
+                    <div style={{ fontSize: 12, color: 'var(--color-text-dim)', marginBottom: 4 }}>Baustellen</div>
+                    {DEMO_PROJECTS.map(p => (
+                        <div className="gantt-row" key={p.id}>
+                            <div className="gantt-label" style={{ fontSize: 11 }}>{p.name.split(' ')[0]}</div>
+                            <div className="gantt-bar-container">
+                                {Array.from({ length: 30 }, (_, i) => (
+                                    <div key={i} style={{ width: 20, height: 12, borderRadius: 2, background: i < 25 ? p.color : 'transparent', opacity: 0.6 }} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+                <div style={{ marginTop: 12, display: 'flex', gap: 12, flexWrap: 'wrap', fontSize: 11 }}>
+                    <span><span className="gantt-cell work" style={{ display: 'inline-block', width: 12, height: 12, verticalAlign: 'middle' }} /> Arbeit</span>
+                    <span><span className="gantt-cell vacation" style={{ display: 'inline-block', width: 12, height: 12, verticalAlign: 'middle' }} /> Urlaub</span>
+                    <span><span className="gantt-cell sick" style={{ display: 'inline-block', width: 12, height: 12, verticalAlign: 'middle' }} /> Krank</span>
+                    <span><span className="gantt-cell weekend" style={{ display: 'inline-block', width: 12, height: 12, verticalAlign: 'middle' }} /> Wochenende</span>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: PRIVATER BEREICH (nur lesen!)
+    // ═══════════════════════════════════════════════════════
+    function ModulePrivate({ lang, onBack }) {
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">🔒</span> {t('modules.private', lang)}</div>
+                <div className="private-section">
+                    <h4>📊 Stundenabrechnung März 2026</h4>
+                    <div className="private-row"><span>Arbeitstage</span><span>22</span></div>
+                    <div className="private-row"><span>Gearbeitete Tage</span><span>20</span></div>
+                    <div className="private-row"><span>Urlaubstage</span><span>2</span></div>
+                    <div className="private-row"><span>Kranktage</span><span>0</span></div>
+                    <div style={{ height: 8 }} />
+                    <div className="private-row"><span>Regelarbeitszeit</span><span>176,0 Std.</span></div>
+                    <div className="private-row"><span>Ist-Arbeitszeit</span><span>168,5 Std.</span></div>
+                    <div className="private-row"><span>Überstunden</span><span style={{ color: 'var(--color-success)' }}>+8,5 Std.</span></div>
+                    <div className="private-row"><span>Überstunden gesamt</span><span style={{ color: 'var(--color-success)' }}>+42,0 Std.</span></div>
+                    <div style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: 'var(--color-success)' }}>✅ Freigegeben</div>
+                </div>
+                <div className="private-section">
+                    <h4>📝 Vereinbarungen</h4>
+                    <p style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>Keine aktuellen Vereinbarungen</p>
+                </div>
+                <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--color-text-dim)', marginTop: 16 }}>
+                    🔒 Nur Lesen — Änderungen nur durch die Firmenleitung
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: CHAT / NACHRICHTEN
+    // ═══════════════════════════════════════════════════════
+    function ModuleChat({ lang, onBack, isAdmin }) {
+        const [message, setMessage] = useState('');
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">💬</span> {t('modules.chat', lang)}</div>
+                <div className="chat-container" style={{ height: 'auto', minHeight: 300 }}>
+                    <div className="chat-messages">
+                        {DEMO_CHAT.map(msg => (
+                            <div key={msg.id}>
+                                <div className={`chat-bubble ${msg.sender === 'admin' ? 'received' : 'sent'}`}>
+                                    {msg.text}
+                                    {msg.translation && <div style={{ fontSize: 11, fontStyle: 'italic', marginTop: 4, opacity: 0.8 }}>🔄 {msg.translation}</div>}
+                                    <div className="chat-bubble-time">{msg.time}</div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="chat-input-bar">
+                        <input className="input-field" placeholder={lang === 'de' ? 'Nachricht...' : 'Message...'}
+                            value={message} onChange={e => setMessage(e.target.value)} />
+                        <button className="voice-btn">🎤</button>
+                        <button className="btn btn-primary btn-sm">📤</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MODUL: DOKUMENTE (vom Admin empfangen)
+    // ═══════════════════════════════════════════════════════
+    function ModuleDocuments({ lang, onBack }) {
+        const docs = [
+            { name: 'Grundriss_EG_Hallenbad.pdf', cat: 'Zeichnung', date: '01.04.2026', note: 'Bitte Detailpunkte beachten!' },
+            { name: 'Abdichtungsanweisung.pdf', cat: 'Anweisung', date: '28.03.2026', note: null },
+            { name: 'Sicherheitsunterweisung_2026.pdf', cat: 'Sicherheit', date: '15.03.2026', note: null },
+        ];
+        return (
+            <div className="fade-in">
+                <button className="btn btn-secondary btn-sm" onClick={onBack} style={{ marginBottom: 12 }}>← {t('nav.home', lang)}</button>
+                <div className="section-title"><span className="section-title-icon">📄</span> {t('modules.documents', lang)}</div>
+                {docs.map((d, i) => (
+                    <div className="card" key={i} style={{ marginBottom: 12, cursor: 'pointer' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <span style={{ fontSize: 28 }}>📄</span>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontWeight: 700, fontSize: 14 }}>{d.name}</div>
+                                <div style={{ fontSize: 11, color: 'var(--color-text-dim)' }}>{d.cat} · {d.date}</div>
+                                {d.note && <div style={{ fontSize: 12, color: 'var(--color-warning)', marginTop: 4 }}>📌 {d.note}</div>}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KOMPONENTE: MOBILE APP (Mitarbeiter)
+    // ═══════════════════════════════════════════════════════
+    function MobileApp({ userId, language, isAdminMirror, employeeName }) {
+        const [currentModule, setCurrentModule] = useState('home');
+        const lang = language || 'de';
+        const goHome = () => setCurrentModule('home');
+
+        const modules = [
+            { id: 'projects', icon: '📁', label: t('modules.projects', lang) },
+            { id: 'calendar', icon: '📅', label: t('modules.calendar', lang) },
+            { id: 'photos', icon: '📸', label: t('modules.photos', lang) },
+            { id: 'timesheet', icon: '📝', label: t('modules.timesheet', lang) },
+            { id: 'monthly', icon: '📊', label: t('modules.monthly', lang) },
+            { id: 'private', icon: '🔒', label: t('modules.private', lang) },
+            { id: 'documents', icon: '📄', label: t('modules.documents', lang) },
+            { id: 'chat', icon: '💬', label: t('modules.chat', lang) },
+        ];
+
+        const renderModule = () => {
+            switch (currentModule) {
+                case 'home': return (
+                    <div>
+                        <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                            <div style={{ fontSize: 40, marginBottom: 8 }}>🏗️</div>
+                            <h3 style={{ color: 'var(--color-accent)' }}>{t('app.title', lang)}</h3>
+                            {employeeName && <p style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>{employeeName}</p>}
+                        </div>
+                        <div className="module-grid">
+                            {modules.map(m => (
+                                <div className="module-tile" key={m.id} onClick={() => setCurrentModule(m.id)}>
+                                    <div className="module-tile-icon">{m.icon}</div>
+                                    <div className="module-tile-label">{m.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+                case 'projects': return <ModuleProjects lang={lang} onBack={goHome} />;
+                case 'photos': return <ModulePhotos lang={lang} onBack={goHome} />;
+                case 'timesheet': return <ModuleTimesheet lang={lang} onBack={goHome} employeeName={employeeName} />;
+                case 'monthly': return <ModuleMonthly lang={lang} onBack={goHome} />;
+                case 'calendar': return <ModuleCalendar lang={lang} onBack={goHome} />;
+                case 'private': return <ModulePrivate lang={lang} onBack={goHome} />;
+                case 'chat': return <ModuleChat lang={lang} onBack={goHome} isAdmin={isAdminMirror} />;
+                case 'documents': return <ModuleDocuments lang={lang} onBack={goHome} />;
+                default: return null;
+            }
+        };
+
+        return (
+            <div className="mobile-container" style={isAdminMirror ? { maxWidth: '100%', minHeight: '100%' } : {}}>
+                <div className="mobile-header">
+                    <h2>🏗️ {isAdminMirror ? `${employeeName}` : t('app.title', lang)}</h2>
+                    <span style={{ fontSize: 13, color: 'var(--color-text-dim)' }}>
+                        {LANGUAGES.find(l => l.code === lang)?.flag}
+                    </span>
+                </div>
+                <div className="mobile-body">
+                    {renderModule()}
+                </div>
+                <div className="mobile-nav" style={isAdminMirror ? { position: 'absolute' } : {}}>
+                    <button className={`nav-item ${currentModule === 'home' ? 'active' : ''}`} onClick={() => setCurrentModule('home')}>
+                        <span className="nav-icon">🏠</span>
+                        {t('nav.home', lang)}
+                    </button>
+                    <button className={`nav-item ${currentModule === 'photos' ? 'active' : ''}`} onClick={() => setCurrentModule('photos')}>
+                        <span className="nav-icon">📸</span>
+                        {t('nav.photos', lang)}
+                    </button>
+                    <button className={`nav-item ${currentModule === 'timesheet' ? 'active' : ''}`} onClick={() => setCurrentModule('timesheet')}>
+                        <span className="nav-icon">📝</span>
+                        {t('nav.timesheet', lang)}
+                    </button>
+                    <button className={`nav-item ${currentModule === 'monthly' ? 'active' : ''}`} onClick={() => setCurrentModule('monthly')}>
+                        <span className="nav-icon">📊</span>
+                        {t('nav.monthly', lang)}
+                    </button>
+                    <button className={`nav-item ${currentModule === 'chat' ? 'active' : ''}`} onClick={() => setCurrentModule('chat')}>
+                        <span className="nav-icon">💬</span>
+                        {t('nav.chat', lang)}
+                    </button>
+                    <button className={`nav-item ${currentModule === 'private' ? 'active' : ''}`} onClick={() => setCurrentModule('private')}>
+                        <span className="nav-icon">👤</span>
+                        {t('nav.profile', lang)}
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // HAUPT-APP (Router + Auth Flow)
+    // ═══════════════════════════════════════════════════════
+    function App() {
+        // App-State
+        const [appState, setAppState] = useState(() => {
+            const saved = localStorage.getItem('tw-bau-state');
+            return saved ? JSON.parse(saved) : { screen: 'language', language: null, role: null, userId: null, approved: false };
+        });
+
+        // State speichern
+        useEffect(() => {
+            localStorage.setItem('tw-bau-state', JSON.stringify(appState));
+        }, [appState]);
+
+        const setScreen = (screen) => setAppState(p => ({ ...p, screen }));
+        const setLanguage = (lang) => setAppState(p => ({ ...p, language: lang, screen: 'register' }));
+
+        const handleRegister = (form) => {
+            // In Firebase speichern (Demo: direkt zu waiting)
+            console.log('Registration:', form);
+            setAppState(p => ({ ...p, screen: 'waiting', role: 'worker' }));
+        };
+
+        // ── ROUTING ──
+        // Admin-Modus: URL-Parameter ?admin=true oder localStorage
+        const isAdmin = useMemo(() => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('admin') === 'true') {
+                localStorage.setItem('tw-bau-admin', 'true');
+                return true;
+            }
+            return localStorage.getItem('tw-bau-admin') === 'true';
+        }, []);
+
+        // Admin → Dashboard
+        if (isAdmin) {
+            return <Dashboard />;
+        }
+
+        // Worker → Auth Flow
+        switch (appState.screen) {
+            case 'language':
+                return <LanguageSelect onSelect={setLanguage} />;
+            case 'register':
+                return <Registration lang={appState.language} onSubmit={handleRegister} onBack={() => setScreen('language')} />;
+            case 'waiting':
+                return <WaitingApproval lang={appState.language} />;
+            case 'app':
+                return <MobileApp userId={appState.userId} language={appState.language} />;
+            default:
+                return <LanguageSelect onSelect={setLanguage} />;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // APP RENDERN
+    // ═══════════════════════════════════════════════════════
+    const root = ReactDOM.createRoot(document.getElementById('app-root'));
+    root.render(<App />);
+    </script>
+</body>
+</html>
