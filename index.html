@@ -386,24 +386,32 @@
     .module-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 16px;
+        gap: 14px;
         padding: 8px 0;
     }
     .module-tile {
-        background: var(--color-bg-card);
-        border-radius: var(--radius);
-        padding: 24px 16px;
+        border-radius: 16px;
+        padding: 22px 14px;
         text-align: center;
         cursor: pointer;
-        transition: var(--transition);
-        border: 2px solid transparent;
+        transition: all 0.25s ease;
+        border: 1.5px solid rgba(255,255,255,0.08);
+        position: relative;
+        overflow: hidden;
+    }
+    .module-tile::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+        pointer-events: none;
     }
     .module-tile:hover, .module-tile:active {
-        border-color: var(--color-accent);
-        transform: scale(1.02);
+        transform: translateY(-3px) scale(1.02);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.3);
     }
-    .module-tile-icon { font-size: 36px; margin-bottom: 8px; }
-    .module-tile-label { font-size: 13px; font-weight: 700; }
+    .module-tile-icon { font-size: 38px; margin-bottom: 10px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); }
+    .module-tile-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px; color: #fff; }
     
     /* ── Language Selector ── */
     .language-screen {
@@ -2328,14 +2336,14 @@
         const goHome = () => setCurrentModule('home');
 
         const modules = [
-            { id: 'projects', icon: '📁', label: t('modules.projects', lang) },
-            { id: 'calendar', icon: '📅', label: t('modules.calendar', lang) },
-            { id: 'photos', icon: '📸', label: t('modules.photos', lang) },
-            { id: 'timesheet', icon: '📝', label: t('modules.timesheet', lang) },
-            { id: 'monthly', icon: '📊', label: t('modules.monthly', lang) },
-            { id: 'private', icon: '🔒', label: t('modules.private', lang) },
-            { id: 'documents', icon: '📄', label: t('modules.documents', lang) },
-            { id: 'chat', icon: '💬', label: t('modules.chat', lang) },
+            { id: 'projects', icon: '📁', label: t('modules.projects', lang), bg: 'linear-gradient(135deg, #1565C0 0%, #1E88E5 100%)' },
+            { id: 'calendar', icon: '📅', label: t('modules.calendar', lang), bg: 'linear-gradient(135deg, #00897B 0%, #26A69A 100%)' },
+            { id: 'photos', icon: '📸', label: t('modules.photos', lang), bg: 'linear-gradient(135deg, #E65100 0%, #F57C00 100%)' },
+            { id: 'timesheet', icon: '📝', label: t('modules.timesheet', lang), bg: 'linear-gradient(135deg, #6A1B9A 0%, #AB47BC 100%)' },
+            { id: 'monthly', icon: '📊', label: t('modules.monthly', lang), bg: 'linear-gradient(135deg, #2E7D32 0%, #43A047 100%)' },
+            { id: 'private', icon: '🔒', label: t('modules.private', lang), bg: 'linear-gradient(135deg, #37474F 0%, #607D8B 100%)' },
+            { id: 'documents', icon: '📄', label: t('modules.documents', lang), bg: 'linear-gradient(135deg, #AD1457 0%, #E91E63 100%)' },
+            { id: 'chat', icon: '💬', label: t('modules.chat', lang), bg: 'linear-gradient(135deg, #FF6F00 0%, #FFA000 100%)' },
         ];
 
         const renderModule = () => {
@@ -2349,7 +2357,8 @@
                         </div>
                         <div className="module-grid">
                             {modules.map(m => (
-                                <div className="module-tile" key={m.id} onClick={() => setCurrentModule(m.id)}>
+                                <div className="module-tile" key={m.id} onClick={() => setCurrentModule(m.id)}
+                                    style={{ background: m.bg }}>
                                     <div className="module-tile-icon">{m.icon}</div>
                                     <div className="module-tile-label">{m.label}</div>
                                 </div>
