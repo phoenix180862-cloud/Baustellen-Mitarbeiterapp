@@ -23,9 +23,9 @@ Mitarbeiter-Handys haben **keinen Zugriff** auf die Original-Kundenordner.
 | 1 | Start | Uhr, Sprach-Wahl, Status | E1 |
 | 2 | Baustellen | Liste freigegebener Baustellen, 4-Ordner-Detail | E4 |
 | 3 | Kalender | Eigener Schichtplan (read-only) | E8 |
-| 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | **E5** |
+| 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | E5 |
 | 5 | Stunden | Stundenzettel-PDF mit Material-Popup | E6 |
-| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | E7 |
+| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | **E7 (Phase A: Translation-Engine)** |
 
 ---
 
@@ -58,39 +58,40 @@ Bei Konflikt zwischen Code und Master-Dokument gewinnt das Master-Dokument.
 
 ## Stand
 
-**Etappe 5 abgeschlossen** — Modul "Fotos" (HERZSTUECK) voll funktional.
+**Etappe 6 abgeschlossen** — Modul "Stunden" (Stundenzettel-PDF) voll funktional.
 
-### Workflow
+### Stunden-Modul (E6)
+- **3-Tab-Navigation:** Heute (Formular), Diese Woche (Historie), Letzte 30 Tage (Historie)
+- **Formular-Felder:** Datum (heute), Baustelle (Dropdown, letzte gemerkt), Anfang/Ende als Time-Picker mit 15-Min-Schritten, Pause-Dropdown (0/15/30/45/60 Min), Netto-Stunden live-berechnet
+- **Taetigkeits-Pickliste:** 12 Standard-Taetigkeiten (Fliesen Wand/Boden, Verfugen, Silikon, Abdichtung, Estrich, Demontage, Material, Vorbereitung, Endreinigung, Kundengespraech, Fahrzeit) + Freitext "Sonstiges"
+- **Material-Popup:** 8 Kategorie-Tabs, Suchfeld, 30 vorinstallierte Fliesenleger-Materialien; pro Eintrag Mengen-Input + Einheit + Speech-Mic fuer schnelle Zahlen-Eingabe
+- **Bemerkung** mit Web-Speech-API in MA-Sprache + automatischem Deutsch-Feld (editierbar)
+- **Wetter:** 4 Tap-Kategorien (Sonnig/Bewoelkt/Regen/Schnee) ODER Auto-Button via Open-Meteo-API (Geolocation + WMO-Weathercode-Mapping, kein API-Key noetig)
+- **WIP-AutoSave:** nach jeder Aenderung (debounced 800ms), beim Wiedereintritt Toast "Entwurf wiederhergestellt"
+- **PDF-Generator** (`tw-ma-pdf.js`): jsPDF + autoTable, TW-Briefkopf mit Logo-Kreis, Firmendaten, Titel "Stundenzettel", Kopfdaten-Tabelle (Baustelle, MA, Arbeitszeit, Wetter), Taetigkeiten-Liste, Material-Tabelle, Bemerkung (Deutsch + Original kursiv wenn anders), Footer
+- **Drive-Upload-Pfad:** `Staging/{Baustelle}/Stunden/{geraet}_Stundenzettel_{yyyymmdd}.pdf`
+- **Sync-Orchestrator** um Item-Typ erweitert (`typ: 'foto' | 'stunde'`), Backoff-Logik weiter aktiv
+- **Stunden-Historie:** Einzel-Tap oeffnet PDF-Vorschau (iframe), Status-Icon (gruen=uploaded / orange=pending / rot=fehler)
+
+### Modul "Fotos" (E5)
 - **Stufe 1:** Baustellen-Auswahl (Live-Liste aus Firebase)
 - **Stufe 2:** Raum-Auswahl mit Dialog "Neuer Raum" (Bezeichnung + Spracheingabe, Raum-Nr, Geschoss KG/EG/OG/DG, Wandzahl 3-8)
-- **Stufe 3:** Phase-Wahl (Rohzustand grau-blau / Abdichtung orange / Fertigstellung gruen) mit Live-Fortschritts-Badge
-- **Stufe 4:** Wand-Raster (2x2 / 3x2 / 4x2) plus Boden plus optional Decke; Foto-Thumbnails inline; Status-Punkt (gruen/orange/rot)
-- **Stufe 5:** Kamera oeffnet automatisch (Mobile: getUserMedia/capture=environment), Vorschau, Wiederholen
-- **Stufe 6:** Sprach-Notiz via Web Speech API in MA-Sprache, Auto-Uebersetzung Deutsch (Passthrough bis Etappe 7), beide Versionen editierbar
-
-### Allgemeine Fotos
-- Bis zu 20 pro Baustelle, eigener Tab
-- Numerierung: allgemein-1 ... allgemein-20
-- Loesch-Button pro Foto
+- **Stufe 3:** Phase-Wahl (Rohzustand/Abdichtung/Fertigstellung) mit Live-Fortschritts-Badge
+- **Stufe 4:** Wand-Raster (2x2 / 3x2 / 4x2) plus Boden plus optional Decke; Foto-Thumbnails inline; Status-Punkt
+- **Stufe 5:** Kamera oeffnet automatisch, Vorschau, Wiederholen
+- **Stufe 6:** Sprach-Notiz via Web Speech API in MA-Sprache, Auto-Uebersetzung Deutsch, beide Versionen editierbar
+- Allgemeine Fotos: bis zu 20 pro Baustelle, eigener Tab
 
 ### Offline-First-Stack
-- **IndexedDB** mit Stores `fotos`, `raeume`, `sync_queue` (inkl. Indexe baustelle/sync_status/raum_phase/next_try_at)
-- **Foto-Kompression** auf max. 1920px lange Seite, JPEG q=0.85
-- **Thumbnails** 320px fuer schnelles Wand-Raster
+- **IndexedDB** mit Stores `fotos`, `raeume`, `stunden`, `sync_queue` (DB-Version 3)
+- **Foto-Kompression** auf max. 1920px lange Seite, JPEG q=0.85; Thumbnails 320px
 - **Sync-Queue** mit Exponential Backoff (30s -> 2m -> 8m -> 30m -> 2h, max 5 Versuche)
 - **Auto-Sync** alle 60 Sekunden + Trigger bei online-Event
-- **Drive-Pfad:** `Staging/{Baustelle}/Bilder/{Phase}/{Raum}/{geraet}_{phase}_{raum}_{wand}_{ts}.jpg`
-- **Notiz-JSON** parallel zu jedem Foto hochgeladen (selber Name + .json) mit Metadaten
+- **Item-Typen:** `foto` (Bild + JSON) und `stunde` (PDF)
 
-### Sync-UI
-- Live-Pending-Badge in Sub-Header aller Foto-Stufen
-- Manueller Sync-Button
-- Online/Offline-Erkennung
-- Foto-Blob wird nach erfolgreichem Upload aus IndexedDB freigegeben (Speicher-Schonung)
+**Davor:** E4 (Baustellen + Drive-Service), E3 (Onboarding/PIN), E2 (Icons/PWA), E1 (Startseite/Nav), E0 (Skelett).
 
-**Davor:** Etappe 4 (Modul Baustellen + Drive-Service), 3 (Onboarding/PIN), 2 (Icons/PWA), 1 (Startseite/Nav), 0 (Skelett).
-
-Naechste Etappe: 6 — Modul "Stunden" (PDF-Formular + Material-Popup).
+Naechste Etappe: **E7** — Modul "Nachrichten" (WhatsApp-Style mit Live-Uebersetzung).
 
 ## Firebase-Fallback-Format fuer Testen
 
