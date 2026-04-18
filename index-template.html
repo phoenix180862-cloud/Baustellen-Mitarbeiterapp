@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>TW Baustellen-App</title>
+
+    <!-- ===== PWA Meta ===== -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1E88E5">
+    <meta name="description" content="Baustellen-App von Thomas Willwacher Fliesenlegermeister e.K.">
+
+    <!-- iOS-spezifisch -->
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TW Baustelle">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+
+    <!-- ===== Fonts (identisch Master-App) ===== -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- ===== Eigenes Design-System ===== -->
+    <link rel="stylesheet" href="css/tw-ma-design.css">
+
+    <!-- ===== React + Babel (CDN) ===== -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- ===== Firebase SDK (Compat-Mode wie Master-App) ===== -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+    <!-- ===== jsPDF (fuer Stundenzettel-PDF) ===== -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.0/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- ===== Globaler Error-Handler ===== -->
+    <script>
+    window.onerror = function(msg, url, line, col, err) {
+        console.error('App Error:', msg, 'Line:', line, err);
+        var d = document.getElementById('crash-info');
+        if (!d) {
+            d = document.createElement('div');
+            d.id = 'crash-info';
+            d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#1a2638;color:#ff4757;border:2px solid #c41e1e;border-radius:14px;z-index:99999;font-family:monospace;font-size:13px;max-height:80vh;overflow:auto;';
+            document.body.appendChild(d);
+        }
+        d.innerHTML = '<b>Fehler:</b> ' + msg + '<br><b>Zeile:</b> ' + line +
+            '<br><button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#1E88E5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold">Schliessen</button>';
+    };
+    </script>
+
+    <!-- ===== Service-Worker-Registrierung ===== -->
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(function(reg) { console.log('SW registriert:', reg.scope); })
+                .catch(function(err) { console.warn('SW Fehler:', err); });
+        });
+    }
+    </script>
+
+    <!-- ===== JS-Module (vor Babel-Block) ===== -->
+    <script src="js/tw-ma-core.js"></script>
+    <script src="js/tw-ma-storage.js"></script>
+    <script src="js/tw-ma-config.js"></script>
+    <script src="js/tw-ma-firebase.js"></script>
+    <script src="js/tw-ma-drive-service.js"></script>
+    <script src="js/tw-ma-translation.js"></script>
+    <script src="js/tw-ma-sync.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- ===== Hier injected build.bat den Babel-Block + Render-Aufruf ===== -->

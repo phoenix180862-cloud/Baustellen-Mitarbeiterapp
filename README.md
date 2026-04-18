@@ -1,191 +1,109 @@
-# 🏗️ TW Baustellen-App
+# TW Baustellen-App (Mitarbeiter-App)
 
-**Thomas Willwacher Fliesenlegermeister e.K.**  
-Echtzeit-App für Baustellenmitarbeiter und Büro-Verwaltung.
-
----
-
-## 📋 Übersicht
-
-Die TW Baustellen-App ist eine Progressive Web App (PWA) mit zwei Ansichten:
-
-| Ansicht | Zugang | Beschreibung |
-|---------|--------|-------------|
-| **Dashboard** (Admin) | `index.html?admin=true` | Zentrale Schaltstelle — alle Mitarbeiter-Apps kontrollieren |
-| **Mobile App** (Mitarbeiter) | `index.html` | Baustellenordner, Fotos, Stundenzettel, Monatskalender u.v.m. |
-
-### 🔒 Architektur: Hub-and-Spoke
-
-```
-         ┌──────────────────────────────┐
-         │     ADMIN DASHBOARD          │
-         │   (Absolute Schaltzentrale)  │
-         └──────────┬───────────────────┘
-                    │
-              Firebase Realtime DB
-              (zentraler Hub)
-                    │
-    ┌───────────────┼───────────────┐
-    │               │               │
-  App A           App B           App C
- (MA 1)          (MA 2)          (MA 3)
-    ✗               ✗               ✗
-    └───── KEINE VERBINDUNG ────────┘
-```
-
-- **Apps können NICHT miteinander kommunizieren**
-- **Jeder Mitarbeiter sieht NUR seine eigenen Daten**
-- **Admin (Dashboard) sieht und steuert ALLES**
+**Thomas Willwacher Fliesenlegermeister e.K.**
+Mobile Begleitung fuer Mitarbeiter auf der Baustelle.
 
 ---
 
-## 🚀 Deployment auf GitHub Pages
+## Architektur
 
-### Schritt 1: Repository erstellen
+Eigenstaendige PWA (Progressive Web App) als Schwester der **TW Business Suite** (Buero-App).
+Datenaustausch ausschliesslich ueber:
+- **Firebase Realtime Database** (`einkaufsliste-98199`) — Nachrichten, Geraete-Whitelist, Kalender
+- **Google Drive Staging-Bereich** (Service-Account) — Fotos, Stundenzettel-PDFs, Zeichnungen
 
-1. Gehe zu [github.com/new](https://github.com/new)
-2. Repository-Name: `tw-baustellen-app`
-3. Public oder Private wählen
-4. "Create repository" klicken
-
-### Schritt 2: Dateien hochladen
-
-1. "Add file" → "Upload files"
-2. `index.html` und `README.md` hochladen
-3. "Commit changes" klicken
-
-### Schritt 3: GitHub Pages aktivieren
-
-1. Repository → "Settings"
-2. Seitenleiste → "Pages"
-3. Source: "Deploy from a branch"
-4. Branch: `main` / `/ (root)`
-5. "Save" klicken
-
-Die App ist dann erreichbar unter:  
-`https://phoenix180862-cloud.github.io/tw-baustellen-app/`
-
-- **Dashboard:** `...?admin=true`
-- **Mobile App:** `...` (direkt)
+Mitarbeiter-Handys haben **keinen Zugriff** auf die Original-Kundenordner.
 
 ---
 
-## 🔥 Firebase einrichten
+## Module (V1)
 
-### Schritt 1: Firebase-Projekt konfigurieren
+| # | Modul | Funktion | Stand |
+|---|---|---|---|
+| 1 | Start | Uhr, Sprach-Wahl, Status | E1 |
+| 2 | Baustellen | Liste freigegebener Baustellen, 4-Ordner-Detail | E4 |
+| 3 | Kalender | Eigener Schichtplan (read-only) | E8 |
+| 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | **E5** |
+| 5 | Stunden | Stundenzettel-PDF mit Material-Popup | E6 |
+| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | E7 |
 
-1. Öffne [console.firebase.google.com](https://console.firebase.google.com)
-2. Wähle Projekt **"einkaufsliste-98199"**
-3. Gehe zu **Projekteinstellungen** → **Allgemein**
-4. Scrolle zu "Ihre Apps" → **Web-App hinzufügen** (falls nicht vorhanden)
-5. Kopiere die Firebase-Konfigurationswerte
+---
 
-### Schritt 2: Firebase-Services aktivieren
+## Build
 
-In der Firebase Console:
-
-- **Authentication** → "Email/Password" aktivieren
-- **Realtime Database** → Erstellen (Region: europe-west1)
-- **Storage** → Aktivieren
-
-### Schritt 3: Security Rules eintragen
-
-In **Realtime Database → Regeln** folgende Rules eintragen:
-
-```json
-{
-  "rules": {
-    "users": {
-      "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
-        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
-      }
-    },
-    "projects": {
-      ".read": "root.child('users').child(auth.uid).child('approved').val() === true",
-      "$projectId": {
-        "documents": { ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'" },
-        "templates": { ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'" },
-        ".write": "root.child('users').child(auth.uid).child('approved').val() === true"
-      }
-    },
-    "monthlyRecords": {
-      "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
-        ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
-      }
-    },
-    "private": {
-      "$uid": {
-        ".read": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'",
-        ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
-      }
-    },
-    "calendar": {
-      ".read": "root.child('users').child(auth.uid).child('approved').val() === true",
-      "employees": {
-        "$uid": {
-          ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
-        }
-      },
-      "projects": {
-        ".write": "root.child('users').child(auth.uid).child('role').val() === 'admin'"
-      }
-    },
-    "chat": {
-      ".read": "root.child('users').child(auth.uid).child('approved').val() === true",
-      ".write": "root.child('users').child(auth.uid).child('approved').val() === true"
-    },
-    "dashboard": {
-      ".read": "root.child('users').child(auth.uid).child('role').val() === 'admin'",
-      "activeApps": {
-        "$uid": {
-          ".write": "$uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin'"
-        }
-      }
-    }
-  }
-}
+```cmd
+build.bat
 ```
 
-### Schritt 4: Credentials in der App eintragen
+Konkateniert alle JSX-Dateien aus `jsx/` in der korrekten Reihenfolge in eine fertige `index.html` (Babel laeuft im Browser).
 
-1. Öffne die App im Browser
-2. Gehe zum Dashboard (`?admin=true`)
-3. Klicke auf ⚙️ (Einstellungen)
-4. Trage die Firebase-Credentials ein
-5. Klicke "Speichern & Neuladen"
+JS-Module aus `js/` werden vom Template per `<script src="...">` geladen.
 
 ---
 
-## 📱 Module
+## Deployment
 
-| # | Modul | Beschreibung |
-|---|-------|-------------|
-| 0 | **Dashboard** | Zentrale Schaltstelle — Spiegelansicht aller Mitarbeiter-Apps |
-| 1 | Baustellenordner | Zugriff auf Projektordner |
-| 2 | Mehrsprachigkeit | 7 Sprachen (DE/CS/SK/EN/ES/FR/PL) |
-| 3 | Kalender | Mitarbeiter- & Baustellen-Planung (Gantt) |
-| 4 | Zugangs-Freigabe | Registrierung → Admin-Freigabe |
-| 5 | Fotodokumentation | Fotos mit Raum-Zuordnung |
-| 6 | Stundenzettel | DIN A4 mit Material-Katalog + Spracheingabe |
-| 7 | Privater Bereich | Vertrauliche Mitarbeiterdaten (nur lesen) |
-| 8 | Monatsabrechnung | Tageskalender mit Arbeitszeit/Leistung |
+GitHub Pages auf Branch `main`.
+Live-URL: https://phoenix180862-cloud.github.io/Baustellen-Mitarbeiterapp/
 
 ---
 
-## 🛠️ Technologie-Stack
+## Spezifikation
 
-- **Frontend:** React 18 (JSX via Babel, Single-File)
-- **Backend/Sync:** Firebase Realtime Database + Storage
-- **Auth:** Firebase Authentication
-- **Spracheingabe:** Web Speech API
-- **PWA:** Service Worker für Offline-Support
-- **Hosting:** GitHub Pages
+Vollstaendige Spec: `docs/MASTER-BAUSTELLEN-APP.md`
+
+Bei Konflikt zwischen Code und Master-Dokument gewinnt das Master-Dokument.
 
 ---
 
-## 📞 Kontakt
+## Stand
 
-Thomas Willwacher Fliesenlegermeister e.K.  
-Flurweg 14a, 56472 Nisterau  
+**Etappe 5 abgeschlossen** — Modul "Fotos" (HERZSTUECK) voll funktional.
+
+### Workflow
+- **Stufe 1:** Baustellen-Auswahl (Live-Liste aus Firebase)
+- **Stufe 2:** Raum-Auswahl mit Dialog "Neuer Raum" (Bezeichnung + Spracheingabe, Raum-Nr, Geschoss KG/EG/OG/DG, Wandzahl 3-8)
+- **Stufe 3:** Phase-Wahl (Rohzustand grau-blau / Abdichtung orange / Fertigstellung gruen) mit Live-Fortschritts-Badge
+- **Stufe 4:** Wand-Raster (2x2 / 3x2 / 4x2) plus Boden plus optional Decke; Foto-Thumbnails inline; Status-Punkt (gruen/orange/rot)
+- **Stufe 5:** Kamera oeffnet automatisch (Mobile: getUserMedia/capture=environment), Vorschau, Wiederholen
+- **Stufe 6:** Sprach-Notiz via Web Speech API in MA-Sprache, Auto-Uebersetzung Deutsch (Passthrough bis Etappe 7), beide Versionen editierbar
+
+### Allgemeine Fotos
+- Bis zu 20 pro Baustelle, eigener Tab
+- Numerierung: allgemein-1 ... allgemein-20
+- Loesch-Button pro Foto
+
+### Offline-First-Stack
+- **IndexedDB** mit Stores `fotos`, `raeume`, `sync_queue` (inkl. Indexe baustelle/sync_status/raum_phase/next_try_at)
+- **Foto-Kompression** auf max. 1920px lange Seite, JPEG q=0.85
+- **Thumbnails** 320px fuer schnelles Wand-Raster
+- **Sync-Queue** mit Exponential Backoff (30s -> 2m -> 8m -> 30m -> 2h, max 5 Versuche)
+- **Auto-Sync** alle 60 Sekunden + Trigger bei online-Event
+- **Drive-Pfad:** `Staging/{Baustelle}/Bilder/{Phase}/{Raum}/{geraet}_{phase}_{raum}_{wand}_{ts}.jpg`
+- **Notiz-JSON** parallel zu jedem Foto hochgeladen (selber Name + .json) mit Metadaten
+
+### Sync-UI
+- Live-Pending-Badge in Sub-Header aller Foto-Stufen
+- Manueller Sync-Button
+- Online/Offline-Erkennung
+- Foto-Blob wird nach erfolgreichem Upload aus IndexedDB freigegeben (Speicher-Schonung)
+
+**Davor:** Etappe 4 (Modul Baustellen + Drive-Service), 3 (Onboarding/PIN), 2 (Icons/PWA), 1 (Startseite/Nav), 0 (Skelett).
+
+Naechste Etappe: 6 — Modul "Stunden" (PDF-Formular + Material-Popup).
+
+## Firebase-Fallback-Format fuer Testen
+
+Lege testweise in Firebase folgende Struktur an:
+```
+/aktive_baustellen
+  bst_001: { name: "Meyer Bad", adresse: "Muehlweg 3, Nisterau", bauherr: "Fam. Meyer", status: "aktiv", zuletzt_geaendert: 1729012345000 }
+
+/baustellen_dateien/bst_001
+  zeichnungen:
+    z1: { name: "Grundriss.pdf", mime: "application/pdf", size: 450000, ts: 1729012345000, url: "https://..." }
+  bilder:
+    b1: { name: "Vorort.jpg", mime: "image/jpeg", size: 120000, ts: 1729012345000, url: "https://..." }
+  nachrichten:
+    n1: { name: "ANWEISUNG_Sicherheit.pdf", mime: "application/pdf", size: 80000, ts: ..., url: "https://..." }
+```
