@@ -25,7 +25,7 @@ Mitarbeiter-Handys haben **keinen Zugriff** auf die Original-Kundenordner.
 | 3 | Kalender | Eigener Schichtplan (read-only) | E8 |
 | 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | E5 |
 | 5 | Stunden | Stundenzettel-PDF mit Material-Popup | E6 |
-| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | **E7 (Phase A: Translation-Engine)** |
+| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | **E7 (Phasen A+B+C)** |
 
 ---
 

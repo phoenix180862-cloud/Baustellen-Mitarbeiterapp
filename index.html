@@ -3988,18 +3988,605 @@ function MAStunden(props) {
 }
 
 // ============================================================
-// TW Baustellen-App  -  Modul Nachrichten (Etappe 0 Skelett)
-// Vollausbau in Etappe 7:
-// - WhatsApp-Stil Chat mit Bubbles (beide Sprachen sichtbar)
-// - Live-Uebersetzung via Gemini Flash
-// - Mic-Eingabe in MA-Sprache
-// - Anweisungs-Tab mit Pinnwand + Lese-Quittung
-// - Firebase-Listener + Push-Notifications via Service Worker
+// TW Baustellen-App  -  Modul Nachrichten (Etappe 7 Phase B+C)
+// ============================================================
+// 2-Tab-Struktur:
+//   1. "Chat"        - WhatsApp-Stil 1:1 mit Buero (Thomas)
+//   2. "Anweisungen" - Pinnwand-Karten von Thomas (mit Lesequittung)
+//
+// Chat-Workflow (Sender-Seite):
+//   1. MA tippt Text in MA-Sprache (oder Mic-Eingabe)
+//   2. Klick "Senden"
+//   3. Sofort lokale Bubble mit Status "wartet" einblenden
+//   4. TWMATranslate.translate(text, MA-Sprache, 'de')
+//   5. TWMAFirebase.sendMessage({ original, uebersetzung })
+//   6. Bubble-Status auf "gesendet"
+//
+// Bubbles:
+//   - Eigene (rechts, blau): Original oben + Uebersetzung darunter (kleiner)
+//   - Fremde (links, grau):   Uebersetzung oben (in MA-Sprache) + Original darunter
+//
+// Auto-Scroll: bei neuer Nachricht ans Bubble-Ende
+// Lese-Quittung: alle empfangenen Nachrichten beim Tab-Open als gelesen markieren
 // ============================================================
 
-function MANachrichten(props) {
+// ===== Tabs ===================================================
+
+function NchTabs(props) {
+    const { lang, aktiv, onChange, anweisungenUngelesen } = props;
+    const tabs = [
+        { id: 'chat',         label: TWMAConfig.t('nch_tab_chat', lang),         badge: 0 },
+        { id: 'anweisungen',  label: TWMAConfig.t('nch_tab_anweisungen', lang),  badge: anweisungenUngelesen || 0 }
+    ];
     return (
-        <MAPlatzhalter modul="Nachrichten" etappe="7" lang={props.lang} />
+        <div style={{
+            display:'flex', gap:0,
+            background:'var(--bg-secondary)',
+            borderBottom:'1px solid var(--border-color)'
+        }}>
+            {tabs.map(function(t) {
+                const an = aktiv === t.id;
+                return (
+                    <button key={t.id} onClick={function(){ onChange(t.id); }}
+                        style={{
+                            flex:1, padding:'12px 8px',
+                            background: an ? 'var(--bg-card)' : 'transparent',
+                            color: an ? 'var(--accent-blue)' : 'var(--text-muted)',
+                            border:'none',
+                            borderBottom: an ? '3px solid var(--accent-blue)' : '3px solid transparent',
+                            fontFamily:'Oswald,sans-serif', fontSize:12, fontWeight:600,
+                            textTransform:'uppercase', letterSpacing:'1px',
+                            cursor:'pointer',
+                            position:'relative'
+                        }}>
+                        {t.label}
+                        {t.badge > 0 && (
+                            <span style={{
+                                position:'absolute', top:6, right:'30%',
+                                background:'#c41e1e', color:'#fff',
+                                borderRadius:999, padding:'1px 7px',
+                                fontSize:10, fontWeight:700,
+                                minWidth:18, textAlign:'center'
+                            }}>{t.badge}</span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// ===== Chat-Bubble ============================================
+
+function ChatBubble(props) {
+    const { msg, lang } = props;
+    const eigene = msg.richtung === 'von_ma';
+
+    // Was zeigen wir oben (gross) und unten (klein)?
+    // Eigene Bubble: oben Original (MA-Sprache), unten Deutsch
+    // Fremde Bubble: oben Uebersetzung in MA-Sprache, unten Original (DE)
+    let oben, unten, obenSprache, untenSprache;
+    if (eigene) {
+        oben         = (msg.original && msg.original.text) || '';
+        obenSprache  = (msg.original && msg.original.sprache) || lang;
+        unten        = msg.uebersetzung && msg.uebersetzung.text;
+        untenSprache = msg.uebersetzung && msg.uebersetzung.sprache;
+    } else {
+        // Eingehend: Original ist DE, MA will Uebersetzung in MA-Sprache sehen
+        oben         = msg.uebersetzung && msg.uebersetzung.text;
+        obenSprache  = msg.uebersetzung && msg.uebersetzung.sprache;
+        unten        = (msg.original && msg.original.text) || '';
+        untenSprache = (msg.original && msg.original.sprache) || 'de';
+        if (!oben) { // Notfall: keine Uebersetzung -> Original gross zeigen
+            oben = unten; obenSprache = untenSprache;
+            unten = null;
+        }
+    }
+
+    const istWartet = msg.lokal_status === 'wartet';
+    const istFehler = msg.lokal_status === 'fehler';
+    const trennfarbeOK = eigene ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)';
+
+    // Status-Icon (nur eigene)
+    let statusIcon = null;
+    if (eigene) {
+        if (istWartet) statusIcon = '\u29D6'; // sanduhr-aehnlich
+        else if (istFehler) statusIcon = '!';
+        else if (msg.gelesen_am) statusIcon = '\u2713\u2713';
+        else statusIcon = '\u2713';
+    }
+
+    // Zeit
+    let zeitStr = '';
+    if (msg.gesendet_am) {
+        const d = new Date(msg.gesendet_am);
+        zeitStr = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    }
+
+    return (
+        <div style={{
+            display:'flex',
+            justifyContent: eigene ? 'flex-end' : 'flex-start',
+            marginBottom: 6
+        }}>
+            <div style={{
+                maxWidth: '78%',
+                padding: '8px 12px',
+                background: eigene
+                    ? 'linear-gradient(135deg,#1E88E5,#1565C0)'
+                    : 'var(--bg-card)',
+                color: eigene ? '#fff' : 'var(--text-white)',
+                border: eigene ? 'none' : '1px solid var(--border-color)',
+                borderRadius: 'var(--radius-lg)',
+                borderTopRightRadius: eigene ? 4 : 'var(--radius-lg)',
+                borderTopLeftRadius:  eigene ? 'var(--radius-lg)' : 4,
+                opacity: istWartet ? 0.7 : 1,
+                position:'relative'
+            }}>
+                {!eigene && msg.absender_name && (
+                    <div style={{
+                        fontSize: 10, fontWeight:700,
+                        color:'var(--accent-blue)',
+                        marginBottom: 3,
+                        textTransform:'uppercase', letterSpacing:'0.5px'
+                    }}>{msg.absender_name}</div>
+                )}
+
+                {/* Haupt-Text (gross) */}
+                <div style={{
+                    fontSize: 14, lineHeight: 1.35,
+                    whiteSpace: 'pre-wrap', wordBreak:'break-word'
+                }}>{oben || (msg.uebersetzung_status === 'failed'
+                       ? '(' + TWMAConfig.t('nch_uebersetzung_fehlt', lang) + ')'
+                       : '')}</div>
+
+                {/* Trennlinie + Untertitel */}
+                {unten && unten !== oben && (
+                    <React.Fragment>
+                        <div style={{
+                            display:'flex', alignItems:'center', gap:6,
+                            margin:'5px 0 3px',
+                            fontSize:9,
+                            color: eigene ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)'
+                        }}>
+                            <span>{'\u{1F310}'}</span>
+                            <span style={{
+                                flex:1, height:1, background: trennfarbeOK
+                            }}></span>
+                            <span style={{textTransform:'uppercase', letterSpacing:'0.5px'}}>
+                                {(untenSprache || '').toUpperCase()}
+                            </span>
+                        </div>
+                        <div style={{
+                            fontSize: 12, lineHeight: 1.3,
+                            opacity: 0.85, fontStyle:'italic',
+                            whiteSpace:'pre-wrap', wordBreak:'break-word'
+                        }}>{unten}</div>
+                    </React.Fragment>
+                )}
+
+                {msg.uebersetzung_status === 'failed' && (
+                    <div style={{
+                        marginTop:4, fontSize:10,
+                        color: eigene ? '#ffcccc' : '#c41e1e'
+                    }}>{'\u26A0 '}{TWMAConfig.t('nch_uebersetzung_fehlt', lang)}</div>
+                )}
+
+                {/* Footer */}
+                <div style={{
+                    display:'flex', justifyContent:'flex-end', gap:6,
+                    marginTop:3, fontSize:10,
+                    color: eigene ? 'rgba(255,255,255,0.75)' : 'var(--text-muted)'
+                }}>
+                    <span>{zeitStr}</span>
+                    {statusIcon && (
+                        <span style={{
+                            color: istFehler ? '#ff7675'
+                                  : (eigene && msg.gelesen_am) ? '#a8e6cf'
+                                  : 'inherit',
+                            fontWeight: 700
+                        }}>{statusIcon}</span>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ===== Chat-Eingabezeile ======================================
+
+function ChatEingabe(props) {
+    const { lang, onSenden, deaktiviert } = props;
+    const [text, setText] = React.useState('');
+    const speech = useSpeech(lang);
+    const taRef = React.useRef(null);
+
+    React.useEffect(function() {
+        if (speech.transcript) {
+            setText(function(t) {
+                return t ? (t + ' ' + speech.transcript) : speech.transcript;
+            });
+        }
+    }, [speech.transcript]);
+
+    function senden() {
+        const t = text.trim();
+        if (!t || deaktiviert) return;
+        onSenden(t);
+        setText('');
+        if (taRef.current) taRef.current.style.height = '40px';
+    }
+
+    function autoResize(e) {
+        const ta = e.target;
+        ta.style.height = '40px';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    }
+
+    return (
+        <div style={{
+            padding:'10px 12px',
+            background:'var(--bg-secondary)',
+            borderTop:'1px solid var(--border-color)',
+            display:'flex', gap:8, alignItems:'flex-end'
+        }}>
+            <textarea ref={taRef}
+                value={text}
+                onChange={function(e){ setText(e.target.value); autoResize(e); }}
+                onKeyDown={function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        senden();
+                    }
+                }}
+                placeholder={TWMAConfig.t('nch_eingabe_platzhalter', lang)}
+                rows={1}
+                style={{
+                    flex:1, padding:'10px 12px',
+                    background:'var(--bg-card)',
+                    color:'var(--text-white)',
+                    border:'1px solid var(--border-color)',
+                    borderRadius:'var(--radius-lg)',
+                    fontSize:14, fontFamily:'inherit',
+                    height:40, minHeight:40, maxHeight:120,
+                    resize:'none', overflowY:'auto',
+                    boxSizing:'border-box'
+                }} />
+
+            {speech.supported && (
+                <MicButton size={40}
+                    recording={speech.recording}
+                    onClick={function(){ speech.recording ? speech.stop() : speech.start(); }} />
+            )}
+
+            <button onClick={senden}
+                disabled={!text.trim() || deaktiviert}
+                style={{
+                    width:48, height:40,
+                    background: text.trim() && !deaktiviert
+                        ? 'linear-gradient(135deg,#1E88E5,#1565C0)'
+                        : 'var(--bg-card)',
+                    color: text.trim() && !deaktiviert ? '#fff' : 'var(--text-muted)',
+                    border:'none', borderRadius:'var(--radius-lg)',
+                    fontSize:18, fontWeight:700,
+                    cursor: text.trim() && !deaktiviert ? 'pointer' : 'not-allowed',
+                    flexShrink:0
+                }}>{'\u27A4'}</button>
+        </div>
+    );
+}
+
+// ===== Chat-Ansicht ===========================================
+
+function ChatAnsicht(props) {
+    const { lang } = props;
+    const [messages, setMessages]     = React.useState([]);
+    const [pending, setPending]       = React.useState([]); // lokale, noch nicht gesendete
+    const [warnung, setWarnung]       = React.useState('');
+    const scrollRef = React.useRef(null);
+    const deviceId = TWMACore.getDeviceId();
+
+    // Firebase-Listener
+    React.useEffect(function() {
+        if (!window.TWMAFirebase || !TWMAFirebase.isReady()) return;
+        const unsub = TWMAFirebase.listenForMessages(deviceId, function(list) {
+            setMessages(list);
+            // Eigene gesendete koennen jetzt aus pending entfernt werden
+            setPending(function(p) {
+                return p.filter(function(localMsg) {
+                    // Match per local_id im Firebase-Eintrag (wir nutzen ihn nicht, also einfach via timestamp+text)
+                    return !list.find(function(m) {
+                        return m.richtung === 'von_ma'
+                            && m.original && localMsg.original
+                            && m.original.text === localMsg.original.text
+                            && Math.abs((m.gesendet_am || 0) - (localMsg.gesendet_am || 0)) < 60000;
+                    });
+                });
+            });
+            // Eingehende ungelesene als gelesen markieren
+            list.forEach(function(m) {
+                if (m.richtung === 'von_buero' && !m.gelesen_am) {
+                    TWMAFirebase.markMessageAsRead(deviceId, m.id);
+                }
+            });
+        });
+        return unsub;
+    }, [deviceId]);
+
+    // Auto-Scroll bei neuer Nachricht
+    React.useEffect(function() {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [messages, pending]);
+
+    // Kein-API-Key-Hinweis
+    React.useEffect(function() {
+        const t = setTimeout(function() {
+            if (window.TWMATranslate && !TWMATranslate.hasApiKey()) {
+                setWarnung(TWMAConfig.t('nch_kein_apikey', lang));
+            }
+        }, 1000);
+        return function() { clearTimeout(t); };
+    }, []);
+
+    async function senden(text) {
+        if (!window.TWMAFirebase || !TWMAFirebase.isReady()) {
+            setWarnung('Firebase nicht bereit');
+            return;
+        }
+
+        const localMsg = {
+            id: 'local_' + Date.now(),
+            richtung: 'von_ma',
+            absender_name: TWMAConfig.t('nch_du', lang),
+            original: { sprache: lang, text: text },
+            uebersetzung: null,
+            gesendet_am: Date.now(),
+            lokal_status: 'wartet',
+            uebersetzung_status: 'pending'
+        };
+        setPending(function(p) { return p.concat(localMsg); });
+
+        // Uebersetzen (DE-Default oder weglassen wenn schon DE)
+        let uebers = null;
+        let ueberStatus = 'ok';
+        if (lang === 'de') {
+            uebers = { sprache: 'de', text: text };
+        } else if (window.TWMATranslate) {
+            try {
+                const tr = await TWMATranslate.translate(text, lang, 'de');
+                if (tr.success) {
+                    uebers = { sprache: 'de', text: tr.text };
+                } else {
+                    uebers = { sprache: 'de', text: text }; // Fallback Original
+                    ueberStatus = 'failed';
+                }
+            } catch (_) {
+                uebers = { sprache: 'de', text: text };
+                ueberStatus = 'failed';
+            }
+        }
+
+        // An Firebase
+        try {
+            await TWMAFirebase.sendMessage({
+                deviceId: deviceId,
+                richtung: 'von_ma',
+                absender_name: TWMAConfig.t('nch_du', 'de'),
+                original: { sprache: lang, text: text },
+                uebersetzung: uebers,
+                uebersetzung_status: ueberStatus,
+                typ: 'chat'
+            });
+            // Pending wird durch listenForMessages-Sync abgeraeumt
+        } catch (err) {
+            // Markiere als Fehler (bleibt in pending)
+            setPending(function(p) {
+                return p.map(function(m) {
+                    return m.id === localMsg.id
+                        ? Object.assign({}, m, { lokal_status: 'fehler' })
+                        : m;
+                });
+            });
+        }
+    }
+
+    // Kombinierte Liste (Firebase + lokale Pending)
+    const alle = messages.concat(pending);
+
+    return (
+        <div style={{flex:1, display:'flex', flexDirection:'column', minHeight:0}}>
+            {warnung && (
+                <div style={{
+                    padding:'8px 14px',
+                    background:'rgba(243,156,18,0.15)',
+                    borderBottom:'1px solid rgba(243,156,18,0.3)',
+                    color:'#f39c12',
+                    fontSize:11, textAlign:'center'
+                }}>{'\u26A0 '}{warnung}</div>
+            )}
+
+            <div ref={scrollRef} style={{
+                flex:1, overflowY:'auto',
+                padding:'12px 14px',
+                background:'var(--bg-primary)'
+            }}>
+                {alle.length === 0 && (
+                    <div style={{
+                        padding:'40px 20px', textAlign:'center',
+                        color:'var(--text-muted)', fontStyle:'italic'
+                    }}>{TWMAConfig.t('nch_keine_nachrichten', lang)}</div>
+                )}
+                {alle.map(function(msg) {
+                    return <ChatBubble key={msg.id} msg={msg} lang={lang} />;
+                })}
+            </div>
+
+            <ChatEingabe lang={lang} onSenden={senden}
+                deaktiviert={!window.TWMAFirebase || !TWMAFirebase.isReady()} />
+        </div>
+    );
+}
+
+// ===== Anweisungen-Karten =====================================
+
+function AnweisungsKarte(props) {
+    const { anweisung, lang, onLesen } = props;
+    const gelesen = !!anweisung.gelesen_am;
+
+    // Sprache fuer Hauptanzeige: MA-Sprache (Uebersetzung), Original drunter
+    const oben = (anweisung.uebersetzung && anweisung.uebersetzung.text) || (anweisung.original && anweisung.original.text);
+    const unten = anweisung.uebersetzung && anweisung.original
+                ? anweisung.original.text : null;
+    const datum = anweisung.gesendet_am
+        ? new Date(anweisung.gesendet_am).toLocaleDateString('de-DE')
+        : '';
+
+    return (
+        <div style={{
+            background: gelesen ? 'var(--bg-card)' : 'rgba(243,156,18,0.08)',
+            border: '1px solid ' + (gelesen ? 'var(--border-color)' : 'rgba(243,156,18,0.4)'),
+            borderRadius:'var(--radius-lg)',
+            padding:'12px 14px',
+            marginBottom:10,
+            display:'flex', flexDirection:'column', gap:6
+        }}>
+            <div style={{
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+                marginBottom:4
+            }}>
+                <div style={{
+                    fontFamily:'Oswald,sans-serif', fontSize:14, fontWeight:600,
+                    color:'var(--text-white)', textTransform:'uppercase', letterSpacing:'1px'
+                }}>{anweisung.titel || 'Anweisung'}</div>
+                {!gelesen && (
+                    <div style={{
+                        background:'#f39c12', color:'#fff',
+                        padding:'2px 8px', borderRadius:999,
+                        fontSize:10, fontWeight:700, letterSpacing:'0.5px'
+                    }}>NEU</div>
+                )}
+            </div>
+
+            <div style={{
+                fontSize:13, lineHeight:1.4,
+                color:'var(--text-light)',
+                whiteSpace:'pre-wrap', wordBreak:'break-word'
+            }}>{oben}</div>
+
+            {unten && unten !== oben && (
+                <div style={{
+                    marginTop:6, paddingTop:6,
+                    borderTop:'1px dashed var(--border-color)',
+                    fontSize:11, lineHeight:1.35,
+                    color:'var(--text-muted)', fontStyle:'italic',
+                    whiteSpace:'pre-wrap'
+                }}>
+                    <span style={{
+                        fontSize:9, textTransform:'uppercase', letterSpacing:'0.5px',
+                        marginRight:6
+                    }}>DE:</span>{unten}
+                </div>
+            )}
+
+            {anweisung.anhang_url && (
+                <a href={anweisung.anhang_url} target="_blank" rel="noopener noreferrer"
+                    style={{
+                        marginTop:6, padding:'8px 12px',
+                        background:'var(--bg-secondary)',
+                        color:'var(--accent-blue)',
+                        border:'1px solid var(--border-color)',
+                        borderRadius:'var(--radius-md)',
+                        fontSize:12, textDecoration:'none',
+                        display:'inline-block', alignSelf:'flex-start'
+                    }}>{'\uD83D\uDCCE Anhang'}</a>
+            )}
+
+            <div style={{
+                display:'flex', justifyContent:'space-between', alignItems:'center',
+                marginTop:6, fontSize:11
+            }}>
+                <span style={{color:'var(--text-muted)'}}>{datum}</span>
+                {gelesen ? (
+                    <span style={{color:'#27ae60', fontWeight:600}}>
+                        {'\u2713 '}{TWMAConfig.t('nch_anweisung_gelesen', lang)}
+                    </span>
+                ) : (
+                    <button onClick={function(){ onLesen(anweisung.id); }}
+                        style={{
+                            padding:'6px 12px',
+                            background:'linear-gradient(135deg,#27ae60,#1e8449)',
+                            color:'#fff', border:'none',
+                            borderRadius:'var(--radius-md)',
+                            fontSize:11, fontWeight:600,
+                            fontFamily:'Oswald,sans-serif',
+                            textTransform:'uppercase', letterSpacing:'0.5px',
+                            cursor:'pointer'
+                        }}>{'\u2713 '}{TWMAConfig.t('nch_anweisung_lesen', lang)}</button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ===== Anweisungs-Tab =========================================
+
+function AnweisungenAnsicht(props) {
+    const { lang } = props;
+    const [anweisungen, setAnweisungen] = React.useState([]);
+    const deviceId = TWMACore.getDeviceId();
+
+    React.useEffect(function() {
+        if (!window.TWMAFirebase || !TWMAFirebase.isReady()) return;
+        const unsub = TWMAFirebase.listenAnweisungen(deviceId, setAnweisungen);
+        return unsub;
+    }, [deviceId]);
+
+    function lesen(id) {
+        if (window.TWMAFirebase) TWMAFirebase.markAnweisungAsRead(deviceId, id);
+    }
+
+    return (
+        <div style={{flex:1, overflowY:'auto', padding:'12px 14px', background:'var(--bg-primary)'}}>
+            {anweisungen.length === 0 && (
+                <div style={{
+                    padding:'40px 20px', textAlign:'center',
+                    color:'var(--text-muted)', fontStyle:'italic'
+                }}>{TWMAConfig.t('nch_keine_anweisungen', lang)}</div>
+            )}
+            {anweisungen.map(function(a) {
+                return <AnweisungsKarte key={a.id} anweisung={a} lang={lang} onLesen={lesen} />;
+            })}
+        </div>
+    );
+}
+
+// ===== Haupt-Komponente =======================================
+
+function MANachrichten(props) {
+    const { lang } = props;
+    const [tab, setTab] = React.useState('chat');
+    const [anweisungenUngelesen, setAnweisungenUngelesen] = React.useState(0);
+
+    // Ungelesen-Counter fuer Anweisungs-Badge (laeuft im Hintergrund mit)
+    React.useEffect(function() {
+        if (!window.TWMAFirebase || !TWMAFirebase.isReady()) return;
+        const deviceId = TWMACore.getDeviceId();
+        const unsub = TWMAFirebase.listenAnweisungen(deviceId, function(list) {
+            setAnweisungenUngelesen(list.filter(function(a){ return !a.gelesen_am; }).length);
+        });
+        return unsub;
+    }, []);
+
+    return (
+        <div style={{flex:1, display:'flex', flexDirection:'column', minHeight:0}}>
+            <NchTabs lang={lang} aktiv={tab} onChange={setTab}
+                anweisungenUngelesen={anweisungenUngelesen} />
+            {tab === 'chat'
+                ? <ChatAnsicht lang={lang} />
+                : <AnweisungenAnsicht lang={lang} />}
+        </div>
     );
 }
 
