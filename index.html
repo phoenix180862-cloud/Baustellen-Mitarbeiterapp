@@ -26,6 +26,10 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- ===== Firebase SDK (Compat-Mode wie Master-App) ===== -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
     <!-- ===== Globaler Error-Handler ===== -->
     <script>
     window.onerror = function(msg, url, line, col, err) {
@@ -513,7 +517,228 @@
         height: 8px;
         border-radius: 50%;
     }
-    .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+    /* ═══════════════════════════════════════════
+       ONBOARDING / PIN-SCREENS (Etappe 3)
+       ═══════════════════════════════════════════ */
+    .auth-screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 40px 24px calc(40px + var(--safe-bottom));
+        position: relative;
+        text-align: center;
+        gap: 24px;
+    }
+
+    .auth-screen::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image:
+            linear-gradient(45deg, rgba(255,255,255,0.015) 25%, transparent 25%),
+            linear-gradient(-45deg, rgba(255,255,255,0.015) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.015) 75%),
+            linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.015) 75%);
+        background-size: 40px 40px;
+        background-position: 0 0, 0 20px, 20px -20px, -20px 0;
+        pointer-events: none;
+    }
+
+    .auth-logo-mini {
+        position: relative;
+        z-index: 1;
+        transform: scale(0.5);
+        margin-bottom: -40px;
+    }
+
+    .auth-titel {
+        position: relative; z-index: 1;
+        font-family: 'Oswald', sans-serif;
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-white);
+    }
+
+    .auth-untertitel {
+        position: relative; z-index: 1;
+        font-size: 14px;
+        color: var(--text-light);
+        max-width: 360px;
+        line-height: 1.5;
+    }
+
+    /* 6-Code-Anzeige */
+    .auth-code-box {
+        position: relative; z-index: 1;
+        background: linear-gradient(135deg, rgba(15,25,35,0.95), rgba(20,40,70,0.9));
+        border: 2px solid var(--accent-blue);
+        border-radius: var(--radius-lg);
+        padding: 28px 36px;
+        box-shadow: 0 0 30px rgba(77,166,255,0.3), 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .auth-code-label {
+        font-family: 'Oswald', sans-serif;
+        font-size: 11px;
+        color: rgba(77,166,255,0.8);
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+
+    .auth-code {
+        font-family: 'SF Mono', 'Roboto Mono', monospace;
+        font-size: 56px;
+        font-weight: 700;
+        color: var(--text-white);
+        letter-spacing: 12px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 20px rgba(77,166,255,0.4);
+    }
+
+    /* Wartepunkt-Animation */
+    .auth-warten {
+        position: relative; z-index: 1;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: var(--text-light);
+        font-size: 13px;
+    }
+
+    .auth-warten-dots {
+        display: inline-flex;
+        gap: 4px;
+    }
+
+    .auth-warten-dots span {
+        width: 8px;
+        height: 8px;
+        background: var(--accent-blue);
+        border-radius: 50%;
+        animation: warten-pulse 1.4s ease-in-out infinite;
+    }
+    .auth-warten-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .auth-warten-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes warten-pulse {
+        0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+        40% { opacity: 1; transform: scale(1.2); }
+    }
+
+    /* PIN-Input */
+    .pin-input-wrapper {
+        position: relative; z-index: 1;
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+
+    .pin-digit {
+        width: 56px;
+        height: 72px;
+        background: var(--bg-secondary);
+        border: 2px solid var(--border-color);
+        border-radius: var(--radius-md);
+        text-align: center;
+        font-family: 'Oswald', sans-serif;
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--text-white);
+        outline: none;
+        transition: all 0.2s;
+    }
+
+    .pin-digit:focus {
+        border-color: var(--accent-blue);
+        box-shadow: 0 0 12px rgba(77,166,255,0.4);
+    }
+
+    .pin-digit.filled {
+        background: var(--bg-tertiary);
+        border-color: var(--success);
+    }
+
+    .pin-digit.fehler {
+        border-color: var(--accent-red);
+        animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+    }
+
+    .auth-action-btn {
+        position: relative; z-index: 1;
+        padding: 14px 32px;
+        background: linear-gradient(135deg, var(--accent-red-light), var(--accent-red));
+        border: none;
+        border-radius: var(--radius-md);
+        color: var(--text-white);
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(196,30,30,0.4);
+        transition: all 0.2s;
+    }
+
+    .auth-action-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(196,30,30,0.5); }
+    .auth-action-btn:active { transform: scale(0.97); }
+    .auth-action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .auth-fehler {
+        position: relative; z-index: 1;
+        color: var(--accent-red-light);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .auth-info-box {
+        position: relative; z-index: 1;
+        background: var(--bg-card);
+        border-left: 3px solid var(--accent-orange);
+        border-radius: var(--radius-sm);
+        padding: 14px 18px;
+        max-width: 360px;
+        font-size: 12px;
+        color: var(--text-light);
+        text-align: left;
+        line-height: 1.5;
+    }
+
+    .auth-info-box strong { color: var(--accent-orange); }
+
+    .auth-firebase-status {
+        position: fixed;
+        top: calc(8px + var(--safe-top));
+        right: 12px;
+        z-index: 200;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 50px;
+        font-size: 10px;
+        color: var(--text-muted);
+    }
+
+    .auth-firebase-status .dot {
+        width: 6px; height: 6px; border-radius: 50%;
+    }
+    .auth-firebase-status .dot.ok { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .auth-firebase-status .dot.fehler { background: var(--accent-red); }
 
     </style>
 </head>
@@ -521,12 +746,613 @@
     <div id="root"></div>
 
     <script type="text/babel">
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
+
+    /* ═══════════════════════════════════════════════════════════
+       FIREBASE-INITIALISIERUNG (Etappe 3)
+       Identische Config wie Master-App: Projekt einkaufsliste-98199
+       ═══════════════════════════════════════════════════════════ */
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E",
+        authDomain: "einkaufsliste-98199.firebaseapp.com",
+        databaseURL: "https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "einkaufsliste-98199",
+        storageBucket: "einkaufsliste-98199.firebasestorage.app",
+        messagingSenderId: "411877213047",
+        appId: "1:411877213047:web:f04e3b9b98a8d97120d772"
+    };
+
+    let firebaseDB = null;
+    let firebaseStatus = 'init';
+
+    try {
+        if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(FIREBASE_CONFIG);
+            firebaseDB = firebase.database();
+            firebaseStatus = 'ok';
+            console.log('Firebase initialisiert: ' + FIREBASE_CONFIG.projectId);
+        } else {
+            firebaseStatus = 'fehler';
+            console.error('Firebase SDK nicht geladen');
+        }
+    } catch(e) {
+        firebaseStatus = 'fehler';
+        console.error('Firebase Init Fehler:', e);
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       AUTH-HELPERS (UUID, Code, PIN-Hash)
+       ═══════════════════════════════════════════════════════════ */
+    function generiereGeraeteId() {
+        // UUID v4 ohne externe Library
+        if (window.crypto && window.crypto.randomUUID) {
+            return 'dev-' + window.crypto.randomUUID();
+        }
+        // Fallback
+        return 'dev-' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0;
+            var v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    function generiereCode() {
+        // 6-stelliger numerischer Code, z.B. 847291
+        var code = '';
+        for (var i = 0; i < 6; i++) {
+            code += Math.floor(Math.random() * 10);
+        }
+        return code;
+    }
+
+    async function pinHash(pin, salt) {
+        // SHA-256 Hash von PIN+Salt (Salt = Geraete-ID, damit jeder Hash einzigartig)
+        var msg = new TextEncoder().encode(pin + ':' + salt);
+        var buf = await crypto.subtle.digest('SHA-256', msg);
+        var hashArray = Array.from(new Uint8Array(buf));
+        return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+
+    /* Erweiterte UI-Labels für Auth-Bildschirme */
+    Object.assign(UI_LABELS, {
+        auth_titel_code: {
+            de: 'Anmelde-Code',
+            cs: 'Prihlasovaci kod',
+            sk: 'Prihlasovaci kod',
+            pl: 'Kod logowania',
+            en: 'Login Code',
+            ro: 'Cod de conectare',
+            uk: 'Kod vkhodu'
+        },
+        auth_text_code: {
+            de: 'Gib diesen Code an Thomas weiter (Anruf oder WhatsApp). Sobald er dich freischaltet, geht es automatisch weiter.',
+            cs: 'Predej tento kod Thomasovi (telefon nebo WhatsApp). Jakmile te povoli, automaticky se pokracuje.',
+            sk: 'Odovzdaj tento kod Thomasovi (telefon alebo WhatsApp). Akonahle ta povoli, automaticky pokracuje.',
+            pl: 'Przekaz ten kod Thomasowi (telefon lub WhatsApp). Po zatwierdzeniu automatycznie przejdziesz dalej.',
+            en: 'Share this code with Thomas (call or WhatsApp). Once approved, the app continues automatically.',
+            ro: 'Trimite acest cod lui Thomas (telefon sau WhatsApp). Dupa aprobare, aplicatia continua automat.',
+            uk: 'Pereday tsey kod Thomasovi (telefon abo WhatsApp). Pislya zatverdzhennya prodovzhytsya avtomatychno.'
+        },
+        auth_warten: {
+            de: 'Warte auf Freigabe',
+            cs: 'Cekam na schvaleni',
+            sk: 'Cakam na schvalenie',
+            pl: 'Oczekiwanie na zatwierdzenie',
+            en: 'Waiting for approval',
+            ro: 'Astept aprobarea',
+            uk: 'Ochikuyu zatverdzhennya'
+        },
+        auth_titel_pin_setup: {
+            de: 'PIN festlegen',
+            cs: 'Nastav PIN',
+            sk: 'Nastav PIN',
+            pl: 'Ustaw PIN',
+            en: 'Set PIN',
+            ro: 'Seteaza PIN',
+            uk: 'Vstanovyty PIN'
+        },
+        auth_text_pin_setup: {
+            de: 'Waehle eine 4-6-stellige PIN. Mit dieser PIN meldest du dich kuenftig in der App an.',
+            cs: 'Vyber 4-6 mistny PIN. Timto PIN se budes do aplikace prihlasovat.',
+            sk: 'Vyber 4-6 ciselny PIN. Tymto PINom sa budes do aplikacie prihlasovat.',
+            pl: 'Wybierz 4-6 cyfrowy PIN. Tym PIN-em bedziesz logowal sie do aplikacji.',
+            en: 'Choose a 4-6 digit PIN. You will use this PIN to log in to the app.',
+            ro: 'Alege un PIN de 4-6 cifre. Cu acest PIN te vei conecta la aplicatie.',
+            uk: 'Vyberit PIN z 4-6 tsyfr. Z tsym PIN-om vy bude vkhodyty v dodatok.'
+        },
+        auth_pin_eingeben: {
+            de: 'PIN eingeben',
+            cs: 'Zadejte PIN',
+            sk: 'Zadajte PIN',
+            pl: 'Wprowadz PIN',
+            en: 'Enter PIN',
+            ro: 'Introdu PIN',
+            uk: 'Vvedit PIN'
+        },
+        auth_pin_bestaetigen: {
+            de: 'PIN wiederholen',
+            cs: 'Zopakovat PIN',
+            sk: 'Zopakovat PIN',
+            pl: 'Powtorz PIN',
+            en: 'Repeat PIN',
+            ro: 'Repeta PIN',
+            uk: 'Povtorit PIN'
+        },
+        auth_pin_falsch: {
+            de: 'Falsche PIN',
+            cs: 'Spatny PIN',
+            sk: 'Nespravny PIN',
+            pl: 'Bledny PIN',
+            en: 'Wrong PIN',
+            ro: 'PIN gresit',
+            uk: 'Nepravylnyy PIN'
+        },
+        auth_pin_keine_uebereinstimmung: {
+            de: 'PINs stimmen nicht ueberein',
+            cs: 'PINy se neshoduji',
+            sk: 'PINy sa nezhoduju',
+            pl: 'PINy sie nie zgadzaja',
+            en: 'PINs do not match',
+            ro: 'PIN-urile nu coincid',
+            uk: 'PIN-y ne spivpadayut'
+        },
+        auth_speichern: {
+            de: 'Speichern',
+            cs: 'Ulozit',
+            sk: 'Ulozit',
+            pl: 'Zapisz',
+            en: 'Save',
+            ro: 'Salveaza',
+            uk: 'Zberehty'
+        },
+        auth_anmelden: {
+            de: 'Anmelden',
+            cs: 'Prihlasit',
+            sk: 'Prihlasit',
+            pl: 'Zaloguj',
+            en: 'Login',
+            ro: 'Conectare',
+            uk: 'Uviyty'
+        },
+        auth_versuche_uebrig: {
+            de: 'Versuche uebrig: ',
+            cs: 'Zbyvajici pokusy: ',
+            sk: 'Zostavajuce pokusy: ',
+            pl: 'Pozostalo prob: ',
+            en: 'Attempts left: ',
+            ro: 'Incercari ramase: ',
+            uk: 'Sproby zalyshylysya: '
+        },
+        auth_gewipt: {
+            de: 'Geraet wurde zurueckgesetzt. Bitte erneut einrichten.',
+            cs: 'Zarizeni bylo resetovano. Prosim nastavte znovu.',
+            sk: 'Zariadenie bolo resetovane. Prosim nastavte znova.',
+            pl: 'Urzadzenie zostalo zresetowane. Skonfiguruj ponownie.',
+            en: 'Device has been reset. Please set up again.',
+            ro: 'Dispozitivul a fost resetat. Te rog configureaza din nou.',
+            uk: 'Prystriy bulo skydanno. Bud laska, nalashtuyte znovu.'
+        },
+        auth_fb_fehler: {
+            de: 'Keine Verbindung zum Server. Bitte Internet pruefen.',
+            cs: 'Zadne pripojeni k serveru. Zkontroluj internet.',
+            sk: 'Ziadne pripojenie k serveru. Skontroluj internet.',
+            pl: 'Brak polaczenia z serwerem. Sprawdz internet.',
+            en: 'No server connection. Please check internet.',
+            ro: 'Fara conexiune la server. Verifica internetul.',
+            uk: 'Nemaye zvyazku z serverom. Perevirit internet.'
+        }
+    });
+
+    /* ═══════════════════════════════════════════════════════════
+       AUTH-COMPONENTS (Etappe 3)
+       ═══════════════════════════════════════════════════════════ */
+
+    // Mini-Logo oben in Auth-Bildschirmen
+    function AuthLogo() {
+        return (
+            <div className="auth-logo-mini"><FirmenLogo size="large"/></div>
+        );
+    }
+
+    // Wartepunkt-Animation
+    function WartenDots() {
+        return (
+            <span className="auth-warten-dots"><span/><span/><span/></span>
+        );
+    }
+
+    // SCREEN 1: Onboarding mit 6-Code
+    function ScreenOnboarding({ lang, code, fbStatus }) {
+        return (
+            <div className="auth-screen">
+                <AuthLogo/>
+                <div className="auth-titel">{t('auth_titel_code', lang)}</div>
+                <div className="auth-untertitel">{t('auth_text_code', lang)}</div>
+
+                <div className="auth-code-box">
+                    <div className="auth-code-label">{t('auth_titel_code', lang)}</div>
+                    <div className="auth-code">{code || '------'}</div>
+                </div>
+
+                <div className="auth-warten">
+                    <WartenDots/>
+                    <span>{t('auth_warten', lang)}</span>
+                </div>
+
+                {fbStatus === 'fehler' && (
+                    <div className="auth-fehler">{t('auth_fb_fehler', lang)}</div>
+                )}
+
+                <div className="auth-info-box">
+                    <strong>Tipp:</strong> Schreibe Thomas eine WhatsApp mit dem Code, dann geht es schneller.
+                </div>
+            </div>
+        );
+    }
+
+    // SCREEN 2: PIN-Setup
+    function ScreenPinSetup({ lang, onPinGesetzt }) {
+        const [pin1, setPin1] = useState('');
+        const [pin2, setPin2] = useState('');
+        const [fehler, setFehler] = useState('');
+        const ref1 = useRef(null);
+
+        useEffect(() => { if (ref1.current) ref1.current.focus(); }, []);
+
+        const handleSpeichern = () => {
+            if (pin1.length < 4 || pin1.length > 6) {
+                setFehler('PIN muss 4-6 Stellen haben');
+                return;
+            }
+            if (pin1 !== pin2) {
+                setFehler(t('auth_pin_keine_uebereinstimmung', lang));
+                return;
+            }
+            onPinGesetzt(pin1);
+        };
+
+        return (
+            <div className="auth-screen">
+                <AuthLogo/>
+                <div className="auth-titel">{t('auth_titel_pin_setup', lang)}</div>
+                <div className="auth-untertitel">{t('auth_text_pin_setup', lang)}</div>
+
+                <div style={{display:'flex', flexDirection:'column', gap:'16px', alignItems:'center', position:'relative', zIndex:1}}>
+                    <input
+                        ref={ref1}
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={pin1}
+                        onChange={e => setPin1(e.target.value.replace(/\D/g,''))}
+                        placeholder={t('auth_pin_eingeben', lang)}
+                        style={{
+                            width:'240px', height:'60px', textAlign:'center',
+                            background:'var(--bg-secondary)', border:'2px solid var(--border-color)',
+                            borderRadius:'var(--radius-md)', color:'var(--text-white)',
+                            fontFamily:'Oswald, sans-serif', fontSize:'24px', fontWeight:'600',
+                            letterSpacing:'8px', outline:'none'
+                        }}
+                    />
+                    <input
+                        type="password"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={pin2}
+                        onChange={e => setPin2(e.target.value.replace(/\D/g,''))}
+                        placeholder={t('auth_pin_bestaetigen', lang)}
+                        style={{
+                            width:'240px', height:'60px', textAlign:'center',
+                            background:'var(--bg-secondary)', border:'2px solid var(--border-color)',
+                            borderRadius:'var(--radius-md)', color:'var(--text-white)',
+                            fontFamily:'Oswald, sans-serif', fontSize:'24px', fontWeight:'600',
+                            letterSpacing:'8px', outline:'none'
+                        }}
+                    />
+                </div>
+
+                {fehler && <div className="auth-fehler">{fehler}</div>}
+
+                <button className="auth-action-btn"
+                        disabled={pin1.length < 4 || pin2.length < 4}
+                        onClick={handleSpeichern}>
+                    {t('auth_speichern', lang)}
+                </button>
+            </div>
+        );
+    }
+
+    // SCREEN 3: PIN-Login
+    function ScreenPinLogin({ lang, onPinKorrekt, onWipe, geraeteId, gespeicherterHash }) {
+        const [pin, setPin] = useState('');
+        const [fehler, setFehler] = useState(false);
+        const [versuche, setVersuche] = useState(() => {
+            return parseInt(localStorage.getItem('tw-ma-pin-versuche') || '0', 10);
+        });
+        const ref = useRef(null);
+
+        useEffect(() => { if (ref.current) ref.current.focus(); }, []);
+
+        const versucheUebrig = 5 - versuche;
+
+        const handleAnmelden = async () => {
+            if (pin.length < 4) return;
+            const hash = await pinHash(pin, geraeteId);
+            if (hash === gespeicherterHash) {
+                localStorage.setItem('tw-ma-pin-versuche', '0');
+                onPinKorrekt();
+            } else {
+                const neueVersuche = versuche + 1;
+                setVersuche(neueVersuche);
+                localStorage.setItem('tw-ma-pin-versuche', String(neueVersuche));
+                setFehler(true);
+                setPin('');
+                if (neueVersuche >= 5) {
+                    setTimeout(() => onWipe('zu_viele_versuche'), 800);
+                } else {
+                    setTimeout(() => setFehler(false), 600);
+                    if (ref.current) ref.current.focus();
+                }
+            }
+        };
+
+        return (
+            <div className="auth-screen">
+                <AuthLogo/>
+                <div className="auth-titel">{t('auth_pin_eingeben', lang)}</div>
+
+                <input
+                    ref={ref}
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pin}
+                    onChange={e => setPin(e.target.value.replace(/\D/g,''))}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAnmelden(); }}
+                    className={fehler ? 'pin-digit fehler' : ''}
+                    style={{
+                        width:'240px', height:'72px', textAlign:'center',
+                        background:'var(--bg-secondary)',
+                        border: fehler ? '2px solid var(--accent-red)' : '2px solid var(--border-color)',
+                        borderRadius:'var(--radius-md)', color:'var(--text-white)',
+                        fontFamily:'Oswald, sans-serif', fontSize:'32px', fontWeight:'600',
+                        letterSpacing:'12px', outline:'none', position:'relative', zIndex:1
+                    }}
+                />
+
+                {fehler && <div className="auth-fehler">{t('auth_pin_falsch', lang)}</div>}
+
+                {versuche > 0 && (
+                    <div style={{color:'var(--text-muted)', fontSize:'12px', position:'relative', zIndex:1}}>
+                        {t('auth_versuche_uebrig', lang)}{versucheUebrig}
+                    </div>
+                )}
+
+                <button className="auth-action-btn"
+                        disabled={pin.length < 4}
+                        onClick={handleAnmelden}>
+                    {t('auth_anmelden', lang)}
+                </button>
+            </div>
+        );
+    }
+
+    // SCREEN 4: Wipe-Bildschirm (kurz, dann Reload)
+    function ScreenWipe({ lang }) {
+        return (
+            <div className="auth-screen">
+                <AuthLogo/>
+                <div className="auth-titel" style={{color:'var(--accent-red-light)'}}>!</div>
+                <div className="auth-untertitel">{t('auth_gewipt', lang)}</div>
+                <div className="auth-warten">
+                    <WartenDots/>
+                </div>
+            </div>
+        );
+    }
+
+    // Firebase-Status-Indikator (oben rechts in Auth-Screens)
+    function FirebaseStatus({ status }) {
+        const txt = status === 'ok' ? 'Server ✓' : status === 'fehler' ? 'Offline' : 'Verbinde...';
+        return (
+            <div className="auth-firebase-status">
+                <span className={'dot ' + (status === 'ok' ? 'ok' : 'fehler')}/>
+                <span>{txt}</span>
+            </div>
+        );
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       AUTH-CONTAINER — Top-Level State Machine
+       Stati: 'pruefen' | 'onboarding' | 'pin-setup' | 'pin-login' | 'app' | 'wipe'
+       ═══════════════════════════════════════════════════════════ */
+    function AuthContainer({ lang }) {
+        const [authState, setAuthState] = useState('pruefen');
+        const [geraeteId, setGeraeteId] = useState(null);
+        const [code, setCode] = useState(null);
+        const [gespeicherterHash, setGespeicherterHash] = useState(null);
+        const pollIntervalRef = useRef(null);
+        const statusListenerRef = useRef(null);
+
+        // Lade lokalen Stand beim Start
+        useEffect(() => {
+            const storedId = localStorage.getItem('tw-ma-geraete-id');
+            const storedCode = localStorage.getItem('tw-ma-code');
+            const storedHash = localStorage.getItem('tw-ma-pin-hash');
+
+            if (!storedId) {
+                // Komplett neuer User → Onboarding starten
+                starteOnboarding();
+            } else {
+                setGeraeteId(storedId);
+                setGespeicherterHash(storedHash);
+
+                if (storedHash) {
+                    // Schon eingerichtet → PIN-Login
+                    setAuthState('pin-login');
+                    // Trotzdem Status horchen (Wipe / Sperre)
+                    horcheAufStatus(storedId);
+                } else if (storedCode) {
+                    // Onboarding laeuft, aber PIN noch nicht gesetzt
+                    setCode(storedCode);
+                    setAuthState('onboarding');
+                    horcheAufStatus(storedId);
+                } else {
+                    starteOnboarding();
+                }
+            }
+
+            return () => {
+                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                if (statusListenerRef.current && firebaseDB) {
+                    firebaseDB.ref('geraete/' + geraeteId + '/status').off('value', statusListenerRef.current);
+                }
+            };
+        }, []);
+
+        function starteOnboarding() {
+            const neueId = generiereGeraeteId();
+            const neuerCode = generiereCode();
+            localStorage.setItem('tw-ma-geraete-id', neueId);
+            localStorage.setItem('tw-ma-code', neuerCode);
+            setGeraeteId(neueId);
+            setCode(neuerCode);
+            setAuthState('onboarding');
+
+            // In Firebase eintragen
+            if (firebaseDB) {
+                firebaseDB.ref('geraete/' + neueId).set({
+                    code: neuerCode,
+                    status: 'wartend',
+                    erstellt: Date.now(),
+                    sprache: lang,
+                    user_agent: navigator.userAgent.substring(0, 200)
+                }).then(() => {
+                    console.log('Geraet in Firebase angelegt:', neueId, 'Code:', neuerCode);
+                    horcheAufStatus(neueId);
+                }).catch(err => {
+                    console.error('Firebase-Fehler beim Anlegen:', err);
+                });
+            }
+        }
+
+        function horcheAufStatus(devId) {
+            if (!firebaseDB) return;
+            const ref = firebaseDB.ref('geraete/' + devId + '/status');
+            const handler = (snapshot) => {
+                const status = snapshot.val();
+                console.log('Firebase-Status-Update:', status);
+                if (status === 'freigegeben') {
+                    const hash = localStorage.getItem('tw-ma-pin-hash');
+                    if (!hash) {
+                        setAuthState('pin-setup');
+                    } else {
+                        // Bereits PIN gesetzt → einfach App offen lassen
+                    }
+                } else if (status === 'gesperrt' || status === 'wipe') {
+                    handleWipe('vom_admin');
+                }
+            };
+            ref.on('value', handler);
+            statusListenerRef.current = handler;
+        }
+
+        async function handlePinGesetzt(pin) {
+            const hash = await pinHash(pin, geraeteId);
+            localStorage.setItem('tw-ma-pin-hash', hash);
+            setGespeicherterHash(hash);
+
+            // In Firebase: PIN-Hash speichern + Status auf 'aktiv'
+            if (firebaseDB) {
+                await firebaseDB.ref('geraete/' + geraeteId).update({
+                    pin_hash: hash,
+                    status: 'aktiv',
+                    pin_gesetzt: Date.now()
+                });
+            }
+
+            // Code loeschen, brauchen wir nicht mehr
+            localStorage.removeItem('tw-ma-code');
+            setAuthState('app');
+        }
+
+        function handleWipe(grund) {
+            console.warn('WIPE: ' + grund);
+            setAuthState('wipe');
+
+            // Firebase informieren
+            if (firebaseDB && geraeteId) {
+                firebaseDB.ref('geraete/' + geraeteId).update({
+                    status: 'gewipt',
+                    gewipt_grund: grund,
+                    gewipt_at: Date.now()
+                }).catch(() => {});
+            }
+
+            // Lokale Daten weg
+            setTimeout(() => {
+                localStorage.removeItem('tw-ma-geraete-id');
+                localStorage.removeItem('tw-ma-code');
+                localStorage.removeItem('tw-ma-pin-hash');
+                localStorage.removeItem('tw-ma-pin-versuche');
+                window.location.reload();
+            }, 2500);
+        }
+
+        // Wenn Firebase nicht da ist und keine PIN existiert: Onboarding nicht moeglich
+        if (firebaseStatus === 'fehler' && authState === 'pruefen') {
+            return (
+                <div className="auth-screen">
+                    <AuthLogo/>
+                    <div className="auth-titel" style={{color:'var(--accent-red-light)'}}>Server-Fehler</div>
+                    <div className="auth-untertitel">{t('auth_fb_fehler', lang)}</div>
+                    <button className="auth-action-btn" onClick={() => window.location.reload()}>
+                        Neu laden
+                    </button>
+                </div>
+            );
+        }
+
+        return (
+            <>
+                {authState !== 'app' && <FirebaseStatus status={firebaseStatus}/>}
+
+                {authState === 'pruefen' && (
+                    <div className="auth-screen">
+                        <AuthLogo/>
+                        <div className="auth-warten"><WartenDots/></div>
+                    </div>
+                )}
+
+                {authState === 'onboarding' && (
+                    <ScreenOnboarding lang={lang} code={code} fbStatus={firebaseStatus}/>
+                )}
+
+                {authState === 'pin-setup' && (
+                    <ScreenPinSetup lang={lang} onPinGesetzt={handlePinGesetzt}/>
+                )}
+
+                {authState === 'pin-login' && (
+                    <ScreenPinLogin lang={lang}
+                                    geraeteId={geraeteId}
+                                    gespeicherterHash={gespeicherterHash}
+                                    onPinKorrekt={() => setAuthState('app')}
+                                    onWipe={handleWipe}/>
+                )}
+
+                {authState === 'wipe' && <ScreenWipe lang={lang}/>}
+
+                {authState === 'app' && <MainApp lang={lang}/>}
+            </>
+        );
+    }
+
+
 
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe1-v2';
+    const APP_VERSION = '1.0.0-etappe3';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -1567,8 +2393,12 @@
     /* ═══════════════════════════════════════════════════════════
        TOP-LEVEL APP
        ═══════════════════════════════════════════════════════════ */
-    function MAApp() {
-        const [lang, setLang] = useState(() => localStorage.getItem('tw-ma-sprache') || 'de');
+    /* ═══════════════════════════════════════════════════════════
+       MAIN APP — der eigentliche App-Inhalt nach erfolgreichem Login
+       (vorher hieß diese Komponente MAApp)
+       ═══════════════════════════════════════════════════════════ */
+    function MainApp({ lang: initialLang }) {
+        const [lang, setLang] = useState(initialLang);
         const [fontLarge, setFontLarge] = useState(() => localStorage.getItem('tw_font_scale') === 'large');
         const [aktiverTab, setAktiverTab] = useState('start');
         const [sprachModalOffen, setSprachModalOffen] = useState(false);
@@ -1641,6 +2471,15 @@
                 )}
             </>
         );
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TOP-LEVEL WRAPPER — verwaltet Sprache, rendert AuthContainer
+       Dieser steht zwischen ReactDOM.render und MainApp.
+       ═══════════════════════════════════════════════════════════ */
+    function MAApp() {
+        const lang = localStorage.getItem('tw-ma-sprache') || 'de';
+        return <AuthContainer lang={lang}/>;
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<MAApp/>);
