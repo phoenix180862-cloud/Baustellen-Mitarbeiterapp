@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+    <defs>
+        <!-- Hintergrund-Gradient (Akzentblau) -->
+        <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stop-color="#1E88E5"/>
+            <stop offset="100%" stop-color="#1565C0"/>
+        </linearGradient>
+        <!-- Helm-Gradient (Orange) -->
+        <linearGradient id="helmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stop-color="#f39c12"/>
+            <stop offset="60%"  stop-color="#e67e22"/>
+            <stop offset="100%" stop-color="#c0660d"/>
+        </linearGradient>
+        <!-- Helm-Highlight -->
+        <radialGradient id="helmGloss" cx="35%" cy="25%" r="40%">
+            <stop offset="0%"   stop-color="rgba(255,255,255,0.55)"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
+        <!-- Subtiler Glow fuer Hintergrund -->
+        <radialGradient id="bgGlow" cx="50%" cy="40%" r="60%">
+            <stop offset="0%"   stop-color="rgba(255,255,255,0.14)"/>
+            <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
+        <!-- Schatten unter dem Helm -->
+        <filter id="helmShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+            <feOffset dx="0" dy="6" result="offsetBlur"/>
+            <feComponentTransfer><feFuncA type="linear" slope="0.4"/></feComponentTransfer>
+            <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+    </defs>
+
+    <!-- Runder Hintergrund -->
+    <rect width="512" height="512" fill="url(#bgGrad)"/>
+    <rect width="512" height="512" fill="url(#bgGlow)"/>
+
+    <!-- Dekorative Akzentringe (sehr dezent) -->
+    <circle cx="256" cy="256" r="235" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+    <circle cx="256" cy="256" r="205" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+    <!-- ===== Bauhelm ===== -->
+    <g filter="url(#helmShadow)">
+        <!-- Helm-Kuppel -->
+        <path d="M 120 300
+                 Q 120 140, 256 140
+                 Q 392 140, 392 300
+                 Z"
+              fill="url(#helmGrad)"/>
+
+        <!-- Helm-Highlight (Glanz oben links) -->
+        <path d="M 120 300
+                 Q 120 140, 256 140
+                 Q 392 140, 392 300
+                 Z"
+              fill="url(#helmGloss)"/>
+
+        <!-- Helm-Krempe (die breite Platte unten) -->
+        <path d="M 90 300
+                 L 422 300
+                 L 422 342
+                 Q 422 358, 406 358
+                 L 106 358
+                 Q 90 358, 90 342
+                 Z"
+              fill="#c0660d"/>
+
+        <!-- Helm-Krempe Highlight -->
+        <rect x="90" y="300" width="332" height="8" fill="rgba(255,255,255,0.18)"/>
+
+        <!-- Vertikaler Mittelsteg -->
+        <rect x="248" y="140" width="16" height="160" fill="rgba(0,0,0,0.12)" rx="3"/>
+    </g>
+
+    <!-- ===== TW-Schild auf der Helm-Vorderseite ===== -->
+    <!-- Schild-Hintergrund -->
+    <rect x="176" y="200" width="160" height="80" rx="10" fill="#ffffff" stroke="#c0660d" stroke-width="2"/>
+    <!-- Dezenter Schatten auf dem Schild -->
+    <rect x="176" y="270" width="160" height="10" fill="rgba(0,0,0,0.08)"/>
+
+    <!-- TW-Monogramm -->
+    <text x="256" y="263"
+          font-family="Oswald, 'Arial Black', sans-serif"
+          font-weight="700"
+          font-size="56"
+          fill="#1565C0"
+          text-anchor="middle"
+          letter-spacing="3">TW</text>
+
+    <!-- ===== Bauhelm-Details ===== -->
+    <!-- Luftlueftungsschlitze (ganz zart) -->
+    <g opacity="0.35" fill="#8a4a0a">
+        <rect x="160" y="170" width="24" height="4" rx="2"/>
+        <rect x="328" y="170" width="24" height="4" rx="2"/>
+    </g>
+
+    <!-- ===== Boden-Akzent (Baustelle) ===== -->
+    <g opacity="0.5">
+        <rect x="80" y="378" width="352" height="3" fill="rgba(255,255,255,0.4)"/>
+        <!-- Kleine "Staub-Punkte" -->
+        <circle cx="120" cy="395" r="2" fill="rgba(255,255,255,0.3)"/>
+        <circle cx="200" cy="402" r="1.5" fill="rgba(255,255,255,0.25)"/>
+        <circle cx="320" cy="398" r="2" fill="rgba(255,255,255,0.3)"/>
+        <circle cx="380" cy="395" r="1.5" fill="rgba(255,255,255,0.25)"/>
+    </g>
+</svg>
