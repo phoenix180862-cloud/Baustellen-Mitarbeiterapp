@@ -9,7 +9,7 @@
 // - Push-Handler-Skelett fuer Etappe 7
 // ============================================================
 
-const CACHE_VERSION = 'v0.8.1-single';
+const CACHE_VERSION = 'v0.8.2-keys-builtin';
 const CACHE_NAME    = 'tw-ma-' + CACHE_VERSION;
 
 // App-Shell: statische Assets, die offline verfuegbar sein muessen.

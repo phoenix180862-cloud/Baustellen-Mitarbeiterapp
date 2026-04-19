@@ -73,7 +73,7 @@
 
         // Cache-Killer: Einmalig alle alten Caches und SW loeschen,
         // wenn noch kein Marker fuer diese Version gesetzt ist.
-        var VERSION_MARKER = 'tw-ma-cache-killed-v0.8.1-single';
+        var VERSION_MARKER = 'tw-ma-cache-killed-v0.8.2-keys-builtin';
         try {
             if (!localStorage.getItem(VERSION_MARKER)) {
                 // Alle bestehenden SW deregistrieren
@@ -653,18 +653,16 @@
     // ===== Version =====
     const APP_VERSION = '0.8.0-e8';
 
-    // ===== Firebase-Config (aus Master-App uebernommen) =====
-    // Wird in Etappe 3 scharf geschaltet.
+    // ===== Firebase-Config (FEST EINGEBAUT - keine Eingabe nötig) =====
+    // Werte aus Master-App "TW Business Suite" / Firebase-Projekt "einkaufsliste-98199"
     const FIREBASE_CONFIG = {
-        // Platzhalter - Thomas traegt echte Werte via Onboarding-Dialog ein
-        // oder sie werden in Etappe 3 aus der Master-App-Config uebernommen.
-        apiKey: '',
+        apiKey: 'AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E',
         authDomain: 'einkaufsliste-98199.firebaseapp.com',
         databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app',
         projectId: 'einkaufsliste-98199',
-        storageBucket: 'einkaufsliste-98199.appspot.com',
-        messagingSenderId: '',
-        appId: ''
+        storageBucket: 'einkaufsliste-98199.firebasestorage.app',
+        messagingSenderId: '411877213047',
+        appId: '1:411877213047:web:f04e3b9b98a8d97120d772'
     };
 
     // ===== Unterstuetzte Sprachen (Erstaufschlag) =====
@@ -972,12 +970,16 @@
         { id: 'so_reiniger',             kategorie: 'sonstiges',   name: 'Zementschleier-Entferner',      default_einheit: 'Flasche' }
     ];
 
-    // ===== Verschluesselte Keys (Platzhalter Etappe 0) =====
-    // Werden in Etappen 3 + 7 befuellt.
+    // ===== API-Keys (FEST EINGEBAUT - keine Eingabe nötig) =====
+    // Gemini-Key fuer KI-Uebersetzung der Chat-Nachrichten.
+    // Wird beim App-Start automatisch in TWMATranslate geladen.
+    const GEMINI_API_KEY = 'AIzaSyBRWzq_9XrDdf_imjmHCxmudX_CE4C7tIQ';
+
+    // Verschluesselte Keys (Optional, fuer extra Schutz - aktuell nicht genutzt)
     const ENCRYPTED_KEYS = {
-        gemini:         null,  // AES-256 verschluesselter Gemini-Key
-        driveService:   null,  // AES-256 verschluesselter Service-Account-JSON
-        masterPassword: null   // Statisch eingebaut vor Auslieferung
+        gemini:         null,
+        driveService:   null,
+        masterPassword: null
     };
 
     // ===== Kosten-Monitoring (Etappe 7) =====
@@ -993,6 +995,7 @@
         LANGUAGES:          LANGUAGES,
         UI_LABELS:          UI_LABELS,
         ENCRYPTED_KEYS:     ENCRYPTED_KEYS,
+        GEMINI_API_KEY:     GEMINI_API_KEY,
         TRANSLATION_LIMITS: TRANSLATION_LIMITS,
         TAETIGKEITEN:       TAETIGKEITEN,
         MATERIAL_DB:        MATERIAL_DB,
@@ -1603,10 +1606,19 @@
         }
     }
 
-    // ---- Beim Start: Key aus Config entschluesseln (falls vorhanden) ----
+    // ---- Beim Start: Key aus Config laden (Klartext oder verschluesselt) ----
     async function initKeyFromConfig() {
         if (apiKey) return true;
-        if (!global.TWMAConfig || !TWMAConfig.ENCRYPTED_KEYS) return false;
+        if (!global.TWMAConfig) return false;
+
+        // 1. Versuche zuerst den Klartext-Key (FEST EINGEBAUT)
+        if (TWMAConfig.GEMINI_API_KEY && TWMAConfig.GEMINI_API_KEY.length > 10) {
+            apiKey = TWMAConfig.GEMINI_API_KEY.trim();
+            return true;
+        }
+
+        // 2. Fallback: Verschluesselter Key (falls verwendet)
+        if (!TWMAConfig.ENCRYPTED_KEYS) return false;
         const enc  = TWMAConfig.ENCRYPTED_KEYS.gemini;
         const pass = TWMAConfig.ENCRYPTED_KEYS.masterPassword;
         if (!enc || !pass) return false;
@@ -1800,10 +1812,12 @@
     };
 
     // ---- Lazy-Init beim Laden (non-blocking) ----
-    if (global.TWMAConfig && TWMAConfig.ENCRYPTED_KEYS
-        && TWMAConfig.ENCRYPTED_KEYS.gemini && TWMAConfig.ENCRYPTED_KEYS.masterPassword) {
+    if (global.TWMAConfig && (
+        TWMAConfig.GEMINI_API_KEY
+        || (TWMAConfig.ENCRYPTED_KEYS && TWMAConfig.ENCRYPTED_KEYS.gemini && TWMAConfig.ENCRYPTED_KEYS.masterPassword)
+    )) {
         initKeyFromConfig().then(function(ok) {
-            if (ok && global.TWMACore) TWMACore.log('info', 'Translation', 'Gemini-Key beim Start entschluesselt');
+            if (ok && global.TWMACore) TWMACore.log('info', 'Translation', 'Gemini-Key beim Start geladen');
         });
     }
 
