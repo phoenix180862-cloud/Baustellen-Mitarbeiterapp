@@ -22,7 +22,7 @@ Mitarbeiter-Handys haben **keinen Zugriff** auf die Original-Kundenordner.
 |---|---|---|---|
 | 1 | Start | Uhr, Sprach-Wahl, Status | E1 |
 | 2 | Baustellen | Liste freigegebener Baustellen, 4-Ordner-Detail | E4 |
-| 3 | Kalender | Eigener Schichtplan (read-only) | E8 |
+| 3 | Kalender | Eigener Schichtplan (read-only) | **E8** |
 | 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | E5 |
 | 5 | Stunden | Stundenzettel-PDF mit Material-Popup | E6 |
 | 6 | Nachrichten | Live-uebersetzter Chat mit Buero | **E7 (Phasen A+B+C)** |
