@@ -29,6 +29,10 @@
     <!-- ===== Firebase SDK (Compat-Mode wie Master-App) ===== -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <!-- ===== Auth-Modul (Login Code+PIN gegen Master-App-Schema) ===== -->
+    <script src="js/tw-ma-auth.js"></script>
 
     <!-- ===== Globaler Error-Handler ===== -->
     <script>
@@ -781,40 +785,8 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       AUTH-HELPERS (UUID, Code, PIN-Hash)
-       ═══════════════════════════════════════════════════════════ */
-    function generiereGeraeteId() {
-        // UUID v4 ohne externe Library
-        if (window.crypto && window.crypto.randomUUID) {
-            return 'dev-' + window.crypto.randomUUID();
-        }
-        // Fallback
-        return 'dev-' + 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            var r = Math.random() * 16 | 0;
-            var v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    }
-
-    function generiereCode() {
-        // 6-stelliger numerischer Code, z.B. 847291
-        var code = '';
-        for (var i = 0; i < 6; i++) {
-            code += Math.floor(Math.random() * 10);
-        }
-        return code;
-    }
-
-    async function pinHash(pin, salt) {
-        // SHA-256 Hash von PIN+Salt (Salt = Geraete-ID, damit jeder Hash einzigartig)
-        var msg = new TextEncoder().encode(pin + ':' + salt);
-        var buf = await crypto.subtle.digest('SHA-256', msg);
-        var hashArray = Array.from(new Uint8Array(buf));
-        return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
-    }
-
-    /* ═══════════════════════════════════════════════════════════
-       AUTH-COMPONENTS (Etappe 3)
+       AUTH-COMPONENTS (Etappe 3 — neu, Schema invitations/+users/)
+       Helpers liegen in js/tw-ma-auth.js (window.TWMAAuth)
        ═══════════════════════════════════════════════════════════ */
 
     // Mini-Logo oben in Auth-Bildschirmen
@@ -831,177 +803,174 @@
         );
     }
 
-    // SCREEN 1: Onboarding mit 6-Code
-    function ScreenOnboarding({ lang, code, fbStatus }) {
-        return (
-            <div className="auth-screen">
-                <AuthLogo/>
-                <div className="auth-titel">{t('auth_titel_code', lang)}</div>
-                <div className="auth-untertitel">{t('auth_text_code', lang)}</div>
-
-                <div className="auth-code-box">
-                    <div className="auth-code-label">{t('auth_titel_code', lang)}</div>
-                    <div className="auth-code">{code || '------'}</div>
-                </div>
-
-                <div className="auth-warten">
-                    <WartenDots/>
-                    <span>{t('auth_warten', lang)}</span>
-                </div>
-
-                {fbStatus === 'fehler' && (
-                    <div className="auth-fehler">{t('auth_fb_fehler', lang)}</div>
-                )}
-
-                <div className="auth-info-box">
-                    <strong>Tipp:</strong> Schreibe Thomas eine WhatsApp mit dem Code, dann geht es schneller.
-                </div>
-            </div>
-        );
-    }
-
-    // SCREEN 2: PIN-Setup
-    function ScreenPinSetup({ lang, onPinGesetzt }) {
-        const [pin1, setPin1] = useState('');
-        const [pin2, setPin2] = useState('');
+    // SCREEN 1: Code + PIN eingeben
+    // Mitarbeiter erhaelt Code+PIN von Thomas (mundlich, WhatsApp oder QR-Code).
+    // Beide Felder werden gegen invitations/{code}.pin in Firebase geprueft.
+    function ScreenCodeEingabe({ lang, onErfolg, onFehler }) {
+        const [code, setCode] = useState('');
+        const [pin, setPin] = useState('');
         const [fehler, setFehler] = useState('');
-        const ref1 = useRef(null);
+        const [busy, setBusy] = useState(false);
+        const codeRef = useRef(null);
+        const pinRef = useRef(null);
 
-        useEffect(() => { if (ref1.current) ref1.current.focus(); }, []);
+        useEffect(() => { if (codeRef.current) codeRef.current.focus(); }, []);
 
-        const handleSpeichern = () => {
-            if (pin1.length < 4 || pin1.length > 6) {
-                setFehler('PIN muss 4-6 Stellen haben');
-                return;
+        // Code-Format: 6 Zeichen alphanumerisch (siehe _generateInvitationCode in Master)
+        // Erlaubte Zeichen: ABCDEFGHJKMNPQRSTUVWXYZ23456789 — also alle Buchstaben
+        // ausser I/L/O und alle Ziffern ausser 0/1
+        const handleCodeChange = (e) => {
+            const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+            setCode(v);
+            if (v.length === 6 && pinRef.current) pinRef.current.focus();
+        };
+
+        const handlePinChange = (e) => {
+            const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+            setPin(v);
+        };
+
+        const handleAnmelden = async () => {
+            if (code.length !== 6 || pin.length < 4) return;
+            setBusy(true);
+            setFehler('');
+            try {
+                const result = await window.TWMAAuth.einloggen(code, pin, lang);
+                onErfolg(result);
+            } catch (e) {
+                const E = window.TWMAAuth.ERR;
+                let msg;
+                switch (e.code) {
+                    case E.CODE_NOT_FOUND:   msg = t('auth_fehler_code_unbekannt', lang); break;
+                    case E.PIN_FALSE:        msg = t('auth_fehler_pin_falsch', lang); break;
+                    case E.INVITE_EXPIRED:   msg = t('auth_fehler_abgelaufen', lang); break;
+                    case E.INVITE_USED:      msg = t('auth_fehler_verwendet', lang); break;
+                    case E.INVITE_REVOKED:   msg = t('auth_fehler_widerrufen', lang); break;
+                    case E.FIREBASE_DOWN:    msg = t('auth_fb_fehler', lang); break;
+                    default:                 msg = e.message || 'Fehler';
+                }
+                setFehler(msg);
+                setBusy(false);
+                onFehler && onFehler(e);
             }
-            if (pin1 !== pin2) {
-                setFehler(t('auth_pin_keine_uebereinstimmung', lang));
-                return;
-            }
-            onPinGesetzt(pin1);
         };
 
         return (
             <div className="auth-screen">
                 <AuthLogo/>
-                <div className="auth-titel">{t('auth_titel_pin_setup', lang)}</div>
-                <div className="auth-untertitel">{t('auth_text_pin_setup', lang)}</div>
+                <div className="auth-titel">{t('auth_titel_anmeldung', lang)}</div>
+                <div className="auth-untertitel">{t('auth_text_anmeldung', lang)}</div>
 
-                <div style={{display:'flex', flexDirection:'column', gap:'16px', alignItems:'center', position:'relative', zIndex:1}}>
-                    <input
-                        ref={ref1}
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={pin1}
-                        onChange={e => setPin1(e.target.value.replace(/\D/g,''))}
-                        placeholder={t('auth_pin_eingeben', lang)}
-                        style={{
-                            width:'240px', height:'60px', textAlign:'center',
-                            background:'var(--bg-secondary)', border:'2px solid var(--border-color)',
-                            borderRadius:'var(--radius-md)', color:'var(--text-white)',
-                            fontFamily:'Oswald, sans-serif', fontSize:'24px', fontWeight:'600',
-                            letterSpacing:'8px', outline:'none'
-                        }}
-                    />
-                    <input
-                        type="password"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={pin2}
-                        onChange={e => setPin2(e.target.value.replace(/\D/g,''))}
-                        placeholder={t('auth_pin_bestaetigen', lang)}
-                        style={{
-                            width:'240px', height:'60px', textAlign:'center',
-                            background:'var(--bg-secondary)', border:'2px solid var(--border-color)',
-                            borderRadius:'var(--radius-md)', color:'var(--text-white)',
-                            fontFamily:'Oswald, sans-serif', fontSize:'24px', fontWeight:'600',
-                            letterSpacing:'8px', outline:'none'
-                        }}
-                    />
+                <div style={{display:'flex', flexDirection:'column', gap:'14px', alignItems:'center', position:'relative', zIndex:1, marginTop:'8px'}}>
+                    {/* Code-Feld */}
+                    <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px'}}>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'2px'}}>
+                            {t('auth_code_label', lang)}
+                        </div>
+                        <input
+                            ref={codeRef}
+                            type="text"
+                            inputMode="text"
+                            autoCapitalize="characters"
+                            autoComplete="off"
+                            spellCheck="false"
+                            maxLength={6}
+                            value={code}
+                            onChange={handleCodeChange}
+                            placeholder="ABC123"
+                            style={{
+                                width:'260px', height:'60px', textAlign:'center',
+                                background:'var(--bg-secondary)',
+                                border: fehler ? '2px solid var(--accent-red)' : '2px solid var(--border-color)',
+                                borderRadius:'var(--radius-md)', color:'var(--text-white)',
+                                fontFamily:'Courier New, monospace', fontSize:'28px', fontWeight:'700',
+                                letterSpacing:'6px', outline:'none', textTransform:'uppercase'
+                            }}
+                        />
+                    </div>
+
+                    {/* PIN-Feld */}
+                    <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'4px'}}>
+                        <div style={{fontSize:'11px', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'2px'}}>
+                            {t('auth_pin_label', lang)}
+                        </div>
+                        <input
+                            ref={pinRef}
+                            type="password"
+                            inputMode="numeric"
+                            autoComplete="off"
+                            maxLength={6}
+                            value={pin}
+                            onChange={handlePinChange}
+                            onKeyDown={e => { if (e.key === 'Enter') handleAnmelden(); }}
+                            placeholder="••••"
+                            style={{
+                                width:'260px', height:'60px', textAlign:'center',
+                                background:'var(--bg-secondary)',
+                                border: fehler ? '2px solid var(--accent-red)' : '2px solid var(--border-color)',
+                                borderRadius:'var(--radius-md)', color:'var(--text-white)',
+                                fontFamily:'Oswald, sans-serif', fontSize:'28px', fontWeight:'600',
+                                letterSpacing:'10px', outline:'none'
+                            }}
+                        />
+                    </div>
                 </div>
 
                 {fehler && <div className="auth-fehler">{fehler}</div>}
 
                 <button className="auth-action-btn"
-                        disabled={pin1.length < 4 || pin2.length < 4}
-                        onClick={handleSpeichern}>
-                    {t('auth_speichern', lang)}
+                        disabled={busy || code.length !== 6 || pin.length < 4}
+                        onClick={handleAnmelden}>
+                    {busy ? '...' : t('auth_anmelden', lang)}
                 </button>
+
+                <div className="auth-info-box">
+                    <strong>{t('auth_hinweis_titel', lang)}</strong> {t('auth_hinweis_text', lang)}
+                </div>
             </div>
         );
     }
 
-    // SCREEN 3: PIN-Login
-    function ScreenPinLogin({ lang, onPinKorrekt, onWipe, geraeteId, gespeicherterHash }) {
-        const [pin, setPin] = useState('');
-        const [fehler, setFehler] = useState(false);
-        const [versuche, setVersuche] = useState(() => {
-            return parseInt(localStorage.getItem('tw-ma-pin-versuche') || '0', 10);
-        });
-        const ref = useRef(null);
-
-        useEffect(() => { if (ref.current) ref.current.focus(); }, []);
-
-        const versucheUebrig = 5 - versuche;
-
-        const handleAnmelden = async () => {
-            if (pin.length < 4) return;
-            const hash = await pinHash(pin, geraeteId);
-            if (hash === gespeicherterHash) {
-                localStorage.setItem('tw-ma-pin-versuche', '0');
-                onPinKorrekt();
-            } else {
-                const neueVersuche = versuche + 1;
-                setVersuche(neueVersuche);
-                localStorage.setItem('tw-ma-pin-versuche', String(neueVersuche));
-                setFehler(true);
-                setPin('');
-                if (neueVersuche >= 5) {
-                    setTimeout(() => onWipe('zu_viele_versuche'), 800);
-                } else {
-                    setTimeout(() => setFehler(false), 600);
-                    if (ref.current) ref.current.focus();
-                }
-            }
-        };
-
+    // SCREEN 2: Warten auf Freigabe durch Thomas
+    // Wird gezeigt nach erfolgreichem Code+PIN, solange users/{uid}/approved=false.
+    // Persistiert via LocalStorage — beim erneuten App-Start direkt hierher springen.
+    function ScreenWarteAufFreigabe({ lang, name, onAbbrechen }) {
         return (
             <div className="auth-screen">
                 <AuthLogo/>
-                <div className="auth-titel">{t('auth_pin_eingeben', lang)}</div>
+                <div className="auth-titel">{t('auth_warte_titel', lang)}</div>
+                <div className="auth-untertitel">
+                    {t('auth_warte_hallo', lang)} <strong style={{color:'var(--accent-blue)'}}>{name}</strong>!
+                    <br/>
+                    {t('auth_warte_text', lang)}
+                </div>
 
-                <input
-                    ref={ref}
-                    type="password"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={pin}
-                    onChange={e => setPin(e.target.value.replace(/\D/g,''))}
-                    onKeyDown={e => { if (e.key === 'Enter') handleAnmelden(); }}
-                    className={fehler ? 'pin-digit fehler' : ''}
+                <div className="auth-warten" style={{marginTop:'24px'}}>
+                    <WartenDots/>
+                    <span>{t('auth_warten', lang)}</span>
+                </div>
+
+                <div className="auth-info-box" style={{marginTop:'24px'}}>
+                    {t('auth_warte_info', lang)}
+                </div>
+
+                {/* Notausgang: erneut anmelden (z.B. falscher Code erwischt) */}
+                <button
+                    onClick={onAbbrechen}
                     style={{
-                        width:'240px', height:'72px', textAlign:'center',
-                        background:'var(--bg-secondary)',
-                        border: fehler ? '2px solid var(--accent-red)' : '2px solid var(--border-color)',
-                        borderRadius:'var(--radius-md)', color:'var(--text-white)',
-                        fontFamily:'Oswald, sans-serif', fontSize:'32px', fontWeight:'600',
-                        letterSpacing:'12px', outline:'none', position:'relative', zIndex:1
-                    }}
-                />
-
-                {fehler && <div className="auth-fehler">{t('auth_pin_falsch', lang)}</div>}
-
-                {versuche > 0 && (
-                    <div style={{color:'var(--text-muted)', fontSize:'12px', position:'relative', zIndex:1}}>
-                        {t('auth_versuche_uebrig', lang)}{versucheUebrig}
-                    </div>
-                )}
-
-                <button className="auth-action-btn"
-                        disabled={pin.length < 4}
-                        onClick={handleAnmelden}>
-                    {t('auth_anmelden', lang)}
+                        marginTop:'16px',
+                        background:'transparent',
+                        border:'1px solid var(--border-color)',
+                        color:'var(--text-muted)',
+                        padding:'10px 20px',
+                        borderRadius:'var(--radius-sm)',
+                        fontFamily:'Oswald, sans-serif',
+                        fontSize:'12px',
+                        textTransform:'uppercase',
+                        letterSpacing:'1px',
+                        cursor:'pointer'
+                    }}>
+                    {t('auth_neu_anmelden', lang)}
                 </button>
             </div>
         );
@@ -1033,144 +1002,130 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       AUTH-CONTAINER — Top-Level State Machine
-       Stati: 'pruefen' | 'onboarding' | 'pin-setup' | 'pin-login' | 'app' | 'wipe'
+       AUTH-CONTAINER — Top-Level State Machine (neu, Schema invitations/+users/)
+       Stati: 'pruefen' | 'code-eingabe' | 'wartet' | 'app' | 'wipe'
        ═══════════════════════════════════════════════════════════ */
     function AuthContainer({ lang }) {
         const [authState, setAuthState] = useState('pruefen');
-        const [geraeteId, setGeraeteId] = useState(null);
-        const [code, setCode] = useState(null);
-        const [gespeicherterHash, setGespeicherterHash] = useState(null);
-        const pollIntervalRef = useRef(null);
-        const statusListenerRef = useRef(null);
+        const [uid, setUid] = useState(null);
+        const [name, setName] = useState('');
+        const approvedListenerRef = useRef(null);
 
-        // Lade lokalen Stand beim Start
+        // ── Initial-Check beim App-Start ──
         useEffect(() => {
-            const storedId = localStorage.getItem('tw-ma-geraete-id');
-            const storedCode = localStorage.getItem('tw-ma-code');
-            const storedHash = localStorage.getItem('tw-ma-pin-hash');
+            const stand = window.TWMAAuth.ladeGespeichertenStand();
 
-            if (!storedId) {
-                // Komplett neuer User → Onboarding starten
-                starteOnboarding();
-            } else {
-                setGeraeteId(storedId);
-                setGespeicherterHash(storedHash);
-
-                if (storedHash) {
-                    // Schon eingerichtet → PIN-Login
-                    setAuthState('pin-login');
-                    // Trotzdem Status horchen (Wipe / Sperre)
-                    horcheAufStatus(storedId);
-                } else if (storedCode) {
-                    // Onboarding laeuft, aber PIN noch nicht gesetzt
-                    setCode(storedCode);
-                    setAuthState('onboarding');
-                    horcheAufStatus(storedId);
-                } else {
-                    starteOnboarding();
-                }
+            if (!stand) {
+                // Komplett neuer User -> Code+PIN-Eingabe
+                setAuthState('code-eingabe');
+                return;
             }
 
+            // Stand vorhanden: 'wartet' oder 'aktiv'
+            setUid(stand.uid);
+            setName(stand.name);
+
+            if (stand.status === 'aktiv') {
+                // Anonymous-Auth-Token persistiert ueber Sessions hinweg.
+                // Der bereits eingeloggte User springt direkt in die App.
+                // Listener trotzdem starten — Thomas koennte zwischenzeitlich gesperrt haben.
+                setAuthState('app');
+                starteApprovedListener(stand.uid);
+            } else {
+                // 'wartet' -> Wartebildschirm wieder zeigen, weiter horchen
+                setAuthState('wartet');
+                starteApprovedListener(stand.uid);
+            }
+        }, []);
+
+        // Cleanup beim Unmount
+        useEffect(() => {
             return () => {
-                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                if (statusListenerRef.current && firebaseDB) {
-                    firebaseDB.ref('geraete/' + geraeteId + '/status').off('value', statusListenerRef.current);
+                if (approvedListenerRef.current) {
+                    approvedListenerRef.current();
+                    approvedListenerRef.current = null;
                 }
             };
         }, []);
 
-        function starteOnboarding() {
-            const neueId = generiereGeraeteId();
-            const neuerCode = generiereCode();
-            localStorage.setItem('tw-ma-geraete-id', neueId);
-            localStorage.setItem('tw-ma-code', neuerCode);
-            setGeraeteId(neueId);
-            setCode(neuerCode);
-            setAuthState('onboarding');
-
-            // In Firebase eintragen
-            if (firebaseDB) {
-                firebaseDB.ref('geraete/' + neueId).set({
-                    code: neuerCode,
-                    status: 'wartend',
-                    erstellt: Date.now(),
-                    sprache: lang,
-                    user_agent: navigator.userAgent.substring(0, 200)
-                }).then(() => {
-                    console.log('Geraet in Firebase angelegt:', neueId, 'Code:', neuerCode);
-                    horcheAufStatus(neueId);
-                }).catch(err => {
-                    console.error('Firebase-Fehler beim Anlegen:', err);
-                });
+        function starteApprovedListener(userUid) {
+            // Bestehenden Listener abbauen
+            if (approvedListenerRef.current) {
+                approvedListenerRef.current();
+                approvedListenerRef.current = null;
             }
-        }
-
-        function horcheAufStatus(devId) {
-            if (!firebaseDB) return;
-            const ref = firebaseDB.ref('geraete/' + devId + '/status');
-            const handler = (snapshot) => {
-                const status = snapshot.val();
-                console.log('Firebase-Status-Update:', status);
-                if (status === 'freigegeben') {
-                    const hash = localStorage.getItem('tw-ma-pin-hash');
-                    if (!hash) {
-                        setAuthState('pin-setup');
-                    } else {
-                        // Bereits PIN gesetzt → einfach App offen lassen
+            const unsub = window.TWMAAuth.horcheAufApproved(
+                userUid,
+                /* onApproved */ function(userData) {
+                    console.log('Freigabe erteilt - App entsperrt');
+                    if (userData && userData.profile && userData.profile.name) {
+                        setName(userData.profile.name);
                     }
-                } else if (status === 'gesperrt' || status === 'wipe') {
-                    handleWipe('vom_admin');
+                    setAuthState('app');
+                },
+                /* onLocked */ function(grund) {
+                    console.warn('Geraet gesperrt/entfernt:', grund);
+                    handleWipe(grund);
+                },
+                /* onError */ function(err) {
+                    console.error('Approved-Listener-Fehler:', err);
                 }
-            };
-            ref.on('value', handler);
-            statusListenerRef.current = handler;
+            );
+            approvedListenerRef.current = unsub;
         }
 
-        async function handlePinGesetzt(pin) {
-            const hash = await pinHash(pin, geraeteId);
-            localStorage.setItem('tw-ma-pin-hash', hash);
-            setGespeicherterHash(hash);
-
-            // In Firebase: PIN-Hash speichern + Status auf 'aktiv'
-            if (firebaseDB) {
-                await firebaseDB.ref('geraete/' + geraeteId).update({
-                    pin_hash: hash,
-                    status: 'aktiv',
-                    pin_gesetzt: Date.now()
-                });
-            }
-
-            // Code loeschen, brauchen wir nicht mehr
-            localStorage.removeItem('tw-ma-code');
-            setAuthState('app');
+        // ── Code+PIN erfolgreich eingegeben ──
+        function handleAnmeldungErfolg(result) {
+            // result = { uid, name, status: 'wartet' }
+            setUid(result.uid);
+            setName(result.name);
+            setAuthState('wartet');
+            starteApprovedListener(result.uid);
         }
 
-        function handleWipe(grund) {
+        function handleAnmeldungFehler(err) {
+            // Fehler wird im Code-Eingabe-Screen angezeigt — hier nichts zu tun
+        }
+
+        // ── Wipe / Reset ──
+        async function handleWipe(grund) {
             console.warn('WIPE: ' + grund);
             setAuthState('wipe');
 
-            // Firebase informieren
-            if (firebaseDB && geraeteId) {
-                firebaseDB.ref('geraete/' + geraeteId).update({
-                    status: 'gewipt',
-                    gewipt_grund: grund,
-                    gewipt_at: Date.now()
-                }).catch(() => {});
+            // Listener abbauen
+            if (approvedListenerRef.current) {
+                approvedListenerRef.current();
+                approvedListenerRef.current = null;
             }
 
-            // Lokale Daten weg
-            setTimeout(() => {
-                localStorage.removeItem('tw-ma-geraete-id');
-                localStorage.removeItem('tw-ma-code');
-                localStorage.removeItem('tw-ma-pin-hash');
-                localStorage.removeItem('tw-ma-pin-versuche');
+            // Lokal alles weg + signOut
+            try {
+                await window.TWMAAuth.wipeNachAnordnung();
+            } catch(e) {
+                console.warn('Wipe-Fehler:', e);
+            }
+
+            // Kurzer visueller Hinweis, dann Reload (App startet bei Code-Eingabe)
+            setTimeout(function() {
                 window.location.reload();
             }, 2500);
         }
 
-        // Wenn Firebase nicht da ist und keine PIN existiert: Onboarding nicht moeglich
-        if (firebaseStatus === 'fehler' && authState === 'pruefen') {
+        // ── Notausgang aus Wartebildschirm: erneut anmelden ──
+        async function handleNeuAnmelden() {
+            // Lokal-Stand verwerfen, signOut, zurueck zur Code-Eingabe
+            if (approvedListenerRef.current) {
+                approvedListenerRef.current();
+                approvedListenerRef.current = null;
+            }
+            await window.TWMAAuth.logoutLokal();
+            setUid(null);
+            setName('');
+            setAuthState('code-eingabe');
+        }
+
+        // ── Frueher Abbruch wenn Firebase nicht erreichbar ──
+        if (firebaseStatus === 'fehler' && (authState === 'pruefen' || authState === 'code-eingabe')) {
             return (
                 <div className="auth-screen">
                     <AuthLogo/>
@@ -1194,20 +1149,18 @@
                     </div>
                 )}
 
-                {authState === 'onboarding' && (
-                    <ScreenOnboarding lang={lang} code={code} fbStatus={firebaseStatus}/>
+                {authState === 'code-eingabe' && (
+                    <ScreenCodeEingabe
+                        lang={lang}
+                        onErfolg={handleAnmeldungErfolg}
+                        onFehler={handleAnmeldungFehler}/>
                 )}
 
-                {authState === 'pin-setup' && (
-                    <ScreenPinSetup lang={lang} onPinGesetzt={handlePinGesetzt}/>
-                )}
-
-                {authState === 'pin-login' && (
-                    <ScreenPinLogin lang={lang}
-                                    geraeteId={geraeteId}
-                                    gespeicherterHash={gespeicherterHash}
-                                    onPinKorrekt={() => setAuthState('app')}
-                                    onWipe={handleWipe}/>
+                {authState === 'wartet' && (
+                    <ScreenWarteAufFreigabe
+                        lang={lang}
+                        name={name}
+                        onAbbrechen={handleNeuAnmelden}/>
                 )}
 
                 {authState === 'wipe' && <ScreenWipe lang={lang}/>}
@@ -1222,7 +1175,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe3-fix1';
+    const APP_VERSION = '1.0.0-etappe3-fix2-auth-schema';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -1297,7 +1250,101 @@
         auth_anmelden: { de: 'Anmelden', cs: 'Prihlasit', sk: 'Prihlasit', pl: 'Zaloguj', en: 'Login', ro: 'Conectare', uk: 'Uviyty' },
         auth_versuche_uebrig: { de: 'Versuche uebrig: ', cs: 'Zbyvajici pokusy: ', sk: 'Zostavajuce pokusy: ', pl: 'Pozostalo prob: ', en: 'Attempts left: ', ro: 'Incercari ramase: ', uk: 'Sproby zalyshylysya: ' },
         auth_gewipt: { de: 'Geraet wurde zurueckgesetzt. Bitte erneut einrichten.', cs: 'Zarizeni bylo resetovano. Prosim nastavte znovu.', sk: 'Zariadenie bolo resetovane. Prosim nastavte znova.', pl: 'Urzadzenie zostalo zresetowane. Skonfiguruj ponownie.', en: 'Device has been reset. Please set up again.', ro: 'Dispozitivul a fost resetat. Te rog configureaza din nou.', uk: 'Prystriy bulo skydanno. Bud laska, nalashtuyte znovu.' },
-        auth_fb_fehler: { de: 'Keine Verbindung zum Server. Bitte Internet pruefen.', cs: 'Zadne pripojeni k serveru. Zkontroluj internet.', sk: 'Ziadne pripojenie k serveru. Skontroluj internet.', pl: 'Brak polaczenia z serwerem. Sprawdz internet.', en: 'No server connection. Please check internet.', ro: 'Fara conexiune la server. Verifica internetul.', uk: 'Nemaye zvyazku z serverom. Perevirit internet.' }
+        auth_fb_fehler: { de: 'Keine Verbindung zum Server. Bitte Internet pruefen.', cs: 'Zadne pripojeni k serveru. Zkontroluj internet.', sk: 'Ziadne pripojenie k serveru. Skontroluj internet.', pl: 'Brak polaczenia z serwerem. Sprawdz internet.', en: 'No server connection. Please check internet.', ro: 'Fara conexiune la server. Verifica internetul.', uk: 'Nemaye zvyazku z serverom. Perevirit internet.' },
+
+        // ── Auth NEU (Code+PIN-Schema) ──────────────────────────────
+        auth_titel_anmeldung: { de: 'Anmeldung', cs: 'Prihlaseni', sk: 'Prihlasenie', pl: 'Logowanie', en: 'Sign in', ro: 'Conectare', uk: 'Vkhid' },
+        auth_text_anmeldung: {
+            de: 'Gib den Code und die PIN ein, die du von Thomas bekommen hast.',
+            cs: 'Zadej kod a PIN, ktere jsi dostal od Thomase.',
+            sk: 'Zadaj kod a PIN, ktore si dostal od Thomasa.',
+            pl: 'Wpisz kod i PIN, ktore otrzymales od Thomasa.',
+            en: 'Enter the code and PIN you received from Thomas.',
+            ro: 'Introdu codul si PIN-ul primite de la Thomas.',
+            uk: 'Vvedit kod ta PIN, yaki vy otrymaly vid Thomasa.'
+        },
+        auth_code_label: { de: 'Code', cs: 'Kod', sk: 'Kod', pl: 'Kod', en: 'Code', ro: 'Cod', uk: 'Kod' },
+        auth_pin_label:  { de: 'PIN',  cs: 'PIN', sk: 'PIN', pl: 'PIN', en: 'PIN', ro: 'PIN', uk: 'PIN' },
+        auth_hinweis_titel: { de: 'Hinweis:', cs: 'Pozn.:', sk: 'Pozn.:', pl: 'Uwaga:', en: 'Note:', ro: 'Nota:', uk: 'Prymitka:' },
+        auth_hinweis_text: {
+            de: 'Wenn du keinen Code hast, ruf Thomas kurz an. Er erstellt dir die Einladung in der Buero-App.',
+            cs: 'Pokud nemas kod, zavolej Thomasovi. Vytvori ti pozvanku v kancelarske aplikaci.',
+            sk: 'Ak nemas kod, zavolaj Thomasovi. Vytvori ti pozvanku v kancelarskej aplikacii.',
+            pl: 'Jesli nie masz kodu, zadzwon do Thomasa. Utworzy zaproszenie w aplikacji biurowej.',
+            en: 'No code yet? Give Thomas a quick call. He will create your invitation in the office app.',
+            ro: 'Nu ai cod? Suna-l pe Thomas. El creeaza invitatia in aplicatia de birou.',
+            uk: 'Yakshcho u vas nemaye kodu, zatelefonuyte Thomasovi. Vin stvoryt zaproshennya v ofisniy zastosunku.'
+        },
+
+        // Wartebildschirm
+        auth_warte_titel: { de: 'Fast geschafft', cs: 'Skoro hotovo', sk: 'Takmer hotovo', pl: 'Prawie gotowe', en: 'Almost there', ro: 'Aproape gata', uk: 'Mayzhe gotovo' },
+        auth_warte_hallo: { de: 'Hallo', cs: 'Ahoj', sk: 'Ahoj', pl: 'Czesc', en: 'Hi', ro: 'Salut', uk: 'Pryvit' },
+        auth_warte_text: {
+            de: 'Thomas muss dein Geraet noch kurz freigeben. Sobald das passiert ist, geht es automatisch weiter.',
+            cs: 'Thomas musi jeste tve zarizeni schvalit. Jakmile to udela, automaticky se pokracuje.',
+            sk: 'Thomas musi este tvoje zariadenie schvalit. Akonahle to urobi, automaticky pokracuje.',
+            pl: 'Thomas musi jeszcze zatwierdzic Twoje urzadzenie. Po zatwierdzeniu automatycznie przejdziesz dalej.',
+            en: 'Thomas needs to approve your device. Once he does, the app continues automatically.',
+            ro: 'Thomas trebuie sa-ti aprobe dispozitivul. Imediat ce face asta, aplicatia continua automat.',
+            uk: 'Thomas povynen shvalyty viy prystriy. Yak til ky tse stanetsya, prodovzhennya bude avtomatychne.'
+        },
+        auth_warte_info: {
+            de: 'Du kannst die App jetzt schliessen. Beim naechsten Oeffnen meldest du dich automatisch wieder an.',
+            cs: 'Nyni muzes aplikaci zavrit. Pri pristim otevreni se automaticky znovu prihlasis.',
+            sk: 'Teraz mozes aplikaciu zavriet. Pri dalsom otvoreni sa automaticky znovu prihlasis.',
+            pl: 'Mozesz teraz zamknac aplikacje. Przy nastepnym otwarciu zalogujesz sie automatycznie.',
+            en: 'You can close the app now. It will sign you in automatically next time you open it.',
+            ro: 'Poti inchide aplicatia. Te va conecta automat data viitoare.',
+            uk: 'Mozhete zakryty zastosunok. Pry nastupnomu vidkrytti vi avtomatychno uviydete.'
+        },
+        auth_neu_anmelden: { de: 'Neu anmelden', cs: 'Prihlasit znovu', sk: 'Prihlasit znova', pl: 'Zaloguj ponownie', en: 'Sign in again', ro: 'Conectare din nou', uk: 'Uviyty znovu' },
+
+        // Fehler-Texte
+        auth_fehler_code_unbekannt: {
+            de: 'Code unbekannt. Bitte pruefen oder Thomas anrufen.',
+            cs: 'Neznamy kod. Zkontroluj nebo zavolej Thomasovi.',
+            sk: 'Neznamy kod. Skontroluj alebo zavolaj Thomasovi.',
+            pl: 'Nieznany kod. Sprawdz lub zadzwon do Thomasa.',
+            en: 'Unknown code. Please check or call Thomas.',
+            ro: 'Cod necunoscut. Verifica sau suna-l pe Thomas.',
+            uk: 'Nevidomyy kod. Perevirte abo zatelefonuyte Thomasovi.'
+        },
+        auth_fehler_pin_falsch: {
+            de: 'PIN falsch. Bitte erneut versuchen.',
+            cs: 'Spatny PIN. Zkus to znovu.',
+            sk: 'Nespravny PIN. Skus to znova.',
+            pl: 'Bledny PIN. Sprobuj ponownie.',
+            en: 'Wrong PIN. Please try again.',
+            ro: 'PIN gresit. Incearca din nou.',
+            uk: 'Nepravylnyy PIN. Sprobuyte shche raz.'
+        },
+        auth_fehler_abgelaufen: {
+            de: 'Einladung ist abgelaufen. Bitte neue von Thomas anfordern.',
+            cs: 'Pozvanka vyprsela. Vyzadej novou od Thomase.',
+            sk: 'Pozvanka vyprsala. Vyziadaj novu od Thomasa.',
+            pl: 'Zaproszenie wygaslo. Popros Thomasa o nowe.',
+            en: 'Invitation expired. Please ask Thomas for a new one.',
+            ro: 'Invitatia a expirat. Cere-i lui Thomas una noua.',
+            uk: 'Zaproshennya prostrocheno. Poprosit Thomasa pro nove.'
+        },
+        auth_fehler_verwendet: {
+            de: 'Diese Einladung wurde bereits verwendet. Bitte neue anfordern.',
+            cs: 'Tato pozvanka byla jiz pouzita. Vyzadej novou.',
+            sk: 'Tato pozvanka uz bola pouzita. Vyziadaj novu.',
+            pl: 'To zaproszenie zostalo juz wykorzystane. Popros o nowe.',
+            en: 'This invitation has already been used. Please request a new one.',
+            ro: 'Aceasta invitatie a fost deja folosita. Cere una noua.',
+            uk: 'Tse zaproshennya vzhe bulo vykorystano. Poprosit nove.'
+        },
+        auth_fehler_widerrufen: {
+            de: 'Einladung wurde widerrufen. Bitte Thomas kontaktieren.',
+            cs: 'Pozvanka byla zrusena. Kontaktuj Thomase.',
+            sk: 'Pozvanka bola zrusena. Kontaktuj Thomasa.',
+            pl: 'Zaproszenie zostalo cofniete. Skontaktuj sie z Thomasem.',
+            en: 'Invitation was revoked. Please contact Thomas.',
+            ro: 'Invitatia a fost revocata. Contacteaza-l pe Thomas.',
+            uk: 'Zaproshennya bulo skasovano. Zvyazhitsya z Thomasom.'
+        }
     };
 
     function t(key, lang) {
