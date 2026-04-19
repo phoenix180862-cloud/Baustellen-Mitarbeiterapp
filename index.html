@@ -7,23 +7,19 @@
 
     <!-- ===== PWA Meta ===== -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0a1019">
+    <meta name="theme-color" content="#0f1923">
     <meta name="description" content="Baustellen-App von Thomas Willwacher Fliesenlegermeister e.K.">
-
-    <!-- iOS-spezifisch -->
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="TW Baustelle">
-
-    <!-- Favicon -->
     <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 
-    <!-- ===== Fonts (Master-App-Optik: Oswald + Source Sans 3) ===== -->
+    <!-- ===== Fonts (1:1 Master-App) ===== -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,700&display=swap" rel="stylesheet">
 
     <!-- ===== React + Babel (CDN) ===== -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -59,422 +55,314 @@
 
     <style>
     /* ═══════════════════════════════════════════════════════════
-       TW BAUSTELLEN-APP — Etappe 1 — Master-App-Optik
+       TW BAUSTELLEN-APP — Etappe 1 v2 — IDENTISCH zur Master-App
+       Quelle: tw-design.css der Master-App (1:1 übernommen)
        ═══════════════════════════════════════════════════════════ */
 
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    button {
+        -webkit-tap-highlight-color: rgba(30,136,229,0.2);
+        touch-action: manipulation;
+        -webkit-user-select: none;
+        user-select: none;
+        cursor: pointer;
+    }
+
     :root {
-        /* Hintergrund-Farben */
-        --bg-primary: #0a1019;
-        --bg-secondary: #141e2e;
-        --bg-card: #1a2638;
-        /* Text-Farben */
-        --text-white: #ffffff;
-        --text-primary: #e8ecf2;
-        --text-light: #b0bcc8;
-        --text-muted: #8896a8;
-        /* Akzent-Farben */
-        --accent-blue: #1E88E5;
-        --accent-blue-dark: #1565C0;
-        --accent-orange: #e67e22;
+        --bg-primary: #0f1923;
+        --bg-secondary: #1a2a3c;
+        --bg-tertiary: #223448;
+        --bg-card: #2a3a50;
+        --bg-hover: #324560;
         --accent-red: #c41e1e;
-        --accent-red-light: #ff4757;
+        --accent-red-light: #e63535;
+        --accent-blue: #4da6ff;
+        --accent-orange: #e67e22;
+        --accent-orange-light: #f39c12;
+        --text-primary: #e8ecf1;
+        --text-secondary: #b0c0d4;
+        --text-white: #f0f2f5;
+        --text-light: #b8c4d4;
+        --text-muted: #8a9ab4;
+        --border-color: #2e4562;
         --success: #27ae60;
-        --warning: #f39c12;
-        /* Strukturen */
-        --border-color: rgba(255,255,255,0.08);
+        --shadow-lg: 0 10px 40px rgba(0,0,0,0.4);
+        --shadow-md: 0 4px 20px rgba(0,0,0,0.3);
         --radius-sm: 6px;
-        --radius-md: 10px;
-        --radius-lg: 14px;
-        --radius-xl: 20px;
-        /* Schriften */
-        --font-display: 'Oswald', sans-serif;
-        --font-body: 'Source Sans 3', sans-serif;
-        /* Schriftgrösse-Toggle */
-        --font-scale: 1;
-        /* Safe-Area iOS */
+        --radius-md: 12px;
+        --radius-lg: 20px;
         --safe-top: env(safe-area-inset-top, 0px);
         --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
     html, body {
-        width: 100%;
-        overflow-x: hidden;
-    }
-
-    body {
-        font-family: var(--font-body);
+        height: 100%;
+        font-family: 'Source Sans 3', -apple-system, sans-serif;
         background: var(--bg-primary);
-        color: var(--text-primary);
-        min-height: 100vh;
-        font-size: calc(15px * var(--font-scale));
+        color: var(--text-white);
+        overflow-x: hidden;
         -webkit-font-smoothing: antialiased;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    /* ── Atmosphärischer Hintergrund-Glow (subtil) ── */
-    body::before {
-        content: '';
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background:
-            radial-gradient(circle at 20% 0%, rgba(30,136,229,0.08), transparent 50%),
-            radial-gradient(circle at 80% 100%, rgba(230,126,34,0.04), transparent 50%);
-        pointer-events: none;
-        z-index: 0;
     }
 
     #root {
-        position: relative;
-        z-index: 1;
-        min-height: 100vh;
+        min-height: 100%;
         display: flex;
         flex-direction: column;
     }
 
-    /* ── Scrollbar (dezent) ── */
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg-primary); }
-    ::-webkit-scrollbar-thumb { background: var(--bg-card); border-radius: 3px; }
+    /* Schriftgrösse-Toggle (wie Master-App) */
+    body.tw-font-large {
+        font-size: 1.5em;
+    }
 
-    /* ═══════════════════════════════════════════════════════════
-       HEADER-LEISTE (oben, fest)
-       ═══════════════════════════════════════════════════════════ */
-    .topbar {
+    /* ═══════════════════════════════════════════
+       LOGO STYLES (1:1 Master-App)
+       ═══════════════════════════════════════════ */
+    .logo-container {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: flex-start;
+        user-select: none;
+    }
+
+    .logo-thomas-row {
+        display: flex;
+        align-items: baseline;
+        margin-bottom: -18px;
+        padding-left: 1px;
+        align-self: flex-start;
+        position: relative;
+        z-index: 2;
+    }
+
+    .logo-thomas-text {
+        font-family: 'Source Sans 3', serif;
+        font-style: italic;
+        font-weight: 700;
+        color: var(--accent-red);
+        font-size: 14.5px;
+        letter-spacing: 0.3px;
+    }
+
+    .logo-word-row {
+        display: flex;
+        align-items: baseline;
+        font-family: 'Oswald', sans-serif;
+        font-weight: 700;
+        color: var(--text-white);
+        line-height: 1;
+    }
+
+    .logo-w { font-size: 62px; }
+
+    .logo-i-wrap {
+        position: relative;
+        font-size: 62px;
+        display: inline-block;
+    }
+
+    .logo-i-wrap .logo-i-char { font-size: 62px; }
+
+    .logo-i-dot {
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 10px;
+        background: var(--accent-red);
+    }
+
+    .logo-LL {
+        font-size: 84px;
+        letter-spacing: 1px;
+        line-height: 0.75;
+    }
+
+    .logo-wacher { font-size: 62px; }
+
+    .logo-subtitle-row {
+        display: flex;
+        justify-content: flex-end;
+        width: 100%;
+        margin-top: 1px;
+    }
+
+    .logo-subtitle-text {
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 600;
+        color: var(--accent-red);
+        font-size: 14.5px;
+        letter-spacing: 2.5px;
+    }
+
+    .logo-address {
+        font-family: 'Source Sans 3', sans-serif;
+        font-weight: 400;
+        color: var(--text-muted);
+        font-size: 12px;
+        letter-spacing: 0.5px;
+        margin-top: 10px;
+        text-align: center;
+        width: 100%;
+    }
+
+    /* ═══════════════════════════════════════════
+       APP HEADER (1:1 Master-App)
+       ═══════════════════════════════════════════ */
+    .app-header {
+        background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+        border-bottom: 1px solid var(--border-color);
+        padding: calc(12px + var(--safe-top)) 16px 12px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: calc(8px + var(--safe-top)) 12px 8px;
-        background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-        border-bottom: 1px solid var(--border-color);
         position: sticky;
         top: 0;
         z-index: 100;
+        gap: 8px;
     }
 
-    .topbar-nav {
-        display: flex;
-        gap: 6px;
-    }
-
-    .topbar-btn {
-        width: 36px;
-        height: 36px;
-        background: rgba(196,30,30,0.15);
-        border: 1px solid rgba(196,30,30,0.4);
-        color: var(--accent-red-light);
-        border-radius: var(--radius-sm);
-        font-size: 16px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-    }
-
-    .topbar-btn:hover, .topbar-btn:active {
-        background: rgba(196,30,30,0.3);
-        transform: scale(0.97);
-    }
-
-    .topbar-title {
-        font-family: var(--font-display);
-        font-size: calc(15px * var(--font-scale));
-        font-weight: 600;
-        letter-spacing: 1.5px;
-        color: var(--text-white);
-        text-transform: uppercase;
-    }
-
-    .topbar-actions {
-        display: flex;
-        gap: 4px;
-    }
-
-    .topbar-action {
-        height: 36px;
-        padding: 0 10px;
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
+    .header-title {
+        font-family: 'Oswald', sans-serif;
+        font-size: 14px;
+        font-weight: 500;
         color: var(--text-light);
-        border-radius: var(--radius-sm);
-        font-family: var(--font-display);
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 3px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        flex: 1;
+        text-align: center;
     }
 
-    .topbar-action.active {
-        background: var(--accent-blue);
-        color: var(--text-white);
-    }
-
-    /* ═══════════════════════════════════════════════════════════
-       MODUL-NAVIGATION (6 Buttons, 3x2-Grid auf Handy)
-       ═══════════════════════════════════════════════════════════ */
-    .module-nav {
+    /* ═══════════════════════════════════════════
+       MODUL-TAB-LEISTE (rote Pillen, wie Bild 1)
+       ═══════════════════════════════════════════ */
+    .modul-tabs {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         gap: 6px;
         padding: 8px 12px;
         background: var(--bg-secondary);
         border-bottom: 1px solid var(--border-color);
     }
 
-    .module-btn {
-        background: linear-gradient(135deg, #1E88E5, #1565C0);
-        box-shadow: 0 4px 12px rgba(30,136,229,0.20);
+    .modul-tab {
+        padding: 10px 4px;
         border: none;
+        border-radius: var(--radius-sm);
+        background: linear-gradient(135deg, var(--accent-red-light), var(--accent-red));
         color: var(--text-white);
-        border-radius: var(--radius-md);
-        padding: 8px 4px;
-        font-family: var(--font-display);
-        font-size: calc(11px * var(--font-scale));
-        font-weight: 600;
+        font-family: 'Oswald', sans-serif;
+        font-size: 11px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.6px;
         cursor: pointer;
+        box-shadow: 0 3px 10px rgba(196,30,30,0.3);
+        transition: all 0.2s ease;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
-        transition: all 0.15s;
-        position: relative;
+        gap: 3px;
+        line-height: 1;
     }
 
-    .module-btn:active {
-        transform: scale(0.96);
+    .modul-tab:active { transform: scale(0.96); }
+
+    .modul-tab.active {
+        background: linear-gradient(135deg, #e84040, #ff5252);
+        box-shadow: 0 0 0 2px var(--accent-orange), 0 4px 14px rgba(196,30,30,0.5);
     }
 
-    .module-btn.active {
-        box-shadow: 0 0 0 2px var(--accent-orange), 0 4px 16px rgba(230,126,34,0.40);
-    }
-
-    .module-btn svg {
-        width: 20px;
-        height: 20px;
+    .modul-tab svg {
+        width: 18px;
+        height: 18px;
         stroke-width: 2;
     }
 
-    @media (min-width: 600px) {
-        .module-nav {
-            grid-template-columns: repeat(6, 1fr);
-        }
-    }
-
-    /* ═══════════════════════════════════════════════════════════
-       HAUPT-INHALT
-       ═══════════════════════════════════════════════════════════ */
-    .main-content {
+    /* ═══════════════════════════════════════════
+       STARTSEITE (1:1 Master-App)
+       ═══════════════════════════════════════════ */
+    .startseite {
         flex: 1;
-        padding: 16px 16px calc(16px + var(--safe-bottom));
         display: flex;
         flex-direction: column;
-        gap: 14px;
-    }
-
-    /* ── Firmen-Header-Block ── */
-    .firma-header {
-        text-align: center;
-        padding: 14px 12px 10px;
-    }
-
-    .firmen-logo {
-        margin: 0 auto 8px;
-        width: 200px;
-        max-width: 80vw;
-    }
-
-    .firmen-adresse {
-        font-size: calc(11px * var(--font-scale));
-        color: var(--text-muted);
-        letter-spacing: 0.5px;
-    }
-
-    .firmen-untertitel {
-        margin-top: 6px;
-        font-family: var(--font-display);
-        font-size: calc(12px * var(--font-scale));
-        font-weight: 700;
-        color: var(--accent-blue);
-        letter-spacing: 2.5px;
-        text-transform: uppercase;
-    }
-
-    /* ── Premium-Uhr-Block ── */
-    .uhr-block {
-        background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-lg);
-        padding: 16px 12px;
-        text-align: center;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 30px 24px calc(24px + var(--safe-bottom));
         position: relative;
         overflow: hidden;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.3);
     }
 
-    .uhr-block::before {
+    /* Subtle tile pattern background — der schöne Schachbrett-Effekt */
+    .startseite::before {
         content: '';
         position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 50%;
-        background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent);
-        transform: rotate(-2deg);
+        inset: 0;
+        background-image:
+            linear-gradient(45deg, rgba(255,255,255,0.015) 25%, transparent 25%),
+            linear-gradient(-45deg, rgba(255,255,255,0.015) 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.015) 75%),
+            linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.015) 75%);
+        background-size: 40px 40px;
+        background-position: 0 0, 0 20px, 20px -20px, -20px 0;
         pointer-events: none;
     }
 
-    .uhr-tag {
-        font-family: var(--font-display);
-        font-size: calc(13px * var(--font-scale));
-        font-weight: 600;
-        color: var(--accent-orange);
-        letter-spacing: 4px;
-        text-transform: uppercase;
-        margin-bottom: 4px;
-    }
-
-    .uhr-zeit {
-        font-family: var(--font-display);
-        font-size: calc(46px * var(--font-scale));
-        font-weight: 500;
-        color: var(--text-white);
-        letter-spacing: 2px;
-        line-height: 1;
-        font-variant-numeric: tabular-nums;
-    }
-
-    .uhr-doppelpunkt {
-        animation: pulse-doppelpunkt 1s ease-in-out infinite;
-        color: var(--accent-blue);
-    }
-
-    @keyframes pulse-doppelpunkt {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.3; }
-    }
-
-    .uhr-datum {
-        font-size: calc(13px * var(--font-scale));
-        color: var(--text-light);
-        margin-top: 6px;
-        letter-spacing: 0.5px;
-    }
-
-    /* ── Sprach-Auswahl-Pill ── */
-    .sprach-pill-wrapper {
+    .logo-section {
+        position: relative;
+        z-index: 1;
+        margin-bottom: 30px;
+        animation: fadeInDown 0.8s ease-out;
         display: flex;
-        justify-content: center;
+        flex-direction: column;
+        align-items: center;
     }
 
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ═══════════════════════════════════════════
+       UHR-PULSE
+       ═══════════════════════════════════════════ */
+    .tw-clock-pulse {
+        animation: tw-clock-pulse-anim 1s ease-in-out infinite;
+    }
+    @keyframes tw-clock-pulse-anim {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.3; }
+    }
+
+    /* ═══════════════════════════════════════════
+       SPRACH-PILLE (statt Verbindungs-Buttons)
+       ═══════════════════════════════════════════ */
     .sprach-pill {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 8px 16px;
-        background: var(--bg-card);
+        gap: 10px;
+        padding: 10px 20px;
+        background: var(--bg-secondary);
         border: 1px solid var(--border-color);
         border-radius: 50px;
         color: var(--text-primary);
-        font-size: calc(13px * var(--font-scale));
+        font-family: 'Source Sans 3', sans-serif;
+        font-size: 14px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.2s;
-    }
-
-    .sprach-pill:hover {
-        border-color: var(--accent-blue);
-    }
-
-    .sprach-pill .flag {
-        font-size: 18px;
-    }
-
-    /* ── Bauteam-Animation (CSS-only, vereinfacht) ── */
-    .bauteam {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: var(--radius-lg);
-        padding: 18px 12px;
         position: relative;
-        overflow: hidden;
-        min-height: 110px;
+        z-index: 1;
     }
 
-    .bauteam-titel {
-        font-family: var(--font-display);
-        font-size: calc(11px * var(--font-scale));
-        color: var(--text-muted);
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        text-align: center;
-        margin-bottom: 12px;
-    }
+    .sprach-pill:hover { border-color: var(--accent-blue); }
+    .sprach-pill .flag { font-size: 20px; }
 
-    .bauteam-szene {
-        display: flex;
-        justify-content: space-around;
-        align-items: flex-end;
-        height: 60px;
-        position: relative;
-    }
-
-    .bauarbeiter {
-        font-size: 32px;
-        animation: bauarbeiter-bounce 2s ease-in-out infinite;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-    }
-
-    .bauarbeiter:nth-child(1) { animation-delay: 0s; }
-    .bauarbeiter:nth-child(2) { animation-delay: 0.4s; }
-    .bauarbeiter:nth-child(3) { animation-delay: 0.8s; }
-    .bauarbeiter:nth-child(4) { animation-delay: 1.2s; }
-
-    @keyframes bauarbeiter-bounce {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-8px); }
-    }
-
-    .bauteam-boden {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, transparent, var(--accent-orange), transparent);
-        opacity: 0.5;
-    }
-
-    /* ── Status-Indikator ── */
-    .status-leiste {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 12px;
-        padding: 8px 12px;
-        font-size: calc(11px * var(--font-scale));
-        color: var(--text-muted);
-        background: var(--bg-secondary);
-        border-radius: var(--radius-md);
-        border: 1px solid var(--border-color);
-    }
-
-    .status-dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-    }
-
-    .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-    .status-dot.offline { background: var(--text-muted); }
-
-    /* ── Modul-Platzhalter (für Module 2-6) ── */
+    /* ═══════════════════════════════════════════
+       MODUL-PLATZHALTER
+       ═══════════════════════════════════════════ */
     .modul-platzhalter {
         flex: 1;
         display: flex;
@@ -482,13 +370,15 @@
         align-items: center;
         justify-content: center;
         text-align: center;
-        padding: 40px 20px;
-        gap: 16px;
+        padding: 60px 20px;
+        gap: 20px;
+        position: relative;
+        z-index: 1;
     }
 
     .modul-platzhalter-icon {
-        width: 80px;
-        height: 80px;
+        width: 96px;
+        height: 96px;
         background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));
         border: 2px dashed var(--accent-blue);
         border-radius: 50%;
@@ -497,15 +387,11 @@
         justify-content: center;
         color: var(--accent-blue);
     }
-
-    .modul-platzhalter-icon svg {
-        width: 40px;
-        height: 40px;
-    }
+    .modul-platzhalter-icon svg { width: 48px; height: 48px; }
 
     .modul-platzhalter-titel {
-        font-family: var(--font-display);
-        font-size: calc(22px * var(--font-scale));
+        font-family: 'Oswald', sans-serif;
+        font-size: 26px;
         font-weight: 600;
         color: var(--text-white);
         text-transform: uppercase;
@@ -513,27 +399,27 @@
     }
 
     .modul-platzhalter-text {
-        font-size: calc(14px * var(--font-scale));
+        font-size: 15px;
         color: var(--text-light);
-        max-width: 300px;
+        max-width: 320px;
         line-height: 1.5;
     }
 
     .modul-platzhalter-info {
-        margin-top: 16px;
-        padding: 12px 18px;
+        margin-top: 12px;
+        padding: 14px 20px;
         background: var(--bg-card);
         border-left: 3px solid var(--accent-orange);
         border-radius: var(--radius-sm);
-        font-size: calc(12px * var(--font-scale));
+        font-size: 13px;
         color: var(--text-light);
-        max-width: 320px;
+        max-width: 360px;
         text-align: left;
     }
 
-    /* ═══════════════════════════════════════════════════════════
+    /* ═══════════════════════════════════════════
        MODAL (Sprach-Auswahl)
-       ═══════════════════════════════════════════════════════════ */
+       ═══════════════════════════════════════════ */
     .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -553,19 +439,19 @@
     }
 
     .modal {
-        background: var(--bg-card);
+        background: var(--bg-secondary);
         border: 1px solid var(--border-color);
-        border-radius: var(--radius-xl);
-        padding: 20px;
+        border-radius: var(--radius-lg);
+        padding: 24px;
         max-width: 400px;
         width: 100%;
         max-height: 80vh;
         overflow-y: auto;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        box-shadow: var(--shadow-lg);
     }
 
     .modal-titel {
-        font-family: var(--font-display);
+        font-family: 'Oswald', sans-serif;
         font-size: 18px;
         color: var(--text-white);
         margin-bottom: 16px;
@@ -585,7 +471,7 @@
         align-items: center;
         gap: 14px;
         padding: 12px 16px;
-        background: var(--bg-secondary);
+        background: var(--bg-tertiary);
         border: 1px solid var(--border-color);
         border-radius: var(--radius-md);
         cursor: pointer;
@@ -596,47 +482,52 @@
 
     .sprach-option:hover {
         border-color: var(--accent-blue);
-        background: var(--bg-primary);
+        background: var(--bg-hover);
     }
 
     .sprach-option.aktiv {
         border-color: var(--accent-blue);
-        background: rgba(30,136,229,0.15);
+        background: rgba(77,166,255,0.15);
     }
 
-    .sprach-option .flag {
-        font-size: 24px;
+    .sprach-option .flag { font-size: 24px; }
+    .sprach-option .name { flex: 1; font-weight: 600; }
+    .sprach-option .check { color: var(--success); font-weight: 700; }
+
+    /* Status unten */
+    .status-leiste {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: 8px 12px;
+        font-size: 11px;
+        color: var(--text-muted);
+        position: relative;
+        z-index: 1;
     }
 
-    .sprach-option .name {
-        flex: 1;
-        font-weight: 600;
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
     }
+    .status-dot.online { background: var(--success); box-shadow: 0 0 8px var(--success); }
 
-    .sprach-option .check {
-        color: var(--success);
-        font-weight: 700;
-    }
-
-    /* ═══════════════════════════════════════════════════════════
-       SVG-LOGO-STIL
-       ═══════════════════════════════════════════════════════════ */
-    .firmen-logo svg {
-        width: 100%;
-        height: auto;
-    }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
+    const { useState, useEffect } = React;
+
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe1';
+    const APP_VERSION = '1.0.0-etappe1-v2';
 
-    // Sprachen (7 Sprachen wie im Master-Plan)
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
         { code: 'cs', flag: '🇨🇿', name: 'Cestina' },
@@ -647,26 +538,20 @@
         { code: 'uk', flag: '🇺🇦', name: 'Ukrayinska' }
     ];
 
-    // UI-Labels (statische Tabelle, wie im Master-Plan Kapitel 11.4)
     const UI_LABELS = {
-        // Modul-Namen
-        start:        { de: 'Start',        cs: 'Start',     sk: 'Start',     pl: 'Start',      en: 'Home',      ro: 'Start',     uk: 'Start' },
-        baustellen:   { de: 'Baustellen',   cs: 'Stavby',    sk: 'Stavby',    pl: 'Budowy',     en: 'Sites',     ro: 'Santiere',  uk: 'Budivnytstvo' },
-        kalender:     { de: 'Kalender',     cs: 'Kalendar',  sk: 'Kalendar',  pl: 'Kalendarz',  en: 'Calendar',  ro: 'Calendar',  uk: 'Kalendar' },
-        fotos:        { de: 'Fotos',        cs: 'Fotky',     sk: 'Fotky',     pl: 'Zdjecia',    en: 'Photos',    ro: 'Foto',      uk: 'Foto' },
-        stunden:      { de: 'Stunden',      cs: 'Hodiny',    sk: 'Hodiny',    pl: 'Godziny',    en: 'Hours',     ro: 'Ore',       uk: 'Hodyny' },
-        nachrichten:  { de: 'Nachrichten',  cs: 'Zpravy',    sk: 'Spravy',    pl: 'Wiadomosci', en: 'Messages',  ro: 'Mesaje',    uk: 'Povidomlennya' },
-        // Allgemein
-        baustellen_app: { de: 'Baustellen App', cs: 'Aplikace Stavba', sk: 'Aplikacia Stavba', pl: 'Aplikacja Budowa', en: 'Site App', ro: 'Aplicatie Santier', uk: 'Dodatok Budivlya' },
+        start:        { de: 'Start', cs: 'Start', sk: 'Start', pl: 'Start', en: 'Home', ro: 'Start', uk: 'Start' },
+        baustellen:   { de: 'Baustell.', cs: 'Stavby', sk: 'Stavby', pl: 'Budowy', en: 'Sites', ro: 'Santiere', uk: 'Stavby' },
+        kalender:     { de: 'Kalender', cs: 'Kalendar', sk: 'Kalendar', pl: 'Kalendarz', en: 'Calendar', ro: 'Calendar', uk: 'Kalendar' },
+        fotos:        { de: 'Fotos', cs: 'Fotky', sk: 'Fotky', pl: 'Zdjecia', en: 'Photos', ro: 'Foto', uk: 'Foto' },
+        stunden:      { de: 'Stunden', cs: 'Hodiny', sk: 'Hodiny', pl: 'Godziny', en: 'Hours', ro: 'Ore', uk: 'Hodyny' },
+        nachrichten:  { de: 'Nachr.', cs: 'Zpravy', sk: 'Spravy', pl: 'Wiadom.', en: 'Msgs', ro: 'Mesaje', uk: 'Povid.' },
+        baustellen_app: { de: 'Baustellen App', cs: 'Aplikace Stavba', sk: 'Aplikacia Stavba', pl: 'Aplikacja Budowa', en: 'Site App', ro: 'Aplicatie Santier', uk: 'Dodatok' },
         sprache_waehlen: { de: 'Sprache wählen', cs: 'Vyberte jazyk', sk: 'Vyberte jazyk', pl: 'Wybierz jezyk', en: 'Choose language', ro: 'Alege limba', uk: 'Vyberit movu' },
-        gross: { de: 'Gross', cs: 'Velke', sk: 'Velke', pl: 'Duze', en: 'Big', ro: 'Mare', uk: 'Velyke' },
-        klein: { de: 'Klein', cs: 'Male', sk: 'Male', pl: 'Male', en: 'Small', ro: 'Mic', uk: 'Male' },
-        zurueck: { de: 'Zurück', cs: 'Zpet', sk: 'Spat', pl: 'Wstecz', en: 'Back', ro: 'Inapoi', uk: 'Nazad' },
-        vor: { de: 'Vor', cs: 'Vpred', sk: 'Vpred', pl: 'Naprzod', en: 'Forward', ro: 'Inainte', uk: 'Vpered' },
-        // Status / Platzhalter
+        gross_klein: { de: 'A↑ Gross', cs: 'A↑ Velke', sk: 'A↑ Velke', pl: 'A↑ Duze', en: 'A↑ Big', ro: 'A↑ Mare', uk: 'A↑ Velyke' },
+        gross_klein_zurueck: { de: 'A↓ Klein', cs: 'A↓ Male', sk: 'A↓ Male', pl: 'A↓ Male', en: 'A↓ Small', ro: 'A↓ Mic', uk: 'A↓ Male' },
+        zurueck: { de: '← Zurück', cs: '← Zpet', sk: '← Spat', pl: '← Wstecz', en: '← Back', ro: '← Inapoi', uk: '← Nazad' },
+        vor: { de: 'Vor →', cs: 'Vpred →', sk: 'Vpred →', pl: 'Naprzod →', en: 'Forward →', ro: 'Inainte →', uk: 'Vpered →' },
         online: { de: 'Online', cs: 'Online', sk: 'Online', pl: 'Online', en: 'Online', ro: 'Online', uk: 'Online' },
-        offline: { de: 'Offline', cs: 'Offline', sk: 'Offline', pl: 'Offline', en: 'Offline', ro: 'Offline', uk: 'Offline' },
-        bauteam: { de: 'TW Bauteam', cs: 'TW Bauteam', sk: 'TW Bauteam', pl: 'TW Bauteam', en: 'TW Bauteam', ro: 'TW Bauteam', uk: 'TW Bauteam' },
         modul_im_bau: { de: 'Noch im Bau', cs: 'Ve vystavbe', sk: 'Vo vystavbe', pl: 'W budowie', en: 'Under construction', ro: 'In constructie', uk: 'V rozrobtsi' },
         modul_im_bau_text: {
             de: 'Dieses Modul wird in einer der nächsten Etappen freigeschaltet.',
@@ -695,127 +580,868 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       SVG-IKONEN (lucide-style, schlank)
+       SVG-IKONEN (lucide-style)
        ═══════════════════════════════════════════════════════════ */
     const Icon = {
-        Home: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12L12 3l9 9"/><path d="M5 10v10h14V10"/>
-            </svg>
-        ),
-        Helm: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 18h20"/><path d="M4 18v-3a8 8 0 0116 0v3"/><path d="M9 18V8m6 10V8"/>
-            </svg>
-        ),
-        Kalender: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>
-            </svg>
-        ),
-        Kamera: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="4"/>
-            </svg>
-        ),
-        Uhr: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
-            </svg>
-        ),
-        Sprechblase: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15a3 3 0 01-3 3H8l-5 4V6a3 3 0 013-3h12a3 3 0 013 3z"/>
-            </svg>
-        ),
-        Werkzeug: () => (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14.7 6.3a4.5 4.5 0 005.6 5.6L21 17l-4 4-4.7-4.7-3 3-3.6-3.6 3-3L4 8l4-4 5.1 5.1z"/>
-            </svg>
-        )
+        Home: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12L12 3l9 9"/><path d="M5 10v10h14V10"/></svg>,
+        Helm: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M2 18h20"/><path d="M4 18v-3a8 8 0 0116 0v3"/><path d="M9 18V8m6 10V8"/></svg>,
+        Kalender: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>,
+        Kamera: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M3 8h3l2-3h8l2 3h3v11H3z"/><circle cx="12" cy="13" r="4"/></svg>,
+        Uhr: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>,
+        Sprechblase: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a3 3 0 01-3 3H8l-5 4V6a3 3 0 013-3h12a3 3 0 013 3z"/></svg>
     };
 
     /* ═══════════════════════════════════════════════════════════
-       FIRMEN-LOGO (SVG, im Master-App-Stil)
+       FIRMEN-LOGO (1:1 Master-App, Quelle: tw-shared-components.jsx Z. 266)
        ═══════════════════════════════════════════════════════════ */
-    function FirmenLogo() {
+    function FirmenLogo({ size = 'large' }) {
+        const scale = size === 'small' ? 0.55 : 1;
         return (
-            <div className="firmen-logo">
-                <svg viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stopColor="#1E88E5"/>
-                            <stop offset="100%" stopColor="#1565C0"/>
-                        </linearGradient>
-                    </defs>
-                    {/* TW Monogramm Hintergrund */}
-                    <rect x="4" y="4" width="62" height="62" rx="10" fill="url(#logoGrad)"/>
-                    <text x="35" y="45" textAnchor="middle"
-                          fontFamily="Oswald, sans-serif" fontSize="32" fontWeight="700"
-                          fill="#fff" letterSpacing="1">TW</text>
-                    {/* Akzent-Strich */}
-                    <rect x="4" y="60" width="62" height="6" rx="0" fill="#e67e22"/>
-                    {/* Firmenname */}
-                    <text x="76" y="32" fontFamily="Oswald, sans-serif" fontSize="18" fontWeight="700"
-                          fill="#e8ecf2" letterSpacing="0.5">THOMAS WILLWACHER</text>
-                    <text x="76" y="50" fontFamily="Source Sans 3, sans-serif" fontSize="11"
-                          fill="#b0bcc8" letterSpacing="2">FLIESENLEGERMEISTER e.K.</text>
-                </svg>
+            <div className="logo-container" style={{ transform: `scale(${scale})`, transformOrigin: 'center' }}>
+                {/* Row 1: "Thomas" in rot kursiv */}
+                <div className="logo-thomas-row">
+                    <span className="logo-thomas-text">Thomas</span>
+                </div>
+                {/* Row 2: "wiLLwacher" */}
+                <div className="logo-word-row">
+                    <span className="logo-w">w</span>
+                    <span className="logo-i-wrap">
+                        <span className="logo-i-char">{'\u0131'}</span>
+                        <span className="logo-i-dot"></span>
+                    </span>
+                    <span className="logo-LL">LL</span>
+                    <span className="logo-wacher">wacher</span>
+                </div>
+                {/* Row 3: "Fliesenlegermeister e.K." rot rechtsbuendig */}
+                <div className="logo-subtitle-row">
+                    <span className="logo-subtitle-text">Fliesenlegermeister e.K.</span>
+                </div>
             </div>
         );
     }
 
     /* ═══════════════════════════════════════════════════════════
-       UHR-BLOCK (Tag · grosse Uhrzeit · Datum)
+       BAUTEAM-FIGUREN + ANIMATION (1:1 aus Master-App)
+       Quelle: tw-shared-components.jsx Zeilen 294-1031
+       MARKER_BAUTEAM_INSERT
+       ═══════════════════════════════════════════════════════════ */
+        /* ═══════════════════════════════════════════
+           BAUTEAM ANIMATION — 3 GRUPPEN, 7 FIGUREN
+           Gruppe 1: Ivan, Michal, Iurii
+           Gruppe 2: Peter, Luca (AM s.r.o.)
+           Gruppe 3: Luca, Silke (BIG BOSS)
+           Zyklus 45s total, je 15s pro Gruppe
+           ═══════════════════════════════════════════ */
+
+        /* ---- Figur 1: IVAN (blau) ---- */
+        function FigurIvan() {
+            return (
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeIvan" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#3498db"/>
+                                <stop offset="1" stopColor="#1a5276"/>
+                            </linearGradient>
+                            <linearGradient id="hoseIvan" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmIvan" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f7dc6f"/>
+                                <stop offset="1" stopColor="#b7950b"/>
+                            </radialGradient>
+                            <radialGradient id="hautIvan" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#dc7633"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseIvan)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseIvan)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeIvan)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#1a5276" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#1a5276" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">IVAN</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeIvan)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautIvan)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeIvan)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautIvan)"/>
+                            <g transform="translate(71,100)">
+                                <path d="M -8,0 L -6,14 L 6,14 L 8,0 Z" fill="#e67e22" stroke="#a04000" strokeWidth="0.8"/>
+                                <ellipse cx="0" cy="0" rx="8" ry="2" fill="#d35400" stroke="#a04000" strokeWidth="0.5"/>
+                                <path d="M -8,0 Q 0,-10 8,0" fill="none" stroke="#2c3e50" strokeWidth="1"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautIvan)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautIvan)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#8b4513" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmIvan)" stroke="#8b6914" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#f4d03f"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fef9e7" strokeWidth="1.5" fill="none" opacity="0.7"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 2: MICHAL (gruen) ---- */
+        function FigurMichal() {
+            return (
+                <div className="tw-figure tw-phase-2" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeMichal" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#27ae60"/>
+                                <stop offset="1" stopColor="#145a32"/>
+                            </linearGradient>
+                            <linearGradient id="hoseMichal" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmMichal" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#ff7675"/>
+                                <stop offset="1" stopColor="#a93226"/>
+                            </radialGradient>
+                            <radialGradient id="hautMichal" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#cd853f"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseMichal)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseMichal)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeMichal)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#145a32" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#145a32" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="32" y="61" width="36" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">MICHAL</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeMichal)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautMichal)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeMichal)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautMichal)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-3" y="-1" width="20" height="4" fill="#f1c40f" stroke="#b7950b" strokeWidth="0.5"/>
+                                <rect x="4" y="0" width="6" height="2.5" fill="#2c3e50"/>
+                                <circle cx="7" cy="1.2" r="0.8" fill="#27ae60"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautMichal)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautMichal)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmMichal)" stroke="#7b241c" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#ec7063"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fadbd8" strokeWidth="1.5" fill="none" opacity="0.7"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 3: IURII (signalrot) ---- */
+        function FigurIurii() {
+            return (
+                <div className="tw-figure tw-phase-3" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeIurii" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#e74c3c"/>
+                                <stop offset="1" stopColor="#922b21"/>
+                            </linearGradient>
+                            <linearGradient id="hoseIurii" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmIurii" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#ffffff"/>
+                                <stop offset="1" stopColor="#bdc3c7"/>
+                            </radialGradient>
+                            <radialGradient id="hautIurii" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#b9770e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseIurii)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseIurii)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeIurii)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#922b21" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#922b21" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="33" y="85" width="34" height="2" fill="#f1c40f" opacity="0.9"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">IURII</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeIurii)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautIurii)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeIurii)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautIurii)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-3" y="-2" width="16" height="8" fill="#2c3e50" stroke="#1a1a1a" strokeWidth="0.5" rx="1"/>
+                                <rect x="13" y="0" width="8" height="4" fill="#95a5a6"/>
+                                <rect x="21" y="1" width="3" height="2" fill="#7f8c8d"/>
+                                <rect x="-3" y="6" width="6" height="4" fill="#1a1a1a"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautIurii)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautIurii)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmIurii)" stroke="#7f8c8d" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#ecf0f1"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#ffffff" strokeWidth="1.5" fill="none" opacity="0.9"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 4: PETER (anthrazit/orange) ---- */
+        function FigurPeter() {
+            return (
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackePeter" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#566573"/>
+                                <stop offset="1" stopColor="#212f3c"/>
+                            </linearGradient>
+                            <linearGradient id="hosePeter" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmPeter" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f5b041"/>
+                                <stop offset="1" stopColor="#ba4a00"/>
+                            </radialGradient>
+                            <radialGradient id="hautPeter" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#cd853f"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hosePeter)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hosePeter)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackePeter)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#212f3c" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#212f3c" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="33" y="75" width="34" height="2" fill="#e67e22" opacity="0.95"/>
+                            <rect x="33" y="88" width="34" height="2" fill="#e67e22" opacity="0.95"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">PETER</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackePeter)"/>
+                            <rect x="27" y="78" width="9" height="1.5" fill="#e67e22" transform="rotate(82 31 79)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautPeter)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackePeter)"/>
+                            <rect x="64" y="78" width="9" height="1.5" fill="#e67e22" transform="rotate(-82 69 79)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautPeter)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-5" y="-2" width="16" height="20" fill="#8b4513" stroke="#5d4037" strokeWidth="0.5"/>
+                                <rect x="-4" y="0" width="14" height="17" fill="#ffffff"/>
+                                <line x1="-2" y1="4" x2="8" y2="4" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-2" y1="8" x2="8" y2="8" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-2" y1="12" x2="8" y2="12" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <rect x="0" y="-3" width="6" height="2" fill="#c0c0c0"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautPeter)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautPeter)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmPeter)" stroke="#873600" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#eb984e"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#fef5e7" strokeWidth="1.5" fill="none" opacity="0.7"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 5: LUCA AM (bordeaux mit AM-Logo) ---- */
+        function FigurLucaAM() {
+            return (
+                <div className="tw-figure tw-phase-2" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeLucaAM" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#922b21"/>
+                                <stop offset="1" stopColor="#4a0e0a"/>
+                            </linearGradient>
+                            <linearGradient id="hoseLucaAM" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmLucaAM" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#5d6d7e"/>
+                                <stop offset="1" stopColor="#17202a"/>
+                            </radialGradient>
+                            <radialGradient id="hautLucaAM" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#b9770e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseLucaAM)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseLucaAM)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeLucaAM)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="82" width="10" height="7" fill="#4a0e0a" opacity="0.6"/>
+                            <rect x="53" y="82" width="10" height="7" fill="#4a0e0a" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="32" y="58" width="36" height="13" fill="#ffffff" stroke="#1a1a1a" strokeWidth="0.5"/>
+                            <text x="50" y="66" textAnchor="middle" fill="#922b21" fontSize="8" fontWeight="900" fontFamily="Arial Black, sans-serif">AM</text>
+                            <text x="50" y="70.5" textAnchor="middle" fill="#1a1a1a" fontSize="4" fontWeight="bold" fontFamily="Arial, sans-serif">s.r.o.</text>
+                            <rect x="36" y="72" width="28" height="8" fill="#f1c40f" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="78.5" textAnchor="middle" fill="#1a1a1a" fontSize="6.5" fontWeight="900" fontFamily="Arial Black, sans-serif">LUCA</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeLucaAM)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautLucaAM)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeLucaAM)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautLucaAM)"/>
+                            <g transform="translate(71,100)">
+                                <rect x="-10" y="-2" width="20" height="14" fill="#bdc3c7" stroke="#7f8c8d" strokeWidth="0.5"/>
+                                <rect x="-10" y="-2" width="20" height="3" fill="#ecf0f1"/>
+                                <rect x="-9" y="2" width="18" height="1" fill="#85929e"/>
+                                <rect x="-9" y="6" width="18" height="1" fill="#85929e"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautLucaAM)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautLucaAM)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmLucaAM)" stroke="#0b0b0b" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#34495e"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#95a5a6" strokeWidth="1.5" fill="none" opacity="0.6"/>
+                            <text x="50" y="31" textAnchor="middle" fill="#f1c40f" fontSize="4" fontWeight="900" fontFamily="Arial Black, sans-serif">AM</text>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 6: LUCA (oliv-braun) ---- */
+        function FigurLuca2() {
+            return (
+                <div className="tw-figure" style={{position:'relative', width:'100px', height:'180px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 100 180" width="100" height="180">
+                        <defs>
+                            <linearGradient id="jackeLuca2" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#7d6608"/>
+                                <stop offset="1" stopColor="#3d3004"/>
+                            </linearGradient>
+                            <linearGradient id="hoseLuca2" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmLuca2" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#5dade2"/>
+                                <stop offset="1" stopColor="#1b4f72"/>
+                            </radialGradient>
+                            <radialGradient id="hautLuca2" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fdebd0"/>
+                                <stop offset="1" stopColor="#ca6f1e"/>
+                            </radialGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 42,100 Q 40,130 38,160 L 46,160 Q 48,130 48,100 Z" fill="url(#hoseLuca2)"/>
+                            <ellipse cx="42" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 52,100 Q 54,130 56,160 L 64,160 Q 62,130 58,100 Z" fill="url(#hoseLuca2)"/>
+                            <ellipse cx="58" cy="162" rx="8" ry="4" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 35,55 Q 32,70 33,100 L 67,100 Q 68,70 65,55 Z" fill="url(#jackeLuca2)"/>
+                            <line x1="50" y1="58" x2="50" y2="95" stroke="#5d4037" strokeWidth="0.8"/>
+                            <rect x="33" y="92" width="34" height="5" fill="#5d4037"/>
+                            <rect x="48" y="91" width="4" height="7" fill="#c0c0c0"/>
+                            <rect x="37" y="78" width="10" height="8" fill="#3d3004" opacity="0.6"/>
+                            <rect x="53" y="78" width="10" height="8" fill="#3d3004" opacity="0.6"/>
+                            <rect x="38" y="99" width="3" height="10" fill="#2c3e50"/>
+                            <rect x="36" y="107" width="7" height="3" fill="#7f8c8d"/>
+                            <rect x="36" y="61" width="28" height="9" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="50" y="68" textAnchor="middle" fill="#1a1a1a" fontSize="7.5" fontWeight="900" fontFamily="Arial Black, sans-serif">LUCA</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 33,58 Q 28,75 26,95 L 32,96 Q 35,75 38,58 Z" fill="url(#jackeLuca2)"/>
+                            <circle cx="29" cy="96" r="5" fill="url(#hautLuca2)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 67,58 Q 72,75 74,95 L 68,96 Q 65,75 62,58 Z" fill="url(#jackeLuca2)"/>
+                            <circle cx="71" cy="96" r="5" fill="url(#hautLuca2)"/>
+                            <g transform="translate(71,100)">
+                                <path d="M -8,0 L -6,14 L 6,14 L 8,0 Z" fill="#34495e" stroke="#1a1a1a" strokeWidth="0.8"/>
+                                <ellipse cx="0" cy="0" rx="8" ry="2" fill="#7f8c8d"/>
+                                <ellipse cx="0" cy="0" rx="6.5" ry="1.2" fill="#bdc3c7"/>
+                                <path d="M -8,0 Q 0,-10 8,0" fill="none" stroke="#1a1a1a" strokeWidth="1"/>
+                            </g>
+                        </g>
+                        <g>
+                            <rect x="45" y="50" width="10" height="8" fill="url(#hautLuca2)"/>
+                            <ellipse cx="50" cy="42" rx="12" ry="14" fill="url(#hautLuca2)"/>
+                            <ellipse cx="50" cy="50" rx="10" ry="3" fill="#654321" opacity="0.3"/>
+                            <circle cx="46" cy="40" r="1" fill="#1a1a1a"/>
+                            <circle cx="54" cy="40" r="1" fill="#1a1a1a"/>
+                            <path d="M 44,37 Q 46,36 48,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 52,37 Q 54,36 56,37" stroke="#3e2723" strokeWidth="1" fill="none"/>
+                            <path d="M 50,42 L 48,46 L 51,46" fill="none" stroke="#a04000" strokeWidth="0.6"/>
+                            <path d="M 47,50 Q 50,51 53,50" fill="none" stroke="#6e2c00" strokeWidth="0.8"/>
+                            <path d="M 38,34 Q 50,22 62,34 L 62,36 L 38,36 Z" fill="url(#helmLuca2)" stroke="#154360" strokeWidth="0.5"/>
+                            <ellipse cx="50" cy="33" rx="12" ry="3" fill="#2e86c1"/>
+                            <path d="M 42,30 Q 45,26 50,25" stroke="#d6eaf8" strokeWidth="1.5" fill="none" opacity="0.8"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- Figur 7: SILKE (BIG BOSS, Frau, pink) ---- */
+        function FigurSilke() {
+            return (
+                <div className="tw-figure tw-figure-silke tw-phase-2" style={{position:'relative', width:'90px', height:'170px'}}>
+                    <div className="tw-shadow"></div>
+                    <svg viewBox="0 0 90 170" width="90" height="170">
+                        <defs>
+                            <linearGradient id="jackeSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#e91e63"/>
+                                <stop offset="1" stopColor="#880e4f"/>
+                            </linearGradient>
+                            <linearGradient id="hoseSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#34495e"/>
+                                <stop offset="1" stopColor="#1a252f"/>
+                            </linearGradient>
+                            <radialGradient id="helmSilke" cx="0.3" cy="0.3">
+                                <stop offset="0" stopColor="#f8bbd0"/>
+                                <stop offset="1" stopColor="#c2185b"/>
+                            </radialGradient>
+                            <radialGradient id="hautSilke" cx="0.4" cy="0.4">
+                                <stop offset="0" stopColor="#fff3e0"/>
+                                <stop offset="1" stopColor="#e0a971"/>
+                            </radialGradient>
+                            <linearGradient id="haareSilke" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#d4a017"/>
+                                <stop offset="0.5" stopColor="#b7950b"/>
+                                <stop offset="1" stopColor="#7d6608"/>
+                            </linearGradient>
+                            <linearGradient id="schaerpeSilke" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0" stopColor="#f1c40f"/>
+                                <stop offset="0.5" stopColor="#f39c12"/>
+                                <stop offset="1" stopColor="#b7950b"/>
+                            </linearGradient>
+                        </defs>
+                        <g className="tw-leg-l">
+                            <path d="M 39,98 Q 38,130 37,155 L 43,155 Q 44,130 44,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="40" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                        </g>
+                        <g className="tw-leg-r">
+                            <path d="M 47,98 Q 48,130 49,155 L 55,155 Q 54,130 51,98 Z" fill="url(#hoseSilke)"/>
+                            <ellipse cx="51" cy="157" rx="6" ry="3.5" fill="#1a1a1a"/>
+                        </g>
+                        <g>
+                            <path d="M 32,55 Q 30,65 31,78 Q 29,85 31,98 L 59,98 Q 61,85 59,78 Q 60,65 58,55 Z" fill="url(#jackeSilke)"/>
+                            <line x1="45" y1="58" x2="45" y2="95" stroke="#5d4037" strokeWidth="0.6"/>
+                            <rect x="31" y="92" width="28" height="4" fill="#5d4037"/>
+                            <rect x="43" y="91" width="4" height="6" fill="#f1c40f"/>
+                            <g>
+                                <path d="M 27,56 L 34,55 L 64,95 L 60,100 Z" fill="url(#schaerpeSilke)" stroke="#7d6608" strokeWidth="0.5"/>
+                                <path d="M 27,56 L 34,55" stroke="#ffd700" strokeWidth="1"/>
+                                <text x="45" y="74" textAnchor="middle" fill="#4a0e0a" fontSize="7" fontWeight="900" fontFamily="Arial Black, sans-serif" transform="rotate(52 45 74)">BIG BOSS</text>
+                                <circle cx="60" cy="100" r="2.5" fill="#f1c40f" stroke="#7d6608" strokeWidth="0.3"/>
+                                <line x1="60" y1="102" x2="59" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="61" y1="102" x2="61" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                                <line x1="62" y1="102" x2="63" y2="106" stroke="#b7950b" strokeWidth="0.5"/>
+                            </g>
+                            <rect x="30" y="84" width="30" height="8" fill="#ffffff" opacity="0.95" stroke="#1a1a1a" strokeWidth="0.3"/>
+                            <text x="45" y="90.5" textAnchor="middle" fill="#1a1a1a" fontSize="6.5" fontWeight="900" fontFamily="Arial Black, sans-serif">SILKE</text>
+                        </g>
+                        <g className="tw-arm-l">
+                            <path d="M 30,58 Q 26,73 24,92 L 29,93 Q 32,73 34,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="27" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                        </g>
+                        <g className="tw-arm-r">
+                            <path d="M 60,58 Q 64,73 66,92 L 61,93 Q 58,73 56,58 Z" fill="url(#jackeSilke)"/>
+                            <circle cx="63" cy="93" r="4.5" fill="url(#hautSilke)"/>
+                            <g transform="translate(63,97)">
+                                <rect x="-6" y="-3" width="16" height="20" fill="#8b4513" stroke="#5d4037" strokeWidth="0.5"/>
+                                <rect x="-5" y="-1" width="14" height="17" fill="#ffffff"/>
+                                <line x1="-3" y1="3" x2="7" y2="3" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-3" y1="7" x2="7" y2="7" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <line x1="-3" y1="11" x2="7" y2="11" stroke="#95a5a6" strokeWidth="0.4"/>
+                                <rect x="-1" y="-4" width="6" height="2" fill="#c0c0c0"/>
+                                <rect x="-3" y="12" width="12" height="4.5" fill="none" stroke="#c0392b" strokeWidth="0.7"/>
+                                <text x="3" y="15.5" textAnchor="middle" fill="#c0392b" fontSize="3.5" fontWeight="900" fontFamily="Arial Black, sans-serif">BOSS</text>
+                            </g>
+                        </g>
+                        <g>
+                            <path d="M 35,33 Q 22,45 20,62 Q 19,78 22,90 Q 24,95 27,92 Q 25,78 26,62 Q 28,48 38,38 Z" fill="url(#haareSilke)" stroke="#7d6608" strokeWidth="0.3"/>
+                            <path d="M 28,45 Q 26,60 27,75" stroke="#f4d03f" strokeWidth="0.8" fill="none" opacity="0.7"/>
+                            <path d="M 32,42 Q 30,55 31,70" stroke="#f4d03f" strokeWidth="0.6" fill="none" opacity="0.5"/>
+                            <ellipse cx="30" cy="35" rx="3" ry="2" fill="#c2185b"/>
+                        </g>
+                        <g>
+                            <rect x="41" y="48" width="8" height="7" fill="url(#hautSilke)"/>
+                            <ellipse cx="45" cy="40" rx="10" ry="12" fill="url(#hautSilke)"/>
+                            <path d="M 36,35 Q 34,42 36,50 L 38,50 Q 37,42 38,35 Z" fill="url(#haareSilke)"/>
+                            <path d="M 54,35 Q 56,42 54,50 L 52,50 Q 53,42 52,35 Z" fill="url(#haareSilke)"/>
+                            <path d="M 37,34 Q 45,30 53,34 L 53,37 L 37,37 Z" fill="url(#haareSilke)"/>
+                            <circle cx="38" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
+                            <circle cx="52" cy="42" r="2.5" fill="#e91e63" opacity="0.25"/>
+                            <ellipse cx="41" cy="39" rx="1.2" ry="1.4" fill="#1a1a1a"/>
+                            <ellipse cx="49" cy="39" rx="1.2" ry="1.4" fill="#1a1a1a"/>
+                            <circle cx="41.3" cy="38.5" r="0.4" fill="#ffffff"/>
+                            <circle cx="49.3" cy="38.5" r="0.4" fill="#ffffff"/>
+                            <line x1="40" y1="37.8" x2="39" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="41" y1="37.5" x2="41" y2="36.2" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="42" y1="37.8" x2="43" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="48" y1="37.8" x2="47" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="49" y1="37.5" x2="49" y2="36.2" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <line x1="50" y1="37.8" x2="51" y2="36.5" stroke="#1a1a1a" strokeWidth="0.4"/>
+                            <path d="M 39,36 Q 41,35.3 43,36" stroke="#7d6608" strokeWidth="0.8" fill="none"/>
+                            <path d="M 47,36 Q 49,35.3 51,36" stroke="#7d6608" strokeWidth="0.8" fill="none"/>
+                            <path d="M 45,40 L 44,44 L 46,44" fill="none" stroke="#d4a470" strokeWidth="0.5"/>
+                            <path d="M 42,48 Q 45,49.5 48,48 Q 45,50 42,48 Z" fill="#c0392b"/>
+                            <path d="M 42,48 Q 45,47 48,48" stroke="#922b21" strokeWidth="0.3" fill="none"/>
+                            <path d="M 34,32 Q 45,20 56,32 L 56,34 L 34,34 Z" fill="url(#helmSilke)" stroke="#880e4f" strokeWidth="0.5"/>
+                            <ellipse cx="45" cy="31" rx="11" ry="2.5" fill="#ec407a"/>
+                            <path d="M 37,28 Q 41,24 45,23" stroke="#fce4ec" strokeWidth="1.5" fill="none" opacity="0.8"/>
+                            <circle cx="35.5" cy="43" r="0.8" fill="#f1c40f"/>
+                            <circle cx="54.5" cy="43" r="0.8" fill="#f1c40f"/>
+                        </g>
+                    </svg>
+                </div>
+            );
+        }
+
+        /* ---- HAUPT-KOMPONENTE: BauteamAnimation mit 3 Gruppen ---- */
+        function BauteamAnimation() {
+            // Gesamtzyklus 45s, je 15s pro Gruppe
+            // Jede Gruppe laeuft von links (-400px) nach rechts (100%) in 15s,
+            // dann 30s unsichtbar (waehrend andere Gruppen laufen)
+            // HOEHE: 210px statt 200px, bottom:20px statt 72px
+            //        → Figuren laufen weiter unten, Koepfe liegen frei ueber dem Sync-Button.
+            //        CSS-Klassen tw-fig-1..tw-fig-9 geben jeder Figur individuelle
+            //        Bewegungs-Geschwindigkeit und Phase (unterschiedliche Schrittlaenge).
+            return (
+                <div style={{position:'relative', height:'210px', marginTop:'auto', width:'100%', overflow:'hidden', pointerEvents:'none'}}>
+                    {/* Fliesenstreifen als Boden */}
+                    <div style={{position:'absolute', bottom:'20px', left:0, right:0, height:'2px',
+                                 background:'linear-gradient(90deg, transparent 3%, rgba(149,165,166,0.4) 15%, rgba(149,165,166,0.5) 50%, rgba(149,165,166,0.4) 85%, transparent 97%)'}} />
+
+                    {/* Gruppe 1: Ivan, Michal, Iurii */}
+                    <div className="tw-group tw-group-1" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-1"><FigurIvan /></div>
+                        <div className="tw-fig-wrap tw-fig-2"><FigurMichal /></div>
+                        <div className="tw-fig-wrap tw-fig-3"><FigurIurii /></div>
+                    </div>
+
+                    {/* Gruppe 2: Peter, Luca (AM s.r.o.) */}
+                    <div className="tw-group tw-group-2" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-4"><FigurPeter /></div>
+                        <div className="tw-fig-wrap tw-fig-5"><FigurLucaAM /></div>
+                    </div>
+
+                    {/* Gruppe 3: Luca, Silke (BIG BOSS) */}
+                    <div className="tw-group tw-group-3" style={{position:'absolute', bottom:'20px', display:'flex', gap:'22px', alignItems:'flex-end'}}>
+                        <div className="tw-fig-wrap tw-fig-6"><FigurLuca2 /></div>
+                        <div className="tw-fig-wrap tw-fig-7"><FigurSilke /></div>
+                    </div>
+
+                    {/* CSS-Animationen fuer Gruppenwechsel und Gehzyklus */}
+                    <style dangerouslySetInnerHTML={{__html: `
+.tw-figure { animation: twBodyBob 0.5s ease-in-out infinite; }
+@keyframes twBodyBob {
+    0%, 100% { transform: translateY(0); }
+    25% { transform: translateY(-3px); }
+    50% { transform: translateY(-1px); }
+    75% { transform: translateY(-3px); }
+}
+.tw-leg-l { animation: twLegLeft 1s ease-in-out infinite; transform-origin: top center; }
+.tw-leg-r { animation: twLegRight 1s ease-in-out infinite; transform-origin: top center; }
+.tw-arm-l { animation: twArmLeft 1s ease-in-out infinite; transform-origin: top center; }
+.tw-arm-r { animation: twArmRight 1s ease-in-out infinite; transform-origin: top center; }
+@keyframes twLegLeft {
+    0%,100% { transform: rotate(25deg); }
+    25%     { transform: rotate(0deg); }
+    50%     { transform: rotate(-25deg); }
+    75%     { transform: rotate(0deg); }
+}
+@keyframes twLegRight {
+    0%,100% { transform: rotate(-25deg); }
+    25%     { transform: rotate(0deg); }
+    50%     { transform: rotate(25deg); }
+    75%     { transform: rotate(0deg); }
+}
+@keyframes twArmLeft {
+    0%,100% { transform: rotate(-20deg); }
+    50%     { transform: rotate(20deg); }
+}
+@keyframes twArmRight {
+    0%,100% { transform: rotate(20deg); }
+    50%     { transform: rotate(-20deg); }
+}
+.tw-phase-2 { animation-delay: -0.25s; }
+.tw-phase-3 { animation-delay: -0.5s; }
+.tw-phase-2.tw-leg-l, .tw-phase-2 .tw-leg-l, .tw-phase-2 .tw-leg-r, .tw-phase-2 .tw-arm-l, .tw-phase-2 .tw-arm-r { animation-delay: -0.25s; }
+.tw-phase-3 .tw-leg-l, .tw-phase-3 .tw-leg-r, .tw-phase-3 .tw-arm-l, .tw-phase-3 .tw-arm-r { animation-delay: -0.5s; }
+.tw-shadow {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 14px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.5), transparent 70%);
+    filter: blur(3px);
+}
+
+/* ─── Individuelle Geh-Charakteristik pro Figur ───
+   Jede Figur bekommt eine andere Geschwindigkeit und Phase,
+   sodass sie NICHT im Gleichschritt laufen. Das wird erreicht,
+   indem wir die Animationen in den Kind-Elementen der Figur
+   auf anderen Speed/Delay-Werten laufen lassen. */
+.tw-fig-wrap { display: inline-block; }
+
+/* Ivan — schneller, forsch */
+.tw-fig-1 .tw-leg-l, .tw-fig-1 .tw-leg-r,
+.tw-fig-1 .tw-arm-l, .tw-fig-1 .tw-arm-r { animation-duration: 0.85s; }
+.tw-fig-1 .tw-figure { animation-duration: 0.425s; }
+
+/* Michal — gemaechlich, breitbeinig */
+.tw-fig-2 .tw-leg-l, .tw-fig-2 .tw-leg-r,
+.tw-fig-2 .tw-arm-l, .tw-fig-2 .tw-arm-r { animation-duration: 1.15s; animation-delay: -0.3s; }
+.tw-fig-2 .tw-figure { animation-duration: 0.575s; animation-delay: -0.15s; }
+
+/* Iurii — schlurfender Gang, langsamer Oberkoerper */
+.tw-fig-3 .tw-leg-l, .tw-fig-3 .tw-leg-r,
+.tw-fig-3 .tw-arm-l, .tw-fig-3 .tw-arm-r { animation-duration: 1.25s; animation-delay: -0.6s; }
+.tw-fig-3 .tw-figure { animation-duration: 0.75s; animation-delay: -0.3s; }
+
+/* Peter — zuegig, rhythmisch */
+.tw-fig-4 .tw-leg-l, .tw-fig-4 .tw-leg-r,
+.tw-fig-4 .tw-arm-l, .tw-fig-4 .tw-arm-r { animation-duration: 0.95s; animation-delay: -0.1s; }
+.tw-fig-4 .tw-figure { animation-duration: 0.475s; }
+
+/* Luca (AM) — locker, entspannt */
+.tw-fig-5 .tw-leg-l, .tw-fig-5 .tw-leg-r,
+.tw-fig-5 .tw-arm-l, .tw-fig-5 .tw-arm-r { animation-duration: 1.05s; animation-delay: -0.4s; }
+.tw-fig-5 .tw-figure { animation-duration: 0.525s; animation-delay: -0.2s; }
+
+/* Luca 2 — sehr flott */
+.tw-fig-6 .tw-leg-l, .tw-fig-6 .tw-leg-r,
+.tw-fig-6 .tw-arm-l, .tw-fig-6 .tw-arm-r { animation-duration: 0.8s; animation-delay: -0.2s; }
+.tw-fig-6 .tw-figure { animation-duration: 0.4s; }
+
+/* Silke — elegant, ruhig */
+.tw-fig-7 .tw-leg-l, .tw-fig-7 .tw-leg-r,
+.tw-fig-7 .tw-arm-l, .tw-fig-7 .tw-arm-r { animation-duration: 1.1s; animation-delay: -0.5s; }
+.tw-fig-7 .tw-figure { animation-duration: 0.55s; animation-delay: -0.25s; }
+
+.tw-group {
+    left: -400px;
+    opacity: 0;
+    animation: twGroupWalk 45s linear infinite;
+}
+.tw-group-1 { animation-delay: 0s; }
+.tw-group-2 { animation-delay: 15s; }
+.tw-group-3 { animation-delay: 30s; }
+@keyframes twGroupWalk {
+    0%    { left: -400px; opacity: 1; }
+    33.3% { left: 100%; opacity: 1; }
+    33.4% { left: 100%; opacity: 0; }
+    100%  { left: 100%; opacity: 0; }
+}
+`}} />
+                </div>
+            );
+        }
+
+    /* ═══════════════════════════════════════════════════════════
+       UHR-BLOCK (1:1 aus Master-App tw-aufmass.jsx Z. 217-274)
        ═══════════════════════════════════════════════════════════ */
     function UhrBlock({ lang }) {
-        const [zeit, setZeit] = React.useState(new Date());
+        const [currentTime, setCurrentTime] = useState(new Date());
 
-        React.useEffect(() => {
-            const i = setInterval(() => setZeit(new Date()), 1000);
-            return () => clearInterval(i);
+        useEffect(() => {
+            const t = setInterval(() => setCurrentTime(new Date()), 1000);
+            return () => clearInterval(t);
         }, []);
 
-        // Wochentag-Lokalisierung pro Sprache
-        const localeMap = { de: 'de-DE', cs: 'cs-CZ', sk: 'sk-SK', pl: 'pl-PL', en: 'en-GB', ro: 'ro-RO', uk: 'uk-UA' };
-        const locale = localeMap[lang] || 'de-DE';
-        const tag = zeit.toLocaleDateString(locale, { weekday: 'long' }).toUpperCase();
-        const datum = zeit.toLocaleDateString(locale, { day: '2-digit', month: 'long', year: 'numeric' });
-        const hh = String(zeit.getHours()).padStart(2, '0');
-        const mm = String(zeit.getMinutes()).padStart(2, '0');
-        const ss = String(zeit.getSeconds()).padStart(2, '0');
+        // Sprach-spezifische Wochentage und Monate
+        const tageMap = {
+            de: ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'],
+            cs: ['Nedele','Pondeli','Utery','Streda','Ctvrtek','Patek','Sobota'],
+            sk: ['Nedela','Pondelok','Utorok','Streda','Stvrtok','Piatok','Sobota'],
+            pl: ['Niedziela','Poniedzialek','Wtorek','Sroda','Czwartek','Piatek','Sobota'],
+            en: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+            ro: ['Duminica','Luni','Marti','Miercuri','Joi','Vineri','Sambata'],
+            uk: ['Nedilya','Ponedilok','Vivtorok','Sereda','Chetver','Pyatnytsya','Subota']
+        };
+        const monateMap = {
+            de: ['Januar','Februar','M\u00e4rz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+            cs: ['Leden','Unor','Brezen','Duben','Kveten','Cerven','Cervenec','Srpen','Zari','Rijen','Listopad','Prosinec'],
+            sk: ['Januar','Februar','Marec','April','Maj','Jun','Jul','August','September','Oktober','November','December'],
+            pl: ['Styczen','Luty','Marzec','Kwiecien','Maj','Czerwiec','Lipiec','Sierpien','Wrzesien','Pazdziernik','Listopad','Grudzien'],
+            en: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+            ro: ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'],
+            uk: ['Sichen','Lyutyi','Berezen','Kviten','Traven','Cherven','Lypen','Serpen','Veresen','Zhovten','Lystopad','Hruden']
+        };
+        const tage = tageMap[lang] || tageMap.de;
+        const monate = monateMap[lang] || monateMap.de;
+
+        const tag = tage[currentTime.getDay()];
+        const datum = currentTime.getDate() + '. ' + monate[currentTime.getMonth()] + ' ' + currentTime.getFullYear();
+        const stunden = String(currentTime.getHours()).padStart(2,'0');
+        const minuten = String(currentTime.getMinutes()).padStart(2,'0');
+        const sekunden = String(currentTime.getSeconds()).padStart(2,'0');
 
         return (
-            <div className="uhr-block">
-                <div className="uhr-tag">{tag}</div>
-                <div className="uhr-zeit">
-                    {hh}<span className="uhr-doppelpunkt">:</span>{mm}<span className="uhr-doppelpunkt">:</span>{ss}
+            <div style={{
+                margin:'0 0 12px', padding:'24px 20px',
+                background:'linear-gradient(135deg, rgba(15,25,35,0.95) 0%, rgba(20,40,70,0.9) 100%)',
+                borderRadius:'20px', textAlign:'center', position:'relative', overflow:'hidden',
+                border:'1px solid rgba(77,166,255,0.2)',
+                boxShadow:'0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+                width: '100%', maxWidth: '480px',
+                zIndex: 1
+            }}>
+                <div style={{position:'absolute', top:'-20px', right:'-20px', width:'120px', height:'120px', background:'radial-gradient(circle, rgba(77,166,255,0.15) 0%, transparent 70%)', borderRadius:'50%'}} />
+                <div style={{position:'absolute', bottom:'-15px', left:'-15px', width:'80px', height:'80px', background:'radial-gradient(circle, rgba(46,204,113,0.1) 0%, transparent 70%)', borderRadius:'50%'}} />
+
+                <div style={{fontSize:'12px', fontWeight:'600', color:'rgba(77,166,255,0.7)', letterSpacing:'5px', textTransform:'uppercase', marginBottom:'8px'}}>
+                    {tag}
                 </div>
-                <div className="uhr-datum">{datum}</div>
+
+                <div style={{
+                    fontSize:'64px', fontWeight:'200', color:'#ffffff', letterSpacing:'6px',
+                    fontFamily:'"SF Pro Display", "Helvetica Neue", system-ui, sans-serif',
+                    lineHeight:'1', marginBottom:'10px', position:'relative'
+                }}>
+                    <span style={{fontWeight:'300'}}>{stunden}</span>
+                    <span className="tw-clock-pulse" style={{color:'var(--accent-blue)', fontWeight:'100'}}>:</span>
+                    <span style={{fontWeight:'300'}}>{minuten}</span>
+                    <span style={{fontSize:'28px', fontWeight:'200', color:'rgba(255,255,255,0.35)', marginLeft:'4px', verticalAlign:'super'}}>{sekunden}</span>
+                </div>
+
+                <div style={{fontSize:'16px', fontWeight:'500', color:'rgba(255,255,255,0.6)', letterSpacing:'1.5px'}}>
+                    {datum}
+                </div>
+
+                <div style={{margin:'14px auto 0', width:'60px', height:'2px', background:'linear-gradient(90deg, transparent, rgba(77,166,255,0.4), transparent)', borderRadius:'1px'}} />
             </div>
         );
     }
 
     /* ═══════════════════════════════════════════════════════════
-       BAUTEAM-ANIMATION (CSS-only, vereinfacht)
-       ═══════════════════════════════════════════════════════════ */
-    function BauteamAnimation({ lang }) {
-        return (
-            <div className="bauteam">
-                <div className="bauteam-titel">{t('bauteam', lang)}</div>
-                <div className="bauteam-szene">
-                    <span className="bauarbeiter">👷</span>
-                    <span className="bauarbeiter">🔨</span>
-                    <span className="bauarbeiter">👷‍♀️</span>
-                    <span className="bauarbeiter">🧱</span>
-                </div>
-                <div className="bauteam-boden"/>
-            </div>
-        );
-    }
-
-    /* ═══════════════════════════════════════════════════════════
-       SPRACH-AUSWAHL-MODAL
+       SPRACH-MODAL
        ═══════════════════════════════════════════════════════════ */
     function SprachModal({ aktuell, onWaehle, onSchliessen }) {
         return (
@@ -839,38 +1465,49 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       STARTSEITE (Modul "Start" Inhalt)
+       STARTSEITE (1:1 Master-App-Optik, OHNE die 5 Verbindungs-Buttons)
        ═══════════════════════════════════════════════════════════ */
     function MAStartseite({ lang, onSprachOeffnen }) {
         const aktSprache = SPRACHEN.find(s => s.code === lang) || SPRACHEN[0];
         return (
-            <>
-                <div className="firma-header">
-                    <FirmenLogo/>
-                    <div className="firmen-adresse">Flurweg 14a · 56472 Nisterau · Tel. 02661-63101</div>
-                    <div className="firmen-untertitel">{t('baustellen_app', lang)}</div>
+            <div className="startseite">
+                {/* FIRMEN-HEADER (identisch Master-App) */}
+                <div className="logo-section">
+                    <FirmenLogo size="large" />
+                    <div className="logo-address">
+                        Flurweg 14a · 56472 Nisterau · Tel. 02661-63101
+                    </div>
+                    <div style={{marginTop:'8px', fontSize:'13px', fontWeight:'700', color:'var(--accent-blue)', letterSpacing:'2px', textTransform:'uppercase'}}>
+                        {t('baustellen_app', lang)}
+                    </div>
                 </div>
-                <UhrBlock lang={lang}/>
-                <div className="sprach-pill-wrapper">
-                    <button className="sprach-pill" onClick={onSprachOeffnen}>
-                        <span className="flag">{aktSprache.flag}</span>
-                        <span>{aktSprache.name}</span>
-                        <span style={{fontSize: 11, color: 'var(--text-muted)'}}>▼</span>
-                    </button>
-                </div>
-                <BauteamAnimation lang={lang}/>
+
+                {/* UHR-BLOCK */}
+                <UhrBlock lang={lang} />
+
+                {/* SPRACH-PILLE (statt der 5 Verbindungs-Buttons!) */}
+                <button className="sprach-pill" onClick={onSprachOeffnen}>
+                    <span className="flag">{aktSprache.flag}</span>
+                    <span>{aktSprache.name}</span>
+                    <span style={{fontSize: 11, color: 'var(--text-muted)'}}>▼</span>
+                </button>
+
+                {/* BAUTEAM-ANIMATION (1:1 Master-App) */}
+                <BauteamAnimation />
+
+                {/* Status */}
                 <div className="status-leiste">
                     <span className="status-dot online"/>
                     <span>{t('online', lang)}</span>
                     <span style={{color: 'var(--text-muted)'}}>·</span>
                     <span>v{APP_VERSION}</span>
                 </div>
-            </>
+            </div>
         );
     }
 
     /* ═══════════════════════════════════════════════════════════
-       MODUL-PLATZHALTER (für Module 2-6, die noch leer sind)
+       MODUL-PLATZHALTER (Module 2-6, kommen in späteren Etappen)
        ═══════════════════════════════════════════════════════════ */
     function ModulPlatzhalter({ lang, titel, IconComp }) {
         return (
@@ -890,34 +1527,65 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       TOP-LEVEL-APP
+       NAV-HEADER (rot, wie Master-App)
+       ═══════════════════════════════════════════════════════════ */
+    function NavHeader({ lang, onBack, onForward, fontLarge, onToggleFont }) {
+        const redBtnStyle = (active) => ({
+            padding: '8px 14px',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            background: active
+                ? 'linear-gradient(135deg, #e84040, #ff5252)'
+                : 'linear-gradient(135deg, var(--accent-red-light), var(--accent-red))',
+            color: '#fff',
+            fontSize: '12px',
+            fontWeight: '700',
+            fontFamily: 'Oswald, sans-serif',
+            textTransform: 'uppercase',
+            letterSpacing: '0.6px',
+            boxShadow: '0 3px 10px rgba(196,30,30,0.3)',
+            transition: 'all 0.2s ease',
+            whiteSpace: 'nowrap'
+        });
+
+        return (
+            <header className="app-header">
+                <div style={{display:'flex', gap:'6px'}}>
+                    <button style={redBtnStyle(false)} onClick={onBack}>{t('zurueck', lang)}</button>
+                    <button style={redBtnStyle(false)} onClick={onForward}>{t('vor', lang)}</button>
+                </div>
+                <span className="header-title">{t('baustellen_app', lang)}</span>
+                <button style={Object.assign(redBtnStyle(fontLarge), {padding:'8px 12px'})}
+                        onClick={onToggleFont}>
+                    {fontLarge ? t('gross_klein_zurueck', lang) : t('gross_klein', lang)}
+                </button>
+            </header>
+        );
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       TOP-LEVEL APP
        ═══════════════════════════════════════════════════════════ */
     function MAApp() {
-        // State aus localStorage laden
-        const [lang, setLang] = React.useState(() => {
-            return localStorage.getItem('tw-ma-sprache') || 'de';
-        });
-        const [fontScale, setFontScale] = React.useState(() => {
-            return parseFloat(localStorage.getItem('tw-ma-fontscale') || '1');
-        });
-        const [aktiverTab, setAktiverTab] = React.useState('start');
-        const [sprachModalOffen, setSprachModalOffen] = React.useState(false);
+        const [lang, setLang] = useState(() => localStorage.getItem('tw-ma-sprache') || 'de');
+        const [fontLarge, setFontLarge] = useState(() => localStorage.getItem('tw_font_scale') === 'large');
+        const [aktiverTab, setAktiverTab] = useState('start');
+        const [sprachModalOffen, setSprachModalOffen] = useState(false);
 
-        // Schriftgroesse anwenden (CSS-Variable setzen)
-        React.useEffect(() => {
-            document.documentElement.style.setProperty('--font-scale', fontScale);
-            localStorage.setItem('tw-ma-fontscale', String(fontScale));
-        }, [fontScale]);
+        useEffect(() => {
+            if (fontLarge) {
+                document.body.classList.add('tw-font-large');
+                localStorage.setItem('tw_font_scale', 'large');
+            } else {
+                document.body.classList.remove('tw-font-large');
+                localStorage.setItem('tw_font_scale', 'normal');
+            }
+        }, [fontLarge]);
 
-        // Sprache speichern
-        React.useEffect(() => {
+        useEffect(() => {
             localStorage.setItem('tw-ma-sprache', lang);
         }, [lang]);
-
-        const setSprache = (code) => {
-            setLang(code);
-            setSprachModalOffen(false);
-        };
 
         const tabs = [
             { id: 'start',       label: t('start', lang),       Icon: Icon.Home },
@@ -930,28 +1598,16 @@
 
         return (
             <>
-                {/* Top-Bar */}
-                <div className="topbar">
-                    <div className="topbar-nav">
-                        <button className="topbar-btn" title={t('zurueck', lang)} onClick={() => history.back()}>‹</button>
-                        <button className="topbar-btn" title={t('vor', lang)} onClick={() => history.forward()}>›</button>
-                    </div>
-                    <div className="topbar-title">{t('baustellen_app', lang)}</div>
-                    <div className="topbar-actions">
-                        <button className={'topbar-action' + (fontScale > 1 ? ' active' : '')}
-                                onClick={() => setFontScale(s => Math.min(1.4, s + 0.1))}
-                                title={t('gross', lang)}>A↑</button>
-                        <button className={'topbar-action' + (fontScale < 1 ? ' active' : '')}
-                                onClick={() => setFontScale(s => Math.max(0.8, s - 0.1))}
-                                title={t('klein', lang)}>A↓</button>
-                    </div>
-                </div>
+                <NavHeader lang={lang}
+                           onBack={() => history.back()}
+                           onForward={() => history.forward()}
+                           fontLarge={fontLarge}
+                           onToggleFont={() => setFontLarge(f => !f)} />
 
-                {/* Modul-Navigation */}
-                <div className="module-nav">
+                <div className="modul-tabs">
                     {tabs.map(tab => (
                         <button key={tab.id}
-                                className={'module-btn' + (aktiverTab === tab.id ? ' active' : '')}
+                                className={'modul-tab' + (aktiverTab === tab.id ? ' active' : '')}
                                 onClick={() => setAktiverTab(tab.id)}>
                             <tab.Icon/>
                             <span>{tab.label}</span>
@@ -959,32 +1615,28 @@
                     ))}
                 </div>
 
-                {/* Hauptinhalt */}
-                <div className="main-content">
-                    {aktiverTab === 'start' && (
-                        <MAStartseite lang={lang} onSprachOeffnen={() => setSprachModalOffen(true)}/>
-                    )}
-                    {aktiverTab === 'baustellen' && (
-                        <ModulPlatzhalter lang={lang} titel={t('baustellen', lang)} IconComp={Icon.Helm}/>
-                    )}
-                    {aktiverTab === 'kalender' && (
-                        <ModulPlatzhalter lang={lang} titel={t('kalender', lang)} IconComp={Icon.Kalender}/>
-                    )}
-                    {aktiverTab === 'fotos' && (
-                        <ModulPlatzhalter lang={lang} titel={t('fotos', lang)} IconComp={Icon.Kamera}/>
-                    )}
-                    {aktiverTab === 'stunden' && (
-                        <ModulPlatzhalter lang={lang} titel={t('stunden', lang)} IconComp={Icon.Uhr}/>
-                    )}
-                    {aktiverTab === 'nachrichten' && (
-                        <ModulPlatzhalter lang={lang} titel={t('nachrichten', lang)} IconComp={Icon.Sprechblase}/>
-                    )}
-                </div>
+                {aktiverTab === 'start' && (
+                    <MAStartseite lang={lang} onSprachOeffnen={() => setSprachModalOffen(true)}/>
+                )}
+                {aktiverTab === 'baustellen' && (
+                    <ModulPlatzhalter lang={lang} titel={t('baustellen', lang)} IconComp={Icon.Helm}/>
+                )}
+                {aktiverTab === 'kalender' && (
+                    <ModulPlatzhalter lang={lang} titel={t('kalender', lang)} IconComp={Icon.Kalender}/>
+                )}
+                {aktiverTab === 'fotos' && (
+                    <ModulPlatzhalter lang={lang} titel={t('fotos', lang)} IconComp={Icon.Kamera}/>
+                )}
+                {aktiverTab === 'stunden' && (
+                    <ModulPlatzhalter lang={lang} titel={t('stunden', lang)} IconComp={Icon.Uhr}/>
+                )}
+                {aktiverTab === 'nachrichten' && (
+                    <ModulPlatzhalter lang={lang} titel={t('nachrichten', lang)} IconComp={Icon.Sprechblase}/>
+                )}
 
-                {/* Sprach-Modal */}
                 {sprachModalOffen && (
                     <SprachModal aktuell={lang}
-                                 onWaehle={setSprache}
+                                 onWaehle={(c) => { setLang(c); setSprachModalOffen(false); }}
                                  onSchliessen={() => setSprachModalOffen(false)}/>
                 )}
             </>
