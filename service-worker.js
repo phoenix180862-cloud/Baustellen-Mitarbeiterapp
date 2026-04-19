@@ -9,23 +9,17 @@
 // - Push-Handler-Skelett fuer Etappe 7
 // ============================================================
 
-const CACHE_VERSION = 'v0.5.0-e5';
+const CACHE_VERSION = 'v0.8.1-single';
 const CACHE_NAME    = 'tw-ma-' + CACHE_VERSION;
 
 // App-Shell: statische Assets, die offline verfuegbar sein muessen.
+// Single-File-Build: alle JS-Module sind INLINE in index.html -> kein js/-Eintrag noetig.
 // Wir cachen OPTIMISTISCH - falls eine Datei fehlt, bricht install nicht ab.
 const APP_SHELL = [
     './',
     './index.html',
     './manifest.json',
     './css/tw-ma-design.css',
-    './js/tw-ma-core.js',
-    './js/tw-ma-storage.js',
-    './js/tw-ma-config.js',
-    './js/tw-ma-firebase.js',
-    './js/tw-ma-drive-service.js',
-    './js/tw-ma-translation.js',
-    './js/tw-ma-sync.js',
     './icons/icon-72.png',
     './icons/icon-96.png',
     './icons/icon-128.png',

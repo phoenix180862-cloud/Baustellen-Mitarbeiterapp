@@ -45,39 +45,2344 @@
     <!-- ===== Globaler Error-Handler ===== -->
     <script>
     window.onerror = function(msg, url, line, col, err) {
-        console.error('App Error:', msg, 'Line:', line, err);
+        try { console.error('App Error:', msg, 'Line:', line, err); } catch(_){}
         var d = document.getElementById('crash-info');
         if (!d) {
             d = document.createElement('div');
             d.id = 'crash-info';
             d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#1a2638;color:#ff4757;border:2px solid #c41e1e;border-radius:14px;z-index:99999;font-family:monospace;font-size:13px;max-height:80vh;overflow:auto;';
-            document.body.appendChild(d);
+            if (document.body) document.body.appendChild(d);
+            else document.addEventListener('DOMContentLoaded', function(){ document.body.appendChild(d); });
         }
-        d.innerHTML = '<b>Fehler:</b> ' + msg + '<br><b>Zeile:</b> ' + line +
+        // Hinweis fuer haeufige Ursachen
+        var hint = '';
+        if (msg && msg.indexOf && msg.indexOf('is not defined') !== -1) {
+            hint = '<div style="margin-top:10px;padding:10px;background:rgba(255,255,255,0.06);border-radius:8px;color:#ffd43b;font-size:12px">'
+                 + '<b>Tipp:</b> Dieser Fehler deutet auf einen Cache-Konflikt hin. Bitte Browser-Cache leeren oder App neu installieren.'
+                 + '</div>';
+        }
+        d.innerHTML = '<b>Fehler:</b> ' + msg + '<br><b>Zeile:</b> ' + line + hint +
             '<br><button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#1E88E5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold">Schliessen</button>';
     };
     </script>
 
-    <!-- ===== Service-Worker-Registrierung ===== -->
+    <!-- ===== Service-Worker-Registrierung mit Cache-Killer ===== -->
     <script>
-    if ('serviceWorker' in navigator) {
+    (function() {
+        if (!('serviceWorker' in navigator)) return;
+
+        // Cache-Killer: Einmalig alle alten Caches und SW loeschen,
+        // wenn noch kein Marker fuer diese Version gesetzt ist.
+        var VERSION_MARKER = 'tw-ma-cache-killed-v0.8.1-single';
+        try {
+            if (!localStorage.getItem(VERSION_MARKER)) {
+                // Alle bestehenden SW deregistrieren
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    regs.forEach(function(r) { r.unregister(); });
+                });
+                // Alle Caches leeren
+                if (window.caches) {
+                    caches.keys().then(function(keys) {
+                        keys.forEach(function(k) { caches.delete(k); });
+                    });
+                }
+                localStorage.setItem(VERSION_MARKER, '1');
+                console.log('TW-MA: Altcache bereinigt');
+            }
+        } catch (e) { /* Privacy-Mode: kein localStorage */ }
+
         window.addEventListener('load', function() {
             navigator.serviceWorker.register('service-worker.js')
                 .then(function(reg) { console.log('SW registriert:', reg.scope); })
                 .catch(function(err) { console.warn('SW Fehler:', err); });
         });
-    }
+    })();
     </script>
 
-    <!-- ===== JS-Module (vor Babel-Block) ===== -->
-    <script src="js/tw-ma-core.js"></script>
-    <script src="js/tw-ma-storage.js"></script>
-    <script src="js/tw-ma-config.js"></script>
-    <script src="js/tw-ma-firebase.js"></script>
-    <script src="js/tw-ma-drive-service.js"></script>
-    <script src="js/tw-ma-translation.js"></script>
-    <script src="js/tw-ma-pdf.js"></script>
-    <script src="js/tw-ma-sync.js"></script>
+    <!-- ===== JS-Module (INLINE, keine externen Dateien) ===== -->
+    <script>
+
+/* ========== js/tw-ma-core.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Core (Etappe 3)
+// ============================================================
+// Logger, Geraete-ID, PIN-Hash (SHA-256), Code-Generator,
+// ExitGuard-Skelett.
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    const VERSION = '0.4.0';
+
+    // ===== Mini-Logger ========================================
+    const log = function(level, area, msg, data) {
+        const ts = new Date().toISOString().substring(11, 19);
+        const prefix = '[' + ts + '][' + area + ']';
+        if (level === 'error') console.error(prefix, msg, data || '');
+        else if (level === 'warn') console.warn(prefix, msg, data || '');
+        else console.log(prefix, msg, data || '');
+    };
+
+    // ===== Geraete-ID (UUID v4 in localStorage) ==============
+    const STORAGE_KEY_DEVICE = 'tw_ma_device_id';
+
+    function getOrCreateDeviceId() {
+        let id = null;
+        try { id = localStorage.getItem(STORAGE_KEY_DEVICE); } catch (e) {}
+        if (!id) {
+            id = 'dev-' + (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).substring(2, 10)));
+            try { localStorage.setItem(STORAGE_KEY_DEVICE, id); } catch (e) {}
+        }
+        return id;
+    }
+
+    function clearDeviceId() {
+        try { localStorage.removeItem(STORAGE_KEY_DEVICE); } catch (e) {}
+    }
+
+    // ===== 6-stelliger Anmelde-Code ==========================
+    function generateAnmeldeCode() {
+        // 100000-999999, kein fuehrender Null
+        return String(Math.floor(100000 + Math.random() * 900000));
+    }
+
+    // ===== SHA-256-Hash (fuer PIN) ===========================
+    async function sha256(text) {
+        const buf = new TextEncoder().encode(text);
+        const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+        const bytes = Array.from(new Uint8Array(hashBuf));
+        return bytes.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+    }
+
+    // PIN + Geraete-ID als Salt -> stabilerer Hash
+    async function hashPin(pin, deviceId) {
+        return sha256((pin || '') + '::' + (deviceId || ''));
+    }
+
+    // ===== Komplett-Wipe (bei 5 falschen PIN) ================
+    async function wipeApp() {
+        log('warn', 'Core', 'WIPE ausgeloest - loesche alles lokal');
+        try { localStorage.clear(); } catch (e) {}
+        try { sessionStorage.clear(); } catch (e) {}
+        // IndexedDB
+        if (window.indexedDB) {
+            try {
+                const dbs = await (indexedDB.databases ? indexedDB.databases() : Promise.resolve([]));
+                for (const d of dbs) { if (d.name) indexedDB.deleteDatabase(d.name); }
+            } catch (e) { log('warn', 'Core', 'IndexedDB-Wipe', e); }
+        }
+        // Service-Worker-Caches
+        if (window.caches) {
+            try {
+                const names = await caches.keys();
+                await Promise.all(names.map(function(n) { return caches.delete(n); }));
+            } catch (e) { log('warn', 'Core', 'Cache-Wipe', e); }
+        }
+    }
+
+    // ===== Public API =========================================
+    global.TWMACore = {
+        VERSION:             VERSION,
+        log:                 log,
+        getDeviceId:         getOrCreateDeviceId,
+        clearDeviceId:       clearDeviceId,
+        generateAnmeldeCode: generateAnmeldeCode,
+        sha256:              sha256,
+        hashPin:             hashPin,
+        wipeApp:             wipeApp,
+
+        // Vollausbau in spaeteren Etappen:
+        registerExitGuard: function(check) { /* TODO Etappe 5 */ },
+        clearExitGuards:   function() { /* TODO Etappe 5 */ }
+    };
+
+    log('info', 'Core', 'TWMACore initialisiert v' + VERSION);
+})(window);
+
+/* ========== js/tw-ma-storage.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Storage (Etappe 5 Vollausbau)
+// ============================================================
+// IndexedDB-Wrapper fuer Offline-Speicher.
+//
+// Stores:
+//   fotos              { id, baustelle_id, raum_id, phase, wand_id,
+//                        foto_blob, thumb_blob, notiz_original,
+//                        notiz_deutsch, aufgenommen_am,
+//                        aufgenommen_von, sync_status, upload_name }
+//   raeume             { id, baustelle_id, bezeichnung, raum_nr,
+//                        geschoss, wand_zahl, wand_labels[], ts }
+//   sync_queue         { id(auto), foto_id, attempts, last_error,
+//                        next_try_at }
+//   wip                { modul, data }
+//   translation_cache  { key, text, ts }
+//   settings           { key, value }
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    const DB_NAME = 'tw-ma-db';
+    const DB_VERSION = 3;  // v2: raeume, v3: stunden
+
+    let dbPromise = null;
+
+    function openDb() {
+        if (dbPromise) return dbPromise;
+        dbPromise = new Promise(function(resolve, reject) {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                const tx = e.target.transaction;
+
+                // Store 'fotos' - neu anlegen oder Indexe nachruesten
+                let fotosStore;
+                if (!db.objectStoreNames.contains('fotos')) {
+                    fotosStore = db.createObjectStore('fotos', { keyPath: 'id' });
+                } else {
+                    fotosStore = tx.objectStore('fotos');
+                }
+                if (!fotosStore.indexNames.contains('baustelle'))
+                    fotosStore.createIndex('baustelle', 'baustelle_id', { unique: false });
+                if (!fotosStore.indexNames.contains('sync_status'))
+                    fotosStore.createIndex('sync_status', 'sync_status', { unique: false });
+                if (!fotosStore.indexNames.contains('raum_phase'))
+                    fotosStore.createIndex('raum_phase', ['baustelle_id', 'raum_id', 'phase'], { unique: false });
+
+                // Store 'sync_queue'
+                let queueStore;
+                if (!db.objectStoreNames.contains('sync_queue')) {
+                    queueStore = db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
+                } else {
+                    queueStore = tx.objectStore('sync_queue');
+                }
+                if (!queueStore.indexNames.contains('foto_id'))
+                    queueStore.createIndex('foto_id', 'foto_id', { unique: false });
+                if (!queueStore.indexNames.contains('next_try_at'))
+                    queueStore.createIndex('next_try_at', 'next_try_at', { unique: false });
+
+                if (!db.objectStoreNames.contains('wip'))
+                    db.createObjectStore('wip', { keyPath: 'modul' });
+                if (!db.objectStoreNames.contains('translation_cache'))
+                    db.createObjectStore('translation_cache', { keyPath: 'key' });
+                if (!db.objectStoreNames.contains('settings'))
+                    db.createObjectStore('settings', { keyPath: 'key' });
+
+                // v2: Raeume-Store
+                if (!db.objectStoreNames.contains('raeume')) {
+                    const raeume = db.createObjectStore('raeume', { keyPath: 'id' });
+                    raeume.createIndex('baustelle', 'baustelle_id', { unique: false });
+                }
+
+                // v3: Stunden-Store (Etappe 6)
+                //   { id, datum (YYYY-MM-DD), baustelle_id, baustelle_name,
+                //     mitarbeiter_id, anfang, ende, pause_min, netto_min,
+                //     taetigkeiten[], material[], bemerkung_original, bemerkung_deutsch,
+                //     wetter, pdf_blob, upload_name, sync_status, ts }
+                if (!db.objectStoreNames.contains('stunden')) {
+                    const stunden = db.createObjectStore('stunden', { keyPath: 'id' });
+                    stunden.createIndex('datum', 'datum', { unique: false });
+                    stunden.createIndex('sync_status', 'sync_status', { unique: false });
+                }
+            };
+            req.onsuccess = function() { resolve(req.result); };
+            req.onerror = function() { reject(req.error); };
+        });
+        return dbPromise;
+    }
+
+    // ===== Helper: Promise-Wrap fuer Transaktion =====
+    function txPromise(storeName, mode, cb) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction(storeName, mode);
+                const store = tx.objectStore(storeName);
+                let result;
+                try {
+                    result = cb(store, tx);
+                } catch (e) {
+                    reject(e); return;
+                }
+                tx.oncomplete = function() { resolve(result); };
+                tx.onerror    = function() { reject(tx.error); };
+                tx.onabort    = function() { reject(tx.error); };
+            });
+        });
+    }
+
+    function reqPromise(req) {
+        return new Promise(function(resolve, reject) {
+            req.onsuccess = function() { resolve(req.result); };
+            req.onerror   = function() { reject(req.error); };
+        });
+    }
+
+    // ===== Settings =====
+    function getSetting(key) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction('settings', 'readonly');
+                const req = tx.objectStore('settings').get(key);
+                req.onsuccess = function() { resolve(req.result ? req.result.value : null); };
+                req.onerror = function() { reject(req.error); };
+            });
+        });
+    }
+
+    function setSetting(key, value) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction('settings', 'readwrite');
+                const req = tx.objectStore('settings').put({ key: key, value: value });
+                req.onsuccess = function() { resolve(); };
+                req.onerror = function() { reject(req.error); };
+            });
+        });
+    }
+
+    // ===== Fotos =====
+    function saveFoto(foto) {
+        if (!foto || !foto.id) return Promise.reject(new Error('Foto ohne ID'));
+        return txPromise('fotos', 'readwrite', function(store) {
+            store.put(foto);
+        });
+    }
+
+    function getFoto(id) {
+        return openDb().then(function(db) {
+            return reqPromise(db.transaction('fotos', 'readonly').objectStore('fotos').get(id));
+        });
+    }
+
+    function deleteFoto(id) {
+        return txPromise('fotos', 'readwrite', function(store) {
+            store.delete(id);
+        });
+    }
+
+    function listFotos(filter) {
+        filter = filter || {};
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction('fotos', 'readonly');
+                const store = tx.objectStore('fotos');
+                const results = [];
+                let cursorReq;
+                if (filter.baustelle_id && filter.raum_id && filter.phase) {
+                    cursorReq = store.index('raum_phase').openCursor(
+                        IDBKeyRange.only([filter.baustelle_id, filter.raum_id, filter.phase])
+                    );
+                } else if (filter.baustelle_id) {
+                    cursorReq = store.index('baustelle').openCursor(IDBKeyRange.only(filter.baustelle_id));
+                } else if (filter.sync_status) {
+                    cursorReq = store.index('sync_status').openCursor(IDBKeyRange.only(filter.sync_status));
+                } else {
+                    cursorReq = store.openCursor();
+                }
+                cursorReq.onsuccess = function(e) {
+                    const cur = e.target.result;
+                    if (!cur) { resolve(results); return; }
+                    const val = cur.value;
+                    // Zusaetzliche In-Memory-Filter
+                    let ok = true;
+                    if (filter.wand_id && val.wand_id !== filter.wand_id) ok = false;
+                    if (filter.phase && val.phase !== filter.phase) ok = false;
+                    if (filter.raum_id && val.raum_id !== filter.raum_id) ok = false;
+                    if (filter.allgemein_only && !(val.wand_id || '').toString().startsWith('allgemein')) ok = false;
+                    if (ok) results.push(val);
+                    cur.continue();
+                };
+                cursorReq.onerror = function() { reject(cursorReq.error); };
+            });
+        });
+    }
+
+    function countFotosByStatus(status) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const idx = db.transaction('fotos', 'readonly').objectStore('fotos').index('sync_status');
+                const req = idx.count(IDBKeyRange.only(status));
+                req.onsuccess = function() { resolve(req.result || 0); };
+                req.onerror   = function() { reject(req.error); };
+            });
+        });
+    }
+
+    // ===== Raeume =====
+    function saveRaum(raum) {
+        if (!raum || !raum.id) return Promise.reject(new Error('Raum ohne ID'));
+        return txPromise('raeume', 'readwrite', function(store) {
+            store.put(raum);
+        });
+    }
+
+    function getRaum(id) {
+        return openDb().then(function(db) {
+            return reqPromise(db.transaction('raeume', 'readonly').objectStore('raeume').get(id));
+        });
+    }
+
+    function listRaeume(baustelleId) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const idx = db.transaction('raeume', 'readonly').objectStore('raeume').index('baustelle');
+                const results = [];
+                const cursorReq = idx.openCursor(IDBKeyRange.only(baustelleId));
+                cursorReq.onsuccess = function(e) {
+                    const cur = e.target.result;
+                    if (!cur) { resolve(results); return; }
+                    results.push(cur.value);
+                    cur.continue();
+                };
+                cursorReq.onerror = function() { reject(cursorReq.error); };
+            });
+        });
+    }
+
+    function deleteRaum(id) {
+        return txPromise('raeume', 'readwrite', function(store) { store.delete(id); });
+    }
+
+    // ===== Sync-Queue =====
+    function enqueueSync(item) {
+        // item: { foto_id, attempts?, last_error?, next_try_at? }
+        item = Object.assign({
+            attempts: 0, last_error: null, next_try_at: Date.now()
+        }, item);
+        return txPromise('sync_queue', 'readwrite', function(store) {
+            store.add(item);
+        });
+    }
+
+    function listPendingSyncItems(limit) {
+        limit = limit || 50;
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const now = Date.now();
+                const results = [];
+                const idx = db.transaction('sync_queue', 'readonly').objectStore('sync_queue').index('next_try_at');
+                const cursorReq = idx.openCursor(IDBKeyRange.upperBound(now));
+                cursorReq.onsuccess = function(e) {
+                    const cur = e.target.result;
+                    if (!cur || results.length >= limit) { resolve(results); return; }
+                    results.push(cur.value);
+                    cur.continue();
+                };
+                cursorReq.onerror = function() { reject(cursorReq.error); };
+            });
+        });
+    }
+
+    function updateSyncItem(id, patch) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction('sync_queue', 'readwrite');
+                const store = tx.objectStore('sync_queue');
+                const getReq = store.get(id);
+                getReq.onsuccess = function() {
+                    const rec = getReq.result;
+                    if (!rec) { resolve(false); return; }
+                    const merged = Object.assign(rec, patch);
+                    const putReq = store.put(merged);
+                    putReq.onsuccess = function() { resolve(true); };
+                    putReq.onerror   = function() { reject(putReq.error); };
+                };
+                getReq.onerror = function() { reject(getReq.error); };
+            });
+        });
+    }
+
+    function removeSyncItem(id) {
+        return txPromise('sync_queue', 'readwrite', function(store) { store.delete(id); });
+    }
+
+    function removeSyncItemsByFotoId(fotoId) {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const tx = db.transaction('sync_queue', 'readwrite');
+                const idx = tx.objectStore('sync_queue').index('foto_id');
+                const req = idx.openCursor(IDBKeyRange.only(fotoId));
+                req.onsuccess = function(e) {
+                    const cur = e.target.result;
+                    if (!cur) { resolve(); return; }
+                    cur.delete();
+                    cur.continue();
+                };
+                req.onerror = function() { reject(req.error); };
+            });
+        });
+    }
+
+    function countPendingSyncItems() {
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const req = db.transaction('sync_queue', 'readonly').objectStore('sync_queue').count();
+                req.onsuccess = function() { resolve(req.result || 0); };
+                req.onerror   = function() { reject(req.error); };
+            });
+        });
+    }
+
+    // ===== WIP (Etappe 6) =====
+    function saveWip(modul, data) {
+        return txPromise('wip', 'readwrite', function(store) {
+            store.put({ modul: modul, data: data, ts: Date.now() });
+        });
+    }
+
+    function loadWip(modul) {
+        return openDb().then(function(db) {
+            return reqPromise(db.transaction('wip', 'readonly').objectStore('wip').get(modul))
+                .then(function(r) { return r ? r.data : null; });
+        });
+    }
+
+    // ===== Speicher-Quota =====
+    async function getSpeicherQuota() {
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const est = await navigator.storage.estimate();
+                return {
+                    usage: est.usage || 0,
+                    quota: est.quota || 0,
+                    usage_mb: Math.round((est.usage || 0) / 1024 / 1024),
+                    quota_mb: Math.round((est.quota || 0) / 1024 / 1024)
+                };
+            } catch (_) { /* fallthrough */ }
+        }
+        return { usage: 0, quota: 0, usage_mb: 0, quota_mb: 0 };
+    }
+
+    // ===== Stunden (Etappe 6) =====
+    function saveStunde(stunde) {
+        if (!stunde || !stunde.id) return Promise.reject(new Error('Stunde ohne ID'));
+        return txPromise('stunden', 'readwrite', function(store) {
+            store.put(stunde);
+        });
+    }
+
+    function getStunde(id) {
+        return openDb().then(function(db) {
+            return reqPromise(db.transaction('stunden', 'readonly').objectStore('stunden').get(id));
+        });
+    }
+
+    function deleteStunde(id) {
+        return txPromise('stunden', 'readwrite', function(store) { store.delete(id); });
+    }
+
+    function listStunden(filter) {
+        filter = filter || {};
+        return openDb().then(function(db) {
+            return new Promise(function(resolve, reject) {
+                const store = db.transaction('stunden', 'readonly').objectStore('stunden');
+                const results = [];
+                const cursorReq = store.openCursor();
+                cursorReq.onsuccess = function(e) {
+                    const cur = e.target.result;
+                    if (!cur) { resolve(results); return; }
+                    const v = cur.value;
+                    let ok = true;
+                    if (filter.datum_ab && v.datum < filter.datum_ab) ok = false;
+                    if (filter.datum_bis && v.datum > filter.datum_bis) ok = false;
+                    if (filter.datum && v.datum !== filter.datum) ok = false;
+                    if (ok) results.push(v);
+                    cur.continue();
+                };
+                cursorReq.onerror = function() { reject(cursorReq.error); };
+            });
+        });
+    }
+
+    // ===== Public API =====
+    global.TWMAStorage = {
+        openDb: openDb,
+        getSetting: getSetting,
+        setSetting: setSetting,
+
+        // Fotos
+        saveFoto:            saveFoto,
+        getFoto:             getFoto,
+        deleteFoto:          deleteFoto,
+        listFotos:           listFotos,
+        countFotosByStatus:  countFotosByStatus,
+
+        // Raeume
+        saveRaum:   saveRaum,
+        getRaum:    getRaum,
+        listRaeume: listRaeume,
+        deleteRaum: deleteRaum,
+
+        // Stunden (Etappe 6)
+        saveStunde:   saveStunde,
+        getStunde:    getStunde,
+        deleteStunde: deleteStunde,
+        listStunden:  listStunden,
+
+        // Sync-Queue
+        enqueueSync:             enqueueSync,
+        listPendingSyncItems:    listPendingSyncItems,
+        updateSyncItem:          updateSyncItem,
+        removeSyncItem:          removeSyncItem,
+        removeSyncItemsByFotoId: removeSyncItemsByFotoId,
+        countPendingSyncItems:   countPendingSyncItems,
+
+        // WIP
+        saveWip: saveWip,
+        loadWip: loadWip,
+
+        // Quota
+        getSpeicherQuota: getSpeicherQuota
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'Storage', 'TWMAStorage v0.5 initialisiert');
+})(window);
+
+/* ========== js/tw-ma-config.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Config (Etappe 0 Skelett)
+// App-Konstanten, UI-Label-Tabelle, Firebase-Config.
+// Verschluesselte Keys (Gemini, Service-Account) kommen in
+// Etappen 3 + 7 dazu.
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    // ===== Version =====
+    const APP_VERSION = '0.8.0-e8';
+
+    // ===== Firebase-Config (aus Master-App uebernommen) =====
+    // Wird in Etappe 3 scharf geschaltet.
+    const FIREBASE_CONFIG = {
+        // Platzhalter - Thomas traegt echte Werte via Onboarding-Dialog ein
+        // oder sie werden in Etappe 3 aus der Master-App-Config uebernommen.
+        apiKey: '',
+        authDomain: 'einkaufsliste-98199.firebaseapp.com',
+        databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app',
+        projectId: 'einkaufsliste-98199',
+        storageBucket: 'einkaufsliste-98199.appspot.com',
+        messagingSenderId: '',
+        appId: ''
+    };
+
+    // ===== Unterstuetzte Sprachen (Erstaufschlag) =====
+    const LANGUAGES = [
+        { code: 'de', label: 'Deutsch',    flag: '🇩🇪' },
+        { code: 'cz', label: 'Cestina',    flag: '🇨🇿' },
+        { code: 'sk', label: 'Slovencina', flag: '🇸🇰' },
+        { code: 'pl', label: 'Polski',     flag: '🇵🇱' },
+        { code: 'en', label: 'English',    flag: '🇬🇧' },
+        { code: 'ro', label: 'Romana',     flag: '🇷🇴' },
+        { code: 'ua', label: 'Ukrayinska', flag: '🇺🇦' }
+    ];
+
+    // ===== UI-Label-Tabelle =====
+    // Hard-Coded fuer schnellsten Zugriff (kein API-Call noetig).
+    // In Etappe 1 deutlich erweitert.
+    const UI_LABELS = {
+        // Modul-Namen
+        start:        { de: 'Start',        cz: 'Start',       sk: 'Start',       pl: 'Start',        en: 'Start',     ro: 'Start',      ua: 'Start' },
+        baustellen:   { de: 'Baustellen',   cz: 'Stavby',      sk: 'Stavby',      pl: 'Budowy',       en: 'Sites',     ro: 'Santiere',   ua: 'Budivnytstvo' },
+        kalender:     { de: 'Kalender',     cz: 'Kalendar',    sk: 'Kalendar',    pl: 'Kalendarz',    en: 'Calendar',  ro: 'Calendar',   ua: 'Kalendar' },
+        fotos:        { de: 'Fotos',        cz: 'Fotky',       sk: 'Fotky',       pl: 'Zdjecia',      en: 'Photos',    ro: 'Foto',       ua: 'Foto' },
+        stunden:      { de: 'Stunden',      cz: 'Hodiny',      sk: 'Hodiny',      pl: 'Godziny',      en: 'Hours',     ro: 'Ore',        ua: 'Hodyny' },
+        nachrichten:  { de: 'Nachrichten',  cz: 'Zpravy',      sk: 'Spravy',      pl: 'Wiadomosci',   en: 'Messages',  ro: 'Mesaje',     ua: 'Povidomlennya' },
+
+        // Standard-Buttons
+        speichern:    { de: 'Speichern',    cz: 'Ulozit',      sk: 'Ulozit',      pl: 'Zapisz',       en: 'Save',      ro: 'Salveaza',   ua: 'Zberehty' },
+        abbrechen:    { de: 'Abbrechen',    cz: 'Zrusit',      sk: 'Zrusit',      pl: 'Anuluj',       en: 'Cancel',    ro: 'Anuleaza',   ua: 'Skasuvaty' },
+        zurueck:      { de: 'Zurueck',      cz: 'Zpet',        sk: 'Spat',        pl: 'Wstecz',       en: 'Back',      ro: 'Inapoi',     ua: 'Nazad' },
+        weiter:       { de: 'Weiter',       cz: 'Dale',        sk: 'Dalej',       pl: 'Dalej',        en: 'Next',      ro: 'Inainte',    ua: 'Dali' },
+
+        // Header / App-Name
+        app_name:     { de: 'Baustellen App', cz: 'Stavebni App', sk: 'Stavebna App', pl: 'Aplikacja Budowa', en: 'Sites App', ro: 'Aplicatie Santier', ua: 'Dodatok Budivnytstva' },
+
+        // Platzhalter fuer noch nicht gebaute Module
+        in_arbeit:    { de: 'Noch im Bau',  cz: 'Jeste se pracuje', sk: 'Este sa pracuje', pl: 'W budowie', en: 'Under construction', ro: 'In lucru', ua: 'U rozrobci' },
+
+        // Sprach-Modal
+        sprache_waehlen: { de: 'Sprache waehlen', cz: 'Vyber jazyka', sk: 'Vyber jazyka', pl: 'Wybierz jezyk', en: 'Select language', ro: 'Alege limba', ua: 'Vybraty movu' },
+
+        // Status-Indikator
+        status_online:     { de: 'Online',    cz: 'Online',    sk: 'Online',    pl: 'Online',    en: 'Online',     ro: 'Online',   ua: 'Onlayn' },
+        status_offline:    { de: 'Offline',   cz: 'Offline',   sk: 'Offline',   pl: 'Offline',   en: 'Offline',    ro: 'Offline',  ua: 'Oflayn' },
+        letzter_sync_nie:  { de: 'Noch nicht synchronisiert', cz: 'Jeste nesynchronizovano', sk: 'Este nesynchronizovane', pl: 'Jeszcze nie zsynchronizowano', en: 'Not yet synchronized', ro: 'Nesincronizat inca', ua: 'Shche ne synkhronizovano' },
+
+        // Onboarding
+        onboarding_titel:       { de: 'Geraet einrichten', cz: 'Nastaveni zarizeni', sk: 'Nastavenie zariadenia', pl: 'Konfiguracja urzadzenia', en: 'Set up device', ro: 'Configureaza dispozitiv', ua: 'Nalashtuvaty prystriy' },
+        onboarding_code_info:   { de: 'Dein Anmelde-Code - bitte Thomas mitteilen:', cz: 'Tvuj prihlasovaci kod - sdel ho Thomasovi:', sk: 'Tvoj prihlasovaci kod - oznam ho Thomasovi:', pl: 'Twoj kod logowania - przekaz go Thomasowi:', en: 'Your registration code - tell it to Thomas:', ro: 'Codul tau de inregistrare - spune-l lui Thomas:', ua: 'Tviy kod reyestratsiyi - peredaiy yoho Tomasu:' },
+        onboarding_warten:      { de: 'Warte auf Freigabe...', cz: 'Cekam na schvaleni...', sk: 'Cakam na schvalenie...', pl: 'Czekam na akceptacje...', en: 'Waiting for approval...', ro: 'Astept aprobarea...', ua: 'Ochikuyu zatverdzhennya...' },
+        onboarding_abgelehnt:   { de: 'Anfrage abgelehnt. Kontaktiere Thomas.', cz: 'Zadost zamitnuta. Kontaktuj Thomase.', sk: 'Ziadost zamietnuta. Kontaktuj Thomase.', pl: 'Wniosek odrzucony. Skontaktuj sie z Thomasem.', en: 'Request declined. Contact Thomas.', ro: 'Cerere respinsa. Contacteaza-l pe Thomas.', ua: 'Zaput vidkhyleno. Zv`yazhysya z Tomasom.' },
+        onboarding_freigegeben: { de: 'Freigegeben! Jetzt PIN vergeben.', cz: 'Schvaleno! Nyni zadej PIN.', sk: 'Schvalene! Teraz zadaj PIN.', pl: 'Zatwierdzono! Teraz ustaw PIN.', en: 'Approved! Now set a PIN.', ro: 'Aprobat! Acum seteaza un PIN.', ua: 'Zatverdzheno! Teper vstanov PIN.' },
+
+        // PIN-Setup
+        pin_setup_titel:        { de: 'PIN festlegen', cz: 'Nastaveni PIN', sk: 'Nastavenie PIN', pl: 'Ustaw PIN', en: 'Set PIN', ro: 'Seteaza PIN', ua: 'Vstanovyty PIN' },
+        pin_setup_info:         { de: '4-6 Ziffern. Merke dir den PIN gut.', cz: '4-6 cifer. Dobre si ho pamatuj.', sk: '4-6 cislic. Dobre si ho zapamataj.', pl: '4-6 cyfr. Dobrze go zapamietaj.', en: '4-6 digits. Remember it well.', ro: '4-6 cifre. Tine-l minte bine.', ua: '4-6 tsyfr. Dobre yoho zapamyatai.' },
+        pin_bestaetigen:        { de: 'PIN wiederholen', cz: 'Opakuj PIN', sk: 'Opakuj PIN', pl: 'Powtorz PIN', en: 'Repeat PIN', ro: 'Repeta PIN', ua: 'Povtoryty PIN' },
+        pin_mismatch:           { de: 'PINs stimmen nicht ueberein', cz: 'PINy se neshoduji', sk: 'PINy sa nezhoduju', pl: 'PINy nie sa identyczne', en: 'PINs do not match', ro: 'PIN-urile nu se potrivesc', ua: 'PIN-kody ne zbihayutsya' },
+        pin_zu_kurz:            { de: 'PIN mindestens 4 Ziffern', cz: 'PIN musi mit min. 4 cislice', sk: 'PIN musi mat min. 4 cislic', pl: 'PIN min. 4 cyfry', en: 'PIN must be at least 4 digits', ro: 'PIN min. 4 cifre', ua: 'PIN minimum 4 tsyfry' },
+
+        // PIN-Login
+        pin_login_titel:        { de: 'PIN eingeben', cz: 'Zadej PIN', sk: 'Zadaj PIN', pl: 'Wprowadz PIN', en: 'Enter PIN', ro: 'Introdu PIN', ua: 'Vvedit PIN' },
+        pin_falsch:             { de: 'PIN falsch', cz: 'Spatny PIN', sk: 'Nespravny PIN', pl: 'Zly PIN', en: 'Wrong PIN', ro: 'PIN gresit', ua: 'Nepravylnyy PIN' },
+        pin_versuche_uebrig:    { de: 'Versuche uebrig', cz: 'Zbyva pokusu', sk: 'Zostava pokusov', pl: 'Proby pozostaly', en: 'attempts left', ro: 'incercari ramase', ua: 'sprob zalyshylosya' },
+        pin_gesperrt:           { de: 'Zu viele Fehlversuche - App wurde zurueckgesetzt', cz: 'Prilis mnoho pokusu - aplikace byla resetovana', sk: 'Prilis vela pokusov - aplikacia bola resetovana', pl: 'Zbyt wiele prob - aplikacja zresetowana', en: 'Too many failed attempts - app has been reset', ro: 'Prea multe incercari gresite - aplicatia a fost resetata', ua: 'Zanadto bahato sprob - dodatok skynuto' },
+
+        // Remote-Wipe
+        wipe_nachricht:         { de: 'Geraet wurde zurueckgesetzt - bitte erneut einrichten', cz: 'Zarizeni bylo resetovano - prosim zarid znovu', sk: 'Zariadenie bolo resetovane - nastav ho znova', pl: 'Urzadzenie zresetowane - skonfiguruj ponownie', en: 'Device has been reset - please set up again', ro: 'Dispozitivul a fost resetat - configureaza-l din nou', ua: 'Prystriy skynuto - nalashtuyte shche raz' },
+
+        // Firebase-Config-Fallback
+        firebase_config_titel:  { de: 'Firebase-Konfiguration', cz: 'Firebase konfigurace', sk: 'Firebase konfiguracia', pl: 'Konfiguracja Firebase', en: 'Firebase configuration', ro: 'Configurare Firebase', ua: 'Nalashtuvannya Firebase' },
+        firebase_config_info:   { de: 'Die App benoetigt Firebase-Zugangsdaten. Kontaktiere Thomas.', cz: 'Aplikace potrebuje Firebase udaje. Kontaktuj Thomase.', sk: 'Aplikacia potrebuje Firebase udaje. Kontaktuj Thomase.', pl: 'Aplikacja wymaga danych Firebase. Skontaktuj sie z Thomasem.', en: 'App needs Firebase credentials. Contact Thomas.', ro: 'Aplicatia are nevoie de Firebase. Contacteaza-l pe Thomas.', ua: 'Dodatok potrebuye Firebase. Zv`yazhytsya z Tomasom.' },
+
+        kopieren:               { de: 'Kopieren', cz: 'Kopirovat', sk: 'Kopirovat', pl: 'Kopiuj', en: 'Copy', ro: 'Copiaza', ua: 'Kopiyuvaty' },
+        kopiert:                { de: 'Kopiert!', cz: 'Zkopirovano!', sk: 'Skopirovane!', pl: 'Skopiowano!', en: 'Copied!', ro: 'Copiat!', ua: 'Skopiyovano!' },
+
+        // Baustellen-Modul (Etappe 4)
+        bst_keine_baustellen:   { de: 'Noch keine Baustellen freigegeben', cz: 'Zadne stavby zatim nejsou schvaleny', sk: 'Ziadne stavby zatial neschvalene', pl: 'Zadnych budow nie zatwierdzono', en: 'No sites assigned yet', ro: 'Nicio santier atribuit inca', ua: 'Zhodnoyi budivli shche ne pryznacheno' },
+        bst_suche:              { de: 'Suchen...', cz: 'Hledat...', sk: 'Hladat...', pl: 'Szukaj...', en: 'Search...', ro: 'Cauta...', ua: 'Poshuk...' },
+        bst_status_aktiv:       { de: 'Aktiv', cz: 'Aktivni', sk: 'Aktivna', pl: 'Aktywna', en: 'Active', ro: 'Activ', ua: 'Aktyvna' },
+        bst_status_pausiert:    { de: 'Pausiert', cz: 'Pozastaveno', sk: 'Pozastavene', pl: 'Wstrzymana', en: 'Paused', ro: 'In pauza', ua: 'Pryzupyneno' },
+        bst_status_beendet:     { de: 'Beendet', cz: 'Dokonceno', sk: 'Ukoncene', pl: 'Zakonczona', en: 'Completed', ro: 'Finalizat', ua: 'Zaversheno' },
+        bst_kachel_zeichnungen: { de: 'Zeichnungen', cz: 'Vykresy', sk: 'Vykresy', pl: 'Rysunki', en: 'Drawings', ro: 'Desene', ua: 'Kreslennya' },
+        bst_kachel_bilder:      { de: 'Bilder', cz: 'Obrazky', sk: 'Obrazky', pl: 'Zdjecia', en: 'Images', ro: 'Imagini', ua: 'Zobrazhennya' },
+        bst_kachel_stunden:     { de: 'Stunden', cz: 'Hodiny', sk: 'Hodiny', pl: 'Godziny', en: 'Hours', ro: 'Ore', ua: 'Hodyny' },
+        bst_kachel_nachrichten: { de: 'Nachrichten', cz: 'Zpravy', sk: 'Spravy', pl: 'Wiadomosci', en: 'Messages', ro: 'Mesaje', ua: 'Povidomlennya' },
+        bst_filter_alle:        { de: 'Alle', cz: 'Vse', sk: 'Vsetky', pl: 'Wszystkie', en: 'All', ro: 'Toate', ua: 'Vsi' },
+        bst_filter_kalender:    { de: 'Kalender', cz: 'Kalendar', sk: 'Kalendar', pl: 'Kalendarz', en: 'Calendar', ro: 'Calendar', ua: 'Kalendar' },
+        bst_filter_nachrichten: { de: 'Nachrichten', cz: 'Zpravy', sk: 'Spravy', pl: 'Wiadomosci', en: 'Messages', ro: 'Mesaje', ua: 'Povidomlennya' },
+        bst_filter_anweisungen: { de: 'Anweisungen', cz: 'Pokyny', sk: 'Pokyny', pl: 'Instrukcje', en: 'Instructions', ro: 'Instructiuni', ua: 'Instruktsiyi' },
+        bst_dateien_zahl:       { de: 'Dateien', cz: 'souboru', sk: 'suborov', pl: 'plikow', en: 'files', ro: 'fisiere', ua: 'faylov' },
+        bst_keine_dateien:      { de: 'Keine Dateien in diesem Ordner', cz: 'V tomto adresari nejsou zadne soubory', sk: 'V tomto priecinku nie su ziadne subory', pl: 'Brak plikow w tym folderze', en: 'No files in this folder', ro: 'Niciun fisier in acest dosar', ua: 'U tsiy papci nemaye faylov' },
+        bst_lade:               { de: 'Lade...', cz: 'Nacitam...', sk: 'Nacitavam...', pl: 'Ladowanie...', en: 'Loading...', ro: 'Se incarca...', ua: 'Zavantazhennya...' },
+        bst_offline_hinweis:    { de: 'Offline - zeige zwischengespeicherte Inhalte', cz: 'Offline - zobrazuji ulozeny obsah', sk: 'Offline - zobrazujem ulozeny obsah', pl: 'Offline - pokazuje zapisana zawartosc', en: 'Offline - showing cached content', ro: 'Offline - afisez continut memorat', ua: 'Oflayn - pokazuyu zbererhenyy vmist' },
+        bst_datei_oeffnen:      { de: 'Oeffnen', cz: 'Otevrit', sk: 'Otvorit', pl: 'Otworz', en: 'Open', ro: 'Deschide', ua: 'Vidkryty' },
+        bst_datei_nicht_vorschaubar: { de: 'Vorschau nicht moeglich - Datei herunterladen', cz: 'Nahled neni mozny - stahnout soubor', sk: 'Nahlad nie je mozny - stiahnut subor', pl: 'Podglad niedostepny - pobierz plik', en: 'Preview not available - download file', ro: 'Previzualizare indisponibila - descarca fisierul', ua: 'Poperednniy pereglyad nedostupnyy - zavantazhyty fayl' },
+        schliessen:             { de: 'Schliessen', cz: 'Zavrit', sk: 'Zavriet', pl: 'Zamknij', en: 'Close', ro: 'Inchide', ua: 'Zakryty' },
+
+        // ===== Fotos-Modul (Etappe 5) =====
+        fot_titel:                  { de: 'Fotos', cz: 'Fotky', sk: 'Fotky', pl: 'Zdjecia', en: 'Photos', ro: 'Foto', ua: 'Foto' },
+        fot_baustelle_waehlen:      { de: 'Baustelle waehlen', cz: 'Vyber stavbu', sk: 'Vyber stavbu', pl: 'Wybierz budowe', en: 'Select site', ro: 'Alege santier', ua: 'Vyberit budivnytstvo' },
+        fot_keine_baustellen:       { de: 'Keine Baustellen freigegeben', cz: 'Zadne stavby schvaleny', sk: 'Ziadne stavby schvalene', pl: 'Brak zatwierdzonych budow', en: 'No sites approved', ro: 'Niciun santier aprobat', ua: 'Zhodnoyi budivli ne zatverdzheno' },
+        fot_raum_waehlen:           { de: 'Raum waehlen', cz: 'Vyber mistnost', sk: 'Vyber miestnost', pl: 'Wybierz pomieszczenie', en: 'Select room', ro: 'Alege camera', ua: 'Vyberit kimnatu' },
+        fot_neuer_raum:             { de: 'Neuer Raum', cz: 'Nova mistnost', sk: 'Nova miestnost', pl: 'Nowy pokoj', en: 'New room', ro: 'Camera noua', ua: 'Nova kimnata' },
+        fot_keine_raeume:           { de: 'Noch keine Raeume angelegt', cz: 'Zatim zadne mistnosti', sk: 'Zatial ziadne miestnosti', pl: 'Brak pomieszczen', en: 'No rooms yet', ro: 'Nicio camera inca', ua: 'Poky kimnat nemaye' },
+        fot_raum_bezeichnung:       { de: 'Raum-Bezeichnung', cz: 'Nazev mistnosti', sk: 'Nazov miestnosti', pl: 'Nazwa pomieszczenia', en: 'Room name', ro: 'Nume camera', ua: 'Nazva kimnaty' },
+        fot_raum_nr:                { de: 'Raum-Nr. (optional)', cz: 'Cislo mistnosti (volitelne)', sk: 'Cislo miestnosti (volitelne)', pl: 'Nr pomieszczenia (opcjonalnie)', en: 'Room no. (optional)', ro: 'Nr camera (optional)', ua: 'Nomer kimnaty (neobovyazkovo)' },
+        fot_geschoss:               { de: 'Geschoss', cz: 'Podlazi', sk: 'Poschodie', pl: 'Pietro', en: 'Floor', ro: 'Etaj', ua: 'Poverkh' },
+        fot_wandzahl:               { de: 'Wandzahl', cz: 'Pocet sten', sk: 'Pocet stien', pl: 'Liczba scian', en: 'Walls', ro: 'Numar pereti', ua: 'Kilkist stin' },
+        fot_gs_kg:                  { de: 'Keller', cz: 'Sklep', sk: 'Pivnica', pl: 'Piwnica', en: 'Basement', ro: 'Subsol', ua: 'Pidval' },
+        fot_gs_eg:                  { de: 'Erdgeschoss', cz: 'Prizemi', sk: 'Prizemie', pl: 'Parter', en: 'Ground', ro: 'Parter', ua: 'Pershyi' },
+        fot_gs_og:                  { de: 'Obergeschoss', cz: 'Patro', sk: 'Poschodie', pl: 'Pietro', en: 'Upper', ro: 'Etaj sup.', ua: 'Verkhniy' },
+        fot_gs_dg:                  { de: 'Dachgeschoss', cz: 'Podkrovi', sk: 'Podkrovie', pl: 'Poddasze', en: 'Attic', ro: 'Mansarda', ua: 'Gorishnii' },
+        fot_phase_waehlen:          { de: 'Phase waehlen', cz: 'Vyber fazi', sk: 'Vyber fazu', pl: 'Wybierz etap', en: 'Select phase', ro: 'Alege faza', ua: 'Vyberit fazu' },
+        fot_phase_roh:              { de: 'Rohzustand', cz: 'Surovy stav', sk: 'Surovy stav', pl: 'Stan surowy', en: 'Raw state', ro: 'Stare bruta', ua: 'Chornovyy stan' },
+        fot_phase_roh_beschr:       { de: 'Vor jeder Arbeit, leerer Raum', cz: 'Pred pracemi, prazdna mistnost', sk: 'Pred pracami, prazdna miestnost', pl: 'Przed pracami, pusty pokoj', en: 'Before any work, empty room', ro: 'Inainte de lucrari', ua: 'Pered robotamy' },
+        fot_phase_abd:              { de: 'Abdichtung / Vorarbeiten', cz: 'Izolace / Pripravne prace', sk: 'Izolacia / Pripravne prace', pl: 'Izolacja / Prace wstepne', en: 'Waterproofing / Prep', ro: 'Hidroizolatie / Pregatire', ua: 'Hidroizolyatsiya' },
+        fot_phase_abd_beschr:       { de: 'Abdichtung, Estrich, Putz', cz: 'Izolace, potery, omitky', sk: 'Izolacia, potery, omietky', pl: 'Izolacja, jastrych, tynk', en: 'Membrane, screed, plaster', ro: 'Izolatie, sapa, tencuiala', ua: 'Izolyatsiya, styazhka' },
+        fot_phase_fert:             { de: 'Fertigstellung', cz: 'Dokonceni', sk: 'Dokoncenie', pl: 'Wykonczenie', en: 'Completion', ro: 'Finalizare', ua: 'Zavershennya' },
+        fot_phase_fert_beschr:      { de: 'Fliesenarbeit fertig', cz: 'Obklady hotove', sk: 'Obklady hotove', pl: 'Plytki gotowe', en: 'Tiling done', ro: 'Faianta gata', ua: 'Plytku zavershen' },
+        fot_fortschritt:            { de: 'von', cz: 'z', sk: 'z', pl: 'z', en: 'of', ro: 'din', ua: 'z' },
+        fot_waende_dokumentiert:    { de: 'Waenden dokumentiert', cz: 'sten zdokumentovano', sk: 'stien zdokumentovanych', pl: 'scian udokumentowano', en: 'walls documented', ro: 'pereti documentati', ua: 'stin zafiksovano' },
+        fot_wand:                   { de: 'Wand', cz: 'Stena', sk: 'Stena', pl: 'Sciana', en: 'Wall', ro: 'Perete', ua: 'Stina' },
+        fot_boden:                  { de: 'Boden', cz: 'Podlaha', sk: 'Podlaha', pl: 'Podloga', en: 'Floor', ro: 'Podea', ua: 'Pidloha' },
+        fot_decke:                  { de: 'Decke', cz: 'Strop', sk: 'Strop', pl: 'Sufit', en: 'Ceiling', ro: 'Tavan', ua: 'Stelya' },
+        fot_allgemein:              { de: 'Allgemein', cz: 'Obecne', sk: 'Vseobecne', pl: 'Ogolne', en: 'General', ro: 'General', ua: 'Zahalni' },
+        fot_allgemeines_foto:       { de: 'Allgemeines Foto', cz: 'Obecne foto', sk: 'Vseobecne foto', pl: 'Zdjecie ogolne', en: 'General photo', ro: 'Foto general', ua: 'Zahalne foto' },
+        fot_foto_aufnehmen:         { de: 'Foto aufnehmen', cz: 'Porid foto', sk: 'Urob foto', pl: 'Zrob zdjecie', en: 'Take photo', ro: 'Fa poza', ua: 'Zrobyty foto' },
+        fot_wiederholen:            { de: 'Wiederholen', cz: 'Opakovat', sk: 'Opakovat', pl: 'Powtorz', en: 'Retake', ro: 'Reia', ua: 'Povtoryty' },
+        fot_verwenden:              { de: 'Verwenden', cz: 'Pouzit', sk: 'Pouzit', pl: 'Uzyj', en: 'Use', ro: 'Foloseste', ua: 'Vykorystaty' },
+        fot_notiz_aufnehmen:        { de: 'Notiz aufnehmen', cz: 'Nahrat poznamku', sk: 'Nahrat poznamku', pl: 'Nagraj notatke', en: 'Record note', ro: 'Inregistreaza nota', ua: 'Zapysaty notatku' },
+        fot_notiz_original:         { de: 'Original-Notiz', cz: 'Puvodni poznamka', sk: 'Povodna poznamka', pl: 'Notatka oryginalna', en: 'Original note', ro: 'Nota originala', ua: 'Orihinalna notatka' },
+        fot_notiz_deutsch:          { de: 'Uebersetzung (Deutsch)', cz: 'Preklad (nemcina)', sk: 'Preklad (nemcina)', pl: 'Tlumaczenie (niemiecki)', en: 'Translation (German)', ro: 'Traducere (germana)', ua: 'Pereklad (nimetska)' },
+        fot_notiz_platzhalter:      { de: 'Mic druecken oder hier tippen...', cz: 'Stiskni mic nebo pis zde...', sk: 'Stlac mic alebo pis sem...', pl: 'Wcisnij mic lub pisz tutaj...', en: 'Press mic or type here...', ro: 'Apasa mic sau scrie aici...', ua: 'Natysnit mik abo pyshit tut...' },
+        fot_speichern:              { de: 'Foto speichern', cz: 'Ulozit foto', sk: 'Ulozit foto', pl: 'Zapisz zdjecie', en: 'Save photo', ro: 'Salveaza foto', ua: 'Zberehty foto' },
+        fot_gespeichert:            { de: 'Gespeichert', cz: 'Ulozeno', sk: 'Ulozene', pl: 'Zapisano', en: 'Saved', ro: 'Salvat', ua: 'Zbereheno' },
+        fot_sync_nun:               { de: 'Jetzt synchronisieren', cz: 'Synchronizovat nyni', sk: 'Synchronizovat teraz', pl: 'Synchronizuj teraz', en: 'Sync now', ro: 'Sincronizeaza acum', ua: 'Synkhronizuvaty zaraz' },
+        fot_sync_pending:           { de: 'wartet auf Upload', cz: 'ceka na nahrani', sk: 'caka na nahranie', pl: 'czeka na upload', en: 'waiting for upload', ro: 'asteapta upload', ua: 'chekaie zavantazhennya' },
+        fot_sync_fehler:            { de: 'Upload-Fehler', cz: 'Chyba nahrani', sk: 'Chyba nahrania', pl: 'Blad uploadu', en: 'Upload error', ro: 'Eroare upload', ua: 'Pomylka zavantazhennya' },
+        fot_sync_ok:                { de: 'Hochgeladen', cz: 'Nahrano', sk: 'Nahrane', pl: 'Przeslano', en: 'Uploaded', ro: 'Incarcat', ua: 'Zavantazheno' },
+        fot_sync_offline:           { de: 'Offline - Upload sobald online', cz: 'Offline - nahraju jakmile online', sk: 'Offline - nahram akonahle online', pl: 'Offline - wyslij gdy online', en: 'Offline - upload when online', ro: 'Offline - incarca cand online', ua: 'Oflayn - zavantazhu koly onlayn' },
+        fot_kamera_nicht_verfuegbar:{ de: 'Kamera nicht verfuegbar', cz: 'Kamera nedostupna', sk: 'Kamera nedostupna', pl: 'Aparat niedostepny', en: 'Camera not available', ro: 'Camera indisponibila', ua: 'Kamera nedostupna' },
+        fot_mic_nicht_verfuegbar:   { de: 'Spracheingabe nicht verfuegbar', cz: 'Hlasovy vstup nedostupny', sk: 'Hlasovy vstup nedostupny', pl: 'Mikrofon niedostepny', en: 'Speech input unavailable', ro: 'Intrare voce indisponibila', ua: 'Mikrofon nedostupnyy' },
+        fot_speicher_voll_warn:     { de: 'Speicher fast voll - bitte synchronisieren', cz: 'Pamet skoro plna - synchronizuj', sk: 'Pamet takmer plna - synchronizuj', pl: 'Pamiec prawie pelna - synchronizuj', en: 'Storage almost full - please sync', ro: 'Memorie aproape plina - sincronizeaza', ua: 'Pamyat mayzhe povna - synkhronizuyte' },
+        fot_allg_limit:             { de: 'Limit 20 erreicht', cz: 'Limit 20 dosazen', sk: 'Limit 20 dosiahnuty', pl: 'Osiagnieto limit 20', en: 'Limit of 20 reached', ro: 'Limita de 20 atinsa', ua: 'Dosiahnuto limitu 20' },
+        fot_loeschen:               { de: 'Loeschen', cz: 'Smazat', sk: 'Zmazat', pl: 'Usun', en: 'Delete', ro: 'Sterge', ua: 'Vydalyty' },
+        fot_bestaetigung_loeschen:  { de: 'Foto wirklich loeschen?', cz: 'Opravdu smazat foto?', sk: 'Naozaj zmazat foto?', pl: 'Naprawde usunac zdjecie?', en: 'Really delete photo?', ro: 'Chiar sa stergi foto?', ua: 'Spravdi vydalyty foto?' },
+        fot_wand_label:             { de: 'Wand-Bezeichnung', cz: 'Nazev steny', sk: 'Nazov steny', pl: 'Nazwa sciany', en: 'Wall name', ro: 'Nume perete', ua: 'Nazva stiny' },
+        fot_raum_loeschen:          { de: 'Raum loeschen', cz: 'Smazat mistnost', sk: 'Zmazat miestnost', pl: 'Usun pomieszczenie', en: 'Delete room', ro: 'Sterge camera', ua: 'Vydalyty kimnatu' },
+        fot_raum_loeschen_warn:     { de: 'Raum mitsamt Fotos unwiderruflich loeschen?', cz: 'Smazat mistnost vcetne vsech fotek?', sk: 'Zmazat miestnost vratane vsetkych fotiek?', pl: 'Usunac pokoj wraz ze zdjeciami?', en: 'Delete room and all its photos?', ro: 'Sterge camera si toate fotografiile?', ua: 'Vydalyty kimnatu razom z foto?' },
+
+        // ===== Stunden-Modul (Etappe 6) =====
+        std_titel:                  { de: 'Stundenzettel', cz: 'Vykaz hodin', sk: 'Vykaz hodin', pl: 'Karta godzin', en: 'Timesheet', ro: 'Pontaj', ua: 'Tabel obliku' },
+        std_tab_heute:              { de: 'Heute', cz: 'Dnes', sk: 'Dnes', pl: 'Dzisiaj', en: 'Today', ro: 'Azi', ua: 'Sohodni' },
+        std_tab_woche:              { de: 'Diese Woche', cz: 'Tento tyden', sk: 'Tento tyzden', pl: 'W tym tygodniu', en: 'This week', ro: 'Saptamana asta', ua: 'Tsiei tyzhden' },
+        std_tab_monat:              { de: 'Letzte 30 Tage', cz: 'Poslednich 30 dni', sk: 'Poslednych 30 dni', pl: 'Ostatnie 30 dni', en: 'Last 30 days', ro: 'Ultimele 30 zile', ua: 'Ostanni 30 dniv' },
+        std_datum:                  { de: 'Datum', cz: 'Datum', sk: 'Datum', pl: 'Data', en: 'Date', ro: 'Data', ua: 'Data' },
+        std_baustelle:              { de: 'Baustelle', cz: 'Stavba', sk: 'Stavba', pl: 'Budowa', en: 'Site', ro: 'Santier', ua: 'Budivelnytstvo' },
+        std_baustelle_waehlen:      { de: 'Baustelle waehlen...', cz: 'Vyber stavbu...', sk: 'Vyber stavbu...', pl: 'Wybierz budowe...', en: 'Select site...', ro: 'Alege santier...', ua: 'Vyberit budivlu...' },
+        std_anfang:                 { de: 'Anfang', cz: 'Zacatek', sk: 'Zaciatok', pl: 'Poczatek', en: 'Start', ro: 'Inceput', ua: 'Pochatok' },
+        std_ende:                   { de: 'Ende', cz: 'Konec', sk: 'Koniec', pl: 'Koniec', en: 'End', ro: 'Sfarsit', ua: 'Kinets' },
+        std_pause:                  { de: 'Pause', cz: 'Prestavka', sk: 'Prestavka', pl: 'Przerwa', en: 'Break', ro: 'Pauza', ua: 'Pererva' },
+        std_netto:                  { de: 'Netto-Stunden', cz: 'Ciste hodiny', sk: 'Ciste hodiny', pl: 'Godziny netto', en: 'Net hours', ro: 'Ore nete', ua: 'Chysti hodyny' },
+        std_min:                    { de: 'Min', cz: 'min', sk: 'min', pl: 'min', en: 'min', ro: 'min', ua: 'khv' },
+        std_std:                    { de: 'Std', cz: 'h', sk: 'h', pl: 'h', en: 'h', ro: 'h', ua: 'hod' },
+        std_taetigkeiten:           { de: 'Taetigkeiten', cz: 'Cinnosti', sk: 'Cinnosti', pl: 'Czynnosci', en: 'Tasks', ro: 'Activitati', ua: 'Roboty' },
+        std_taetigkeiten_waehlen:   { de: 'Taetigkeiten auswaehlen (mehrfach moeglich)', cz: 'Vyber cinnosti (vice moznych)', sk: 'Vyber cinnosti (viacero moznych)', pl: 'Wybierz czynnosci (kilka mozliwych)', en: 'Select tasks (multiple)', ro: 'Alege activitati (mai multe)', ua: 'Vyberit roboty (kilka mozhlyvo)' },
+        std_taet_sonstiges:         { de: 'Sonstiges...', cz: 'Jine...', sk: 'Ine...', pl: 'Inne...', en: 'Other...', ro: 'Altele...', ua: 'Inshe...' },
+        std_material_verwendet:     { de: 'Material verwendet?', cz: 'Pouzity material?', sk: 'Pouzity material?', pl: 'Uzyty material?', en: 'Material used?', ro: 'Material folosit?', ua: 'Vykorystano material?' },
+        std_material_hinzu:         { de: 'Material hinzufuegen', cz: 'Pridat material', sk: 'Pridat material', pl: 'Dodaj material', en: 'Add material', ro: 'Adauga material', ua: 'Dodaty material' },
+        std_material_suche:         { de: 'Material suchen...', cz: 'Hledat material...', sk: 'Hladat material...', pl: 'Szukaj materialu...', en: 'Search material...', ro: 'Cauta material...', ua: 'Poshuk materialu...' },
+        std_menge:                  { de: 'Menge', cz: 'Mnozstvi', sk: 'Mnozstvo', pl: 'Ilosc', en: 'Amount', ro: 'Cantitate', ua: 'Kilkist' },
+        std_einheit:                { de: 'Einheit', cz: 'Jednotka', sk: 'Jednotka', pl: 'Jednostka', en: 'Unit', ro: 'Unitate', ua: 'Odynytsya' },
+        std_bemerkung:              { de: 'Bemerkung', cz: 'Poznamka', sk: 'Poznamka', pl: 'Uwaga', en: 'Notes', ro: 'Observatii', ua: 'Prymitky' },
+        std_bemerkung_platzhalter:  { de: 'Besonderheiten des Tages...', cz: 'Zvlastnosti dne...', sk: 'Zvlastnosti dna...', pl: 'Szczegoly dnia...', en: 'Notes of the day...', ro: 'Detalii ale zilei...', ua: 'Osoblyvosti dnya...' },
+        std_wetter:                 { de: 'Wetter', cz: 'Pocasi', sk: 'Pocasie', pl: 'Pogoda', en: 'Weather', ro: 'Vreme', ua: 'Pohoda' },
+        std_wetter_sonnig:          { de: 'Sonnig', cz: 'Slunecno', sk: 'Slnecno', pl: 'Slonecznie', en: 'Sunny', ro: 'Insorit', ua: 'Sonyachno' },
+        std_wetter_bewoelkt:        { de: 'Bewoelkt', cz: 'Oblacno', sk: 'Oblacno', pl: 'Pochmurno', en: 'Cloudy', ro: 'Innorat', ua: 'Khmarno' },
+        std_wetter_regen:           { de: 'Regen', cz: 'Dest', sk: 'Dazd', pl: 'Deszcz', en: 'Rain', ro: 'Ploaie', ua: 'Doshch' },
+        std_wetter_schnee:          { de: 'Schnee', cz: 'Snih', sk: 'Sneh', pl: 'Snieg', en: 'Snow', ro: 'Zapada', ua: 'Snih' },
+        std_wetter_auto:            { de: 'Automatisch aus Wetter-API', cz: 'Automaticky z API', sk: 'Automaticky z API', pl: 'Automatycznie z API', en: 'Auto from weather API', ro: 'Automat din API', ua: 'Avtomatychno z API' },
+        std_speichern_pdf:          { de: 'Speichern und PDF erstellen', cz: 'Ulozit a vytvorit PDF', sk: 'Ulozit a vytvorit PDF', pl: 'Zapisz i utworz PDF', en: 'Save and create PDF', ro: 'Salveaza si creeaza PDF', ua: 'Zberehty ta stvoryty PDF' },
+        std_entwurf_geladen:        { de: 'Entwurf wiederhergestellt', cz: 'Navrh obnoven', sk: 'Navrh obnoveny', pl: 'Szkic przywrocony', en: 'Draft restored', ro: 'Schita restaurata', ua: 'Chernitku vidnovleno' },
+        std_pflichtfelder:          { de: 'Bitte alle Pflichtfelder ausfuellen', cz: 'Vypln vsechna povinna pole', sk: 'Vypln vsetky povinne polia', pl: 'Wypelnij wszystkie pola', en: 'Please fill all required fields', ro: 'Completeaza toate campurile', ua: 'Zapovnit vsi poli' },
+        std_keine_eintraege:        { de: 'Keine Eintraege in diesem Zeitraum', cz: 'Zadne zaznamy v tomto obdobi', sk: 'Ziadne zaznamy v tomto obdobi', pl: 'Brak wpisow w tym okresie', en: 'No entries in this period', ro: 'Nicio inregistrare in aceasta perioada', ua: 'Zhodnykh zapysiv' },
+        std_erstellt:               { de: 'Erstellt', cz: 'Vytvoreno', sk: 'Vytvorene', pl: 'Utworzone', en: 'Created', ro: 'Creat', ua: 'Stvoreno' },
+        std_pdf_ansehen:            { de: 'PDF ansehen', cz: 'Zobrazit PDF', sk: 'Zobrazit PDF', pl: 'Zobacz PDF', en: 'View PDF', ro: 'Vezi PDF', ua: 'Pohlyanuty PDF' },
+        std_pdf_erzeugen:           { de: 'PDF wird erzeugt...', cz: 'Vytvari se PDF...', sk: 'Vytvara sa PDF...', pl: 'Tworzenie PDF...', en: 'Creating PDF...', ro: 'Se creeaza PDF...', ua: 'Stvorennya PDF...' },
+        std_mat_kat_fliesen:        { de: 'Fliesen', cz: 'Obklady', sk: 'Obklady', pl: 'Plytki', en: 'Tiles', ro: 'Faianta', ua: 'Plytka' },
+        std_mat_kat_kleber:         { de: 'Kleber/Moertel', cz: 'Lepidlo/Malta', sk: 'Lepidlo/Malta', pl: 'Klej/Zaprawa', en: 'Adhesive/Mortar', ro: 'Adeziv/Mortar', ua: 'Klei/Rozchyn' },
+        std_mat_kat_fuge:           { de: 'Fugenmasse', cz: 'Spara', sk: 'Spara', pl: 'Fuga', en: 'Grout', ro: 'Chit rosturi', ua: 'Zatyrka' },
+        std_mat_kat_silikon:        { de: 'Silikon', cz: 'Silikon', sk: 'Silikon', pl: 'Silikon', en: 'Silicone', ro: 'Silicon', ua: 'Silikon' },
+        std_mat_kat_abdicht:        { de: 'Abdichtung', cz: 'Izolace', sk: 'Izolacia', pl: 'Izolacja', en: 'Waterproofing', ro: 'Hidroizolatie', ua: 'Hidroizolyatsiya' },
+        std_mat_kat_hilfsmittel:    { de: 'Hilfsmittel', cz: 'Pomucky', sk: 'Pomocky', pl: 'Akcesoria', en: 'Accessories', ro: 'Accesorii', ua: 'Dopomizhni' },
+        std_mat_kat_werkzeug:       { de: 'Werkzeug', cz: 'Naradi', sk: 'Naradie', pl: 'Narzedzia', en: 'Tools', ro: 'Unelte', ua: 'Instrument' },
+        std_mat_kat_sonstiges:      { de: 'Sonstiges', cz: 'Ostatni', sk: 'Ostatne', pl: 'Inne', en: 'Other', ro: 'Altele', ua: 'Inshe' },
+
+        // ===== Nachrichten-Modul (Etappe 7) =====
+        nch_tab_chat:               { de: 'Chat', cz: 'Chat', sk: 'Chat', pl: 'Czat', en: 'Chat', ro: 'Chat', ua: 'Chat' },
+        nch_tab_anweisungen:        { de: 'Anweisungen', cz: 'Pokyny', sk: 'Pokyny', pl: 'Polecenia', en: 'Instructions', ro: 'Instructiuni', ua: 'Instruktsii' },
+        nch_eingabe_platzhalter:    { de: 'Nachricht schreiben...', cz: 'Napsat zpravu...', sk: 'Napisat spravu...', pl: 'Napisz wiadomosc...', en: 'Type a message...', ro: 'Scrie un mesaj...', ua: 'Napysaty povidomlennya...' },
+        nch_senden:                 { de: 'Senden', cz: 'Odeslat', sk: 'Odoslat', pl: 'Wyslij', en: 'Send', ro: 'Trimite', ua: 'Nadislaty' },
+        nch_buero:                  { de: 'Buero (Thomas)', cz: 'Kancelar (Thomas)', sk: 'Kancelaria (Thomas)', pl: 'Biuro (Thomas)', en: 'Office (Thomas)', ro: 'Birou (Thomas)', ua: 'Ofis (Thomas)' },
+        nch_du:                     { de: 'Du', cz: 'Ty', sk: 'Ty', pl: 'Ty', en: 'You', ro: 'Tu', ua: 'Ty' },
+        nch_keine_nachrichten:      { de: 'Noch keine Nachrichten', cz: 'Zatim zadne zpravy', sk: 'Zatial ziadne spravy', pl: 'Brak wiadomosci', en: 'No messages yet', ro: 'Niciun mesaj inca', ua: 'Povidomlen ne maye' },
+        nch_uebersetze:             { de: 'Uebersetze...', cz: 'Prekladam...', sk: 'Prekladam...', pl: 'Tlumacze...', en: 'Translating...', ro: 'Se traduce...', ua: 'Perekladayu...' },
+        nch_uebersetzung_fehlt:     { de: 'Uebersetzung fehlgeschlagen', cz: 'Preklad selhal', sk: 'Preklad zlyhal', pl: 'Tlumaczenie nieudane', en: 'Translation failed', ro: 'Traducere esuata', ua: 'Pereklad nevdaly' },
+        nch_offline_warte:          { de: 'Offline - wird gesendet sobald online', cz: 'Offline - odesle se po pripojeni', sk: 'Offline - odosle sa po pripojeni', pl: 'Offline - wyslane po polaczeniu', en: 'Offline - will send when online', ro: 'Offline - se va trimite cand esti online', ua: 'Bez merezhi - nadishlyu pislya pidklyuchennya' },
+        nch_anweisung_lesen:        { de: 'Als gelesen markieren', cz: 'Oznacit jako precteno', sk: 'Oznacit ako precitane', pl: 'Oznacz jako przeczytane', en: 'Mark as read', ro: 'Marcheaza ca citit', ua: 'Pozanychyty yak prochytane' },
+        nch_anweisung_gelesen:      { de: 'Gelesen', cz: 'Precteno', sk: 'Precitane', pl: 'Przeczytane', en: 'Read', ro: 'Citit', ua: 'Prochytano' },
+        nch_keine_anweisungen:      { de: 'Keine Anweisungen', cz: 'Zadne pokyny', sk: 'Ziadne pokyny', pl: 'Brak polecen', en: 'No instructions', ro: 'Nicio instructiune', ua: 'Nemaye instruktsiy' },
+        nch_kein_apikey:            { de: 'Uebersetzung deaktiviert (kein API-Key)', cz: 'Preklad vypnut', sk: 'Preklad vypnuty', pl: 'Tlumaczenie wylaczone', en: 'Translation disabled (no API key)', ro: 'Traducere dezactivata', ua: 'Pereklad vymknuto' },
+
+        // ===== Kalender-Modul (Etappe 8) =====
+        kal_titel:                  { de: 'Kalender', cz: 'Kalendar', sk: 'Kalendar', pl: 'Kalendarz', en: 'Calendar', ro: 'Calendar', ua: 'Kalendar' },
+        kal_view_monat:             { de: 'Monat', cz: 'Mesic', sk: 'Mesiac', pl: 'Miesiac', en: 'Month', ro: 'Luna', ua: 'Misyats' },
+        kal_view_woche:             { de: 'Woche', cz: 'Tyden', sk: 'Tyzden', pl: 'Tydzien', en: 'Week', ro: 'Saptamana', ua: 'Tyzhden' },
+        kal_heute:                  { de: 'Heute', cz: 'Dnes', sk: 'Dnes', pl: 'Dzisiaj', en: 'Today', ro: 'Azi', ua: 'Sohodni' },
+        kal_typ_arbeit:             { de: 'Arbeit', cz: 'Prace', sk: 'Praca', pl: 'Praca', en: 'Work', ro: 'Munca', ua: 'Robota' },
+        kal_typ_urlaub:             { de: 'Urlaub', cz: 'Dovolena', sk: 'Dovolenka', pl: 'Urlop', en: 'Vacation', ro: 'Concediu', ua: 'Vidpustka' },
+        kal_typ_krankheit:          { de: 'Krankheit', cz: 'Nemoc', sk: 'Choroba', pl: 'Choroba', en: 'Sick leave', ro: 'Boala', ua: 'Khvoroba' },
+        kal_typ_termin:             { de: 'Termin', cz: 'Schuzka', sk: 'Stretnutie', pl: 'Termin', en: 'Appointment', ro: 'Programare', ua: 'Zustrich' },
+        kal_keine_eintraege:        { de: 'Keine Eintraege', cz: 'Zadne zaznamy', sk: 'Ziadne zaznamy', pl: 'Brak wpisow', en: 'No entries', ro: 'Nicio inregistrare', ua: 'Nemaye zapysiv' },
+        kal_lese_nur:               { de: 'Aenderungen nur durch das Buero moeglich', cz: 'Zmeny pouze kancelar', sk: 'Zmeny iba kancelaria', pl: 'Zmiany tylko biuro', en: 'Changes only via office', ro: 'Modificari doar prin birou', ua: 'Zminy lyshe ofis' }
+    };
+
+    // ===== Kalender-Lokalisierung (Etappe 8) =====
+    // Wochentage Kurz (Mo, Di, Mi, Do, Fr, Sa, So); Index 0 = Montag
+    const KAL_WOCHENTAGE = {
+        de: ['Mo','Di','Mi','Do','Fr','Sa','So'],
+        cz: ['Po','Ut','St','Ct','Pa','So','Ne'],
+        sk: ['Po','Ut','St','St','Pi','So','Ne'],
+        pl: ['Pn','Wt','Sr','Cz','Pt','So','Nd'],
+        en: ['Mo','Tu','We','Th','Fr','Sa','Su'],
+        ro: ['Lu','Ma','Mi','Jo','Vi','Sa','Du'],
+        ua: ['Pn','Vt','Sr','Ct','Pt','Sb','Nd']
+    };
+    // Monate ausgeschrieben; Index 0 = Januar
+    const KAL_MONATE = {
+        de: ['Januar','Februar','Maerz','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'],
+        cz: ['Leden','Unor','Brezen','Duben','Kveten','Cerven','Cervenec','Srpen','Zari','Rijen','Listopad','Prosinec'],
+        sk: ['Januar','Februar','Marec','April','Maj','Jun','Jul','August','September','Oktober','November','December'],
+        pl: ['Styczen','Luty','Marzec','Kwiecien','Maj','Czerwiec','Lipiec','Sierpien','Wrzesien','Pazdziernik','Listopad','Grudzien'],
+        en: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+        ro: ['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'],
+        ua: ['Sichen','Lyutyi','Berezen','Kviten','Traven','Cherven','Lypen','Serpen','Veresen','Zhovten','Lystopad','Hruden']
+    };
+
+    // ===== Taetigkeits-Pickliste (Etappe 6, Master-Dok 9.4) =====
+    const TAETIGKEITEN = [
+        { id: 't_fliesen_wand',  de: 'Fliesen Wand verlegen',        cz: 'Obklady steny', sk: 'Obklady steny', pl: 'Plytki na sciane', en: 'Wall tiling', ro: 'Faianta perete', ua: 'Plytka na stinu' },
+        { id: 't_fliesen_boden', de: 'Fliesen Boden verlegen',       cz: 'Obklady podlahy', sk: 'Obklady podlahy', pl: 'Plytki na podloge', en: 'Floor tiling', ro: 'Gresie pardoseala', ua: 'Plytka na pidlohu' },
+        { id: 't_verfugen',      de: 'Verfugen',                     cz: 'Sparovani', sk: 'Sparovanie', pl: 'Fugowanie', en: 'Grouting', ro: 'Rostuire', ua: 'Zatyrannya' },
+        { id: 't_silikon',       de: 'Silikon',                      cz: 'Silikonovani', sk: 'Silikonovanie', pl: 'Silikonowanie', en: 'Siliconing', ro: 'Siliconare', ua: 'Silikonuvannya' },
+        { id: 't_abdichtung',    de: 'Abdichtung verlegen',          cz: 'Pokladani izolace', sk: 'Pokladanie izolacie', pl: 'Ukladanie izolacji', en: 'Waterproofing', ro: 'Hidroizolatie', ua: 'Hidroizolyatsiya' },
+        { id: 't_estrich',       de: 'Estrich vorbereiten',          cz: 'Priprava poteru', sk: 'Priprava poteru', pl: 'Przygotowanie jastrychu', en: 'Screed prep', ro: 'Pregatire sapa', ua: 'Pidhotovka styazhky' },
+        { id: 't_demontage',     de: 'Demontage Altbestand',         cz: 'Demontaz stareho', sk: 'Demontaz stareho', pl: 'Demontaz starego', en: 'Demolition', ro: 'Demolare vechi', ua: 'Demontazh' },
+        { id: 't_material',      de: 'Material liefern/einraeumen',  cz: 'Doprava materialu', sk: 'Doprava materialu', pl: 'Dostawa materialu', en: 'Material delivery', ro: 'Livrare material', ua: 'Dostavka materialu' },
+        { id: 't_vorbereitung',  de: 'Vorbereitung/Einrichtung',     cz: 'Priprava/zarizeni', sk: 'Priprava/zariadenie', pl: 'Przygotowanie', en: 'Setup', ro: 'Amenajare', ua: 'Pidhotovka' },
+        { id: 't_endreinigung',  de: 'Endreinigung',                 cz: 'Zaverecny uklid', sk: 'Zaverecne upratovanie', pl: 'Sprzatanie koncowe', en: 'Final cleaning', ro: 'Curatenie finala', ua: 'Finalne prybyrannya' },
+        { id: 't_kundengespr',   de: 'Kundengespraech/Aufmass',      cz: 'Jednani se zakaznikem/zamereni', sk: 'Jednanie so zakaznikom/zameranie', pl: 'Rozmowa z klientem/pomiar', en: 'Client meeting/measuring', ro: 'Discutie client/masurare', ua: 'Perehovory z kliyentom' },
+        { id: 't_fahrzeit',      de: 'Fahrzeit',                     cz: 'Cestovni cas', sk: 'Cestovny cas', pl: 'Czas dojazdu', en: 'Travel time', ro: 'Timp drum', ua: 'Chas proyizhdzhenya' }
+    ];
+
+    // ===== Material-Datenbank (Etappe 6) =====
+    // 30 Standard-Fliesenleger-Materialien. Kategorie-IDs passen zu UI-Labels std_mat_kat_*.
+    // In Etappe 8 optional erweiterbar via Firebase-Sync aus Master-App.
+    const MATERIAL_DB = [
+        // Fliesen (5)
+        { id: 'fl_feinsteinzeug_60x60',  kategorie: 'fliesen',     name: 'Feinsteinzeug 60x60',           default_einheit: 'm2',        icon: '\u25A2' },
+        { id: 'fl_feinsteinzeug_30x60',  kategorie: 'fliesen',     name: 'Feinsteinzeug 30x60',           default_einheit: 'm2',        icon: '\u25A2' },
+        { id: 'fl_wandfliese_25x33',     kategorie: 'fliesen',     name: 'Wandfliese 25x33',              default_einheit: 'm2',        icon: '\u25A2' },
+        { id: 'fl_mosaik',               kategorie: 'fliesen',     name: 'Mosaik-Matte 30x30',            default_einheit: 'Stueck',    icon: '\u25A2' },
+        { id: 'fl_sockel',               kategorie: 'fliesen',     name: 'Sockelfliese',                  default_einheit: 'lfm',       icon: '\u25A2' },
+        // Kleber/Moertel (5)
+        { id: 'kl_sopro_trasflex',       kategorie: 'kleber',      name: 'Sopro Trasflexkleber 25kg',     default_einheit: 'Sack',      verpackung_kg: 25 },
+        { id: 'kl_sopro_fliexkleber',    kategorie: 'kleber',      name: 'Sopro FKM Flexkleber 25kg',     default_einheit: 'Sack',      verpackung_kg: 25 },
+        { id: 'kl_pci_nanolight',        kategorie: 'kleber',      name: 'PCI Nanolight 15kg',            default_einheit: 'Sack',      verpackung_kg: 15 },
+        { id: 'kl_fliesenkleber_std',    kategorie: 'kleber',      name: 'Fliesenkleber C2TE 25kg',       default_einheit: 'Sack',      verpackung_kg: 25 },
+        { id: 'kl_ausgleichsmasse',      kategorie: 'kleber',      name: 'Ausgleichsmasse 25kg',          default_einheit: 'Sack',      verpackung_kg: 25 },
+        // Fugenmasse (4)
+        { id: 'fg_pci_nanofug_silber',   kategorie: 'fuge',        name: 'PCI Nanofug Premium silbergrau',default_einheit: 'kg',        verpackung_kg: 5 },
+        { id: 'fg_pci_nanofug_anthr',    kategorie: 'fuge',        name: 'PCI Nanofug Premium anthrazit', default_einheit: 'kg',        verpackung_kg: 5 },
+        { id: 'fg_sopro_fugenmoertel',   kategorie: 'fuge',        name: 'Sopro Fugenmoertel',            default_einheit: 'kg',        verpackung_kg: 5 },
+        { id: 'fg_epoxid',               kategorie: 'fuge',        name: 'Epoxid-Fuge',                   default_einheit: 'kg',        verpackung_kg: 5 },
+        // Silikon (3)
+        { id: 'si_otto_novasil_grau',    kategorie: 'silikon',     name: 'Otto Novasil S70 grau',         default_einheit: 'Kartusche' },
+        { id: 'si_otto_novasil_weiss',   kategorie: 'silikon',     name: 'Otto Novasil S70 weiss',        default_einheit: 'Kartusche' },
+        { id: 'si_sanitaer',             kategorie: 'silikon',     name: 'Sanitaer-Silikon transparent',  default_einheit: 'Kartusche' },
+        // Abdichtung (4)
+        { id: 'ab_sopro_dsf',            kategorie: 'abdicht',     name: 'Sopro DSF Dichtschlaemme',      default_einheit: 'kg',        verpackung_kg: 20 },
+        { id: 'ab_pci_seccoral',         kategorie: 'abdicht',     name: 'PCI Seccoral 2K',               default_einheit: 'Set',       verpackung_kg: 24 },
+        { id: 'ab_dichtband',            kategorie: 'abdicht',     name: 'Dichtband 10m Rolle',           default_einheit: 'Rolle' },
+        { id: 'ab_eckmanschette',        kategorie: 'abdicht',     name: 'Eckmanschette',                 default_einheit: 'Stueck' },
+        // Hilfsmittel (5)
+        { id: 'hi_fliesenkreuze_3mm',    kategorie: 'hilfsmittel', name: 'Fliesenkreuze 3mm',             default_einheit: 'Beutel' },
+        { id: 'hi_fliesenkreuze_5mm',    kategorie: 'hilfsmittel', name: 'Fliesenkreuze 5mm',             default_einheit: 'Beutel' },
+        { id: 'hi_nivelliersystem',      kategorie: 'hilfsmittel', name: 'Nivelliersystem Keile+Laschen', default_einheit: 'Set' },
+        { id: 'hi_aluschiene',           kategorie: 'hilfsmittel', name: 'Alu-Abschlussschiene 2,5m',     default_einheit: 'Stueck' },
+        { id: 'hi_eckschiene',           kategorie: 'hilfsmittel', name: 'Eckschiene Chrom 2,5m',         default_einheit: 'Stueck' },
+        // Werkzeug (3)
+        { id: 'we_schneidscheibe',       kategorie: 'werkzeug',    name: 'Diamant-Trennscheibe',          default_einheit: 'Stueck' },
+        { id: 'we_zahnkelle',            kategorie: 'werkzeug',    name: 'Zahnkelle 8mm',                 default_einheit: 'Stueck' },
+        { id: 'we_gummiwischer',         kategorie: 'werkzeug',    name: 'Fugengummi',                    default_einheit: 'Stueck' },
+        // Sonstiges (1)
+        { id: 'so_reiniger',             kategorie: 'sonstiges',   name: 'Zementschleier-Entferner',      default_einheit: 'Flasche' }
+    ];
+
+    // ===== Verschluesselte Keys (Platzhalter Etappe 0) =====
+    // Werden in Etappen 3 + 7 befuellt.
+    const ENCRYPTED_KEYS = {
+        gemini:         null,  // AES-256 verschluesselter Gemini-Key
+        driveService:   null,  // AES-256 verschluesselter Service-Account-JSON
+        masterPassword: null   // Statisch eingebaut vor Auslieferung
+    };
+
+    // ===== Kosten-Monitoring (Etappe 7) =====
+    const TRANSLATION_LIMITS = {
+        daily:   1000,
+        monthly: 30000
+    };
+
+    // ===== Public API =====
+    global.TWMAConfig = {
+        APP_VERSION:        APP_VERSION,
+        FIREBASE_CONFIG:    FIREBASE_CONFIG,
+        LANGUAGES:          LANGUAGES,
+        UI_LABELS:          UI_LABELS,
+        ENCRYPTED_KEYS:     ENCRYPTED_KEYS,
+        TRANSLATION_LIMITS: TRANSLATION_LIMITS,
+        TAETIGKEITEN:       TAETIGKEITEN,
+        MATERIAL_DB:        MATERIAL_DB,
+        KAL_WOCHENTAGE:     KAL_WOCHENTAGE,
+        KAL_MONATE:         KAL_MONATE,
+
+        // Helper: Label in gewaehlter Sprache holen (Fallback DE)
+        t: function(key, lang) {
+            const entry = UI_LABELS[key];
+            if (!entry) return key;
+            return entry[lang] || entry.de || key;
+        },
+
+        // Helper: Taetigkeit uebersetzen
+        taetigkeit: function(id, lang) {
+            const t = TAETIGKEITEN.find(function(x){ return x.id === id; });
+            if (!t) return id;
+            return t[lang] || t.de || id;
+        }
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'Config', 'TWMAConfig geladen v' + APP_VERSION);
+})(window);
+
+/* ========== js/tw-ma-firebase.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Firebase (Etappe 3)
+// ============================================================
+// Scharf geschaltet: Realtime-DB-Anbindung fuer:
+// - Geraete-Onboarding (Freigabe-Request, Status-Polling)
+// - PIN-Hash speichern
+// - Heartbeat (letzter-online-Zeitstempel)
+// - Remote-Wipe-Erkennung
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    let initialized = false;
+    let db = null;
+
+    // ===== Init ==============================================
+    function init(customConfig) {
+        if (initialized) return true;
+        const cfg = customConfig || (global.TWMAConfig && global.TWMAConfig.FIREBASE_CONFIG);
+        if (!cfg || !cfg.apiKey) {
+            if (window.TWMACore) TWMACore.log('warn', 'Firebase', 'Keine apiKey in Config - init uebersprungen');
+            return false;
+        }
+        try {
+            if (typeof firebase === 'undefined') {
+                if (window.TWMACore) TWMACore.log('error', 'Firebase', 'Firebase SDK nicht geladen');
+                return false;
+            }
+            if (!firebase.apps.length) firebase.initializeApp(cfg);
+            db = firebase.database();
+            initialized = true;
+            if (window.TWMACore) TWMACore.log('info', 'Firebase', 'Initialisiert');
+            return true;
+        } catch (e) {
+            if (window.TWMACore) TWMACore.log('error', 'Firebase', 'Init-Fehler', e);
+            return false;
+        }
+    }
+
+    // ===== Onboarding: Freigabe-Request =======================
+    // Erzeugt einen Eintrag unter /geraete/{geraete-id} mit
+    // Status "wartet" und dem Anmelde-Code.
+    function requestDeviceApproval(deviceId, anmeldeCode) {
+        if (!initialized || !db) return Promise.reject(new Error('Firebase nicht bereit'));
+        return db.ref('geraete/' + deviceId).set({
+            status:         'wartet',
+            anmelde_code:   anmeldeCode,
+            angefragt_am:   firebase.database.ServerValue.TIMESTAMP,
+            user_agent:     navigator.userAgent.substring(0, 200),
+            last_seen:      firebase.database.ServerValue.TIMESTAMP
+        });
+    }
+
+    // ===== Status-Polling ====================================
+    // Liefert Listener-Unsubscribe-Funktion.
+    // Callback bekommt {status, name, ...} oder null.
+    function onDeviceStatus(deviceId, callback) {
+        if (!initialized || !db) { callback(null); return function() {}; }
+        const ref = db.ref('geraete/' + deviceId);
+        const handler = ref.on('value', function(snap) {
+            callback(snap.val());
+        });
+        return function unsubscribe() { ref.off('value', handler); };
+    }
+
+    // ===== PIN-Hash speichern ================================
+    function setPinHash(deviceId, pinHash) {
+        if (!initialized || !db) return Promise.reject(new Error('Firebase nicht bereit'));
+        return db.ref('geraete/' + deviceId + '/pin_hash').set(pinHash);
+    }
+
+    // ===== Falsche-PIN-Zaehler erhoehen =====================
+    function incrementFailedPinCounter(deviceId) {
+        if (!initialized || !db) return Promise.reject(new Error('Firebase nicht bereit'));
+        const ref = db.ref('geraete/' + deviceId + '/pin_fails');
+        return ref.transaction(function(current) { return (current || 0) + 1; });
+    }
+
+    function resetFailedPinCounter(deviceId) {
+        if (!initialized || !db) return Promise.resolve();
+        return db.ref('geraete/' + deviceId + '/pin_fails').set(0);
+    }
+
+    // ===== Heartbeat =========================================
+    function heartbeat(deviceId) {
+        if (!initialized || !db) return Promise.resolve();
+        return db.ref('geraete/' + deviceId + '/last_seen').set(firebase.database.ServerValue.TIMESTAMP);
+    }
+
+    // ===== Public API =========================================
+    global.TWMAFirebase = {
+        init:                     init,
+        isReady:                  function() { return initialized; },
+        db:                       function() { return db; },
+        requestDeviceApproval:    requestDeviceApproval,
+        onDeviceStatus:           onDeviceStatus,
+        setPinHash:               setPinHash,
+        incrementFailedPinCounter: incrementFailedPinCounter,
+        resetFailedPinCounter:    resetFailedPinCounter,
+        heartbeat:                heartbeat,
+
+        // ===== Nachrichten-Layer (Etappe 7) =====
+        // Datenstruktur (Master-Dok 10.9):
+        //   /nachrichten/{deviceId}/{msgId} = {
+        //     id, richtung: 'von_buero'|'von_ma', absender_name,
+        //     original: { sprache, text }, uebersetzung: { sprache, text },
+        //     gesendet_am (ServerValue.TIMESTAMP), gelesen_am, anhang_url,
+        //     typ: 'chat'|'anweisung', baustelle_id
+        //   }
+        listenForMessages: function(deviceId, callback) {
+            if (!initialized || !db) { callback([]); return function() {}; }
+            const ref = db.ref('nachrichten/' + deviceId).orderByChild('gesendet_am');
+            const handler = ref.on('value', function(snap) {
+                const val = snap.val() || {};
+                const list = Object.keys(val).map(function(id) {
+                    return Object.assign({ id: id }, val[id]);
+                });
+                list.sort(function(a, b) {
+                    return (a.gesendet_am || 0) - (b.gesendet_am || 0);
+                });
+                callback(list);
+            });
+            return function() { ref.off('value', handler); };
+        },
+
+        // sendMessage erwartet: { deviceId, richtung, absender_name,
+        //   original:{sprache,text}, uebersetzung:{sprache,text},
+        //   typ?, baustelle_id?, anhang_url? }
+        sendMessage: function(msg) {
+            if (!initialized || !db) return Promise.reject(new Error('Firebase nicht bereit'));
+            if (!msg || !msg.deviceId) return Promise.reject(new Error('deviceId fehlt'));
+            const ref = db.ref('nachrichten/' + msg.deviceId).push();
+            const payload = {
+                richtung:        msg.richtung,
+                absender_name:   msg.absender_name || '',
+                original:        msg.original  || { sprache: 'de', text: '' },
+                uebersetzung:    msg.uebersetzung || null,
+                gesendet_am:     firebase.database.ServerValue.TIMESTAMP,
+                gelesen_am:      null,
+                anhang_url:      msg.anhang_url || null,
+                typ:             msg.typ || 'chat',
+                baustelle_id:    msg.baustelle_id || null,
+                uebersetzung_status: msg.uebersetzung_status || 'ok'  // 'ok' | 'failed'
+            };
+            return ref.set(payload).then(function() { return ref.key; });
+        },
+
+        // Markiert eingehende Nachricht als gelesen (Server-Timestamp)
+        markMessageAsRead: function(deviceId, messageId) {
+            if (!initialized || !db || !messageId) return Promise.resolve();
+            return db.ref('nachrichten/' + deviceId + '/' + messageId + '/gelesen_am')
+                     .set(firebase.database.ServerValue.TIMESTAMP);
+        },
+
+        // Anweisungen-Tab: separater Pfad fuer Broadcasts vom Buero
+        // /anweisungen/{baustelleOrAll}/{anweisungsId} = {
+        //   titel, original:{sprache,text}, uebersetzung:..., gesendet_am,
+        //   anhang_url, pflicht (bool)
+        // }
+        // Lese-Status pro Geraet: /anweisungen_gelesen/{deviceId}/{anweisungsId} = ts
+        listenAnweisungen: function(deviceId, callback) {
+            if (!initialized || !db) { callback([]); return function() {}; }
+            // Wir hoeren auf /anweisungen/all (alle Mitarbeiter) — Erweiterung pro Baustelle spaeter
+            const refAll = db.ref('anweisungen/all').orderByChild('gesendet_am');
+            const refLes = db.ref('anweisungen_gelesen/' + deviceId);
+            let liste = [];
+            let gelesen = {};
+            function emit() {
+                const out = liste.map(function(a) {
+                    return Object.assign({}, a, { gelesen_am: gelesen[a.id] || null });
+                });
+                out.sort(function(a, b) { return (b.gesendet_am || 0) - (a.gesendet_am || 0); });
+                callback(out);
+            }
+            const h1 = refAll.on('value', function(snap) {
+                const val = snap.val() || {};
+                liste = Object.keys(val).map(function(id) { return Object.assign({ id: id }, val[id]); });
+                emit();
+            });
+            const h2 = refLes.on('value', function(snap) {
+                gelesen = snap.val() || {};
+                emit();
+            });
+            return function() {
+                refAll.off('value', h1);
+                refLes.off('value', h2);
+            };
+        },
+
+        markAnweisungAsRead: function(deviceId, anweisungsId) {
+            if (!initialized || !db || !anweisungsId) return Promise.resolve();
+            return db.ref('anweisungen_gelesen/' + deviceId + '/' + anweisungsId)
+                     .set(firebase.database.ServerValue.TIMESTAMP);
+        },
+
+        // ===== Kalender-Listener (Etappe 8) =====
+        // Pfad: /kalender/{deviceId}/{YYYYMMDD} = {
+        //   baustelle_id, baustelle_name, von, bis,
+        //   typ: 'arbeit'|'urlaub'|'krankheit'|'termin',
+        //   bemerkung
+        // }
+        listenKalenderEintraege: function(deviceId, callback) {
+            if (!initialized || !db) { callback({}); return function() {}; }
+            const ref = db.ref('kalender/' + deviceId);
+            const handler = ref.on('value', function(snap) {
+                callback(snap.val() || {});
+            });
+            return function() { ref.off('value', handler); };
+        },
+
+        // ===== Baustellen-Listener (Etappe 4) =====
+        // Horcht auf /aktive_baustellen und liefert aktuelles Array.
+        // Rueckgabe: Unsubscribe-Funktion.
+        listenAktiveBaustellen: function(callback) {
+            if (!initialized || !db) { callback([]); return function() {}; }
+            const ref = db.ref('aktive_baustellen');
+            const handler = ref.on('value', function(snap) {
+                const val = snap.val() || {};
+                const list = Object.keys(val).map(function(id) {
+                    return Object.assign({ id: id }, val[id]);
+                });
+                callback(list);
+            });
+            return function() { ref.off('value', handler); };
+        },
+
+        // ===== Baustellen-Dateien-Listener (Etappe 4 Fallback) =====
+        // Horcht auf /baustellen_dateien/{baustelleId}
+        // Erwartet Struktur:
+        //   baustellen_dateien/{id}/{ordner}/{dateiId} = { name, url, mime, size, ts }
+        // Ordner: "zeichnungen", "bilder", "stunden", "nachrichten"
+        listenBaustelleDateien: function(baustelleId, ordner, callback) {
+            if (!initialized || !db) { callback([]); return function() {}; }
+            const ref = db.ref('baustellen_dateien/' + baustelleId + '/' + ordner);
+            const handler = ref.on('value', function(snap) {
+                const val = snap.val() || {};
+                const list = Object.keys(val).map(function(id) {
+                    return Object.assign({ id: id }, val[id]);
+                }).sort(function(a, b) { return (b.ts || 0) - (a.ts || 0); });
+                callback(list);
+            });
+            return function() { ref.off('value', handler); };
+        }
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'Firebase', 'TWMAFirebase v0.4 geladen');
+})(window);
+
+/* ========== js/tw-ma-drive-service.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Drive Service (Etappe 4)
+// ============================================================
+// Zugriff auf Google Drive Staging via Service-Account.
+//
+// BETRIEBSMODI:
+//   1. Production-Mode: echtes Service-Account-JWT
+//      - `TWMAConfig.DRIVE_SERVICE_ACCOUNT` muss gesetzt sein:
+//         { client_email, private_key, staging_root_folder_id }
+//      - Der private_key ist PEM-formatiert (-----BEGIN PRIVATE KEY-----)
+//      - In Etappe 4 klartextkompatibel. Verschluesselung wird in
+//        Etappe 7 mit dem Gemini-Key zusammen eingebaut.
+//
+//   2. Firebase-Fallback (default): Wenn keine Service-Account-Daten
+//      eingebaut sind, laufen alle Datei-Operationen ueber Firebase
+//      (siehe TWMAFirebase.listenBaustelleDateien). Ermoeglicht
+//      vollstaendiges UI-Testen ohne Service-Account-Setup.
+//
+// Core-Konzept (gemaess Master-Dok Kapitel 12.2):
+//   Service-Account hat NUR Zugriff auf den Staging-Root-Ordner.
+//   Originale sind physisch unsichtbar.
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    let accessToken = null;
+    let tokenExpiry = 0;   // ms seit Epoch
+    let clientEmail = null;
+    let privateKeyPem = null;
+    let stagingRootId = null;
+
+    // ===== Public: Modus-Detection ===========================
+    function getMode() {
+        const cfg = global.TWMAConfig && global.TWMAConfig.DRIVE_SERVICE_ACCOUNT;
+        if (cfg && cfg.client_email && cfg.private_key) return 'production';
+        return 'fallback';
+    }
+
+    // ===== JWT-Signing fuer Service-Account OAuth ============
+    // Erzeugt Base64URL-kodiertes JWT, signiert mit RS256.
+    // Dokumentation: https://developers.google.com/identity/protocols/oauth2/service-account
+
+    function base64urlEncode(bufOrStr) {
+        let bytes;
+        if (typeof bufOrStr === 'string') {
+            bytes = new TextEncoder().encode(bufOrStr);
+        } else {
+            bytes = new Uint8Array(bufOrStr);
+        }
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    // Extrahiert den DER-Inhalt aus einem PEM-String
+    function pemToArrayBuffer(pem) {
+        const cleaned = pem
+            .replace('-----BEGIN PRIVATE KEY-----', '')
+            .replace('-----END PRIVATE KEY-----', '')
+            .replace(/\s/g, '');
+        const bin = atob(cleaned);
+        const buf = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+        return buf.buffer;
+    }
+
+    async function importRsaKey(pem) {
+        const der = pemToArrayBuffer(pem);
+        return crypto.subtle.importKey(
+            'pkcs8', der,
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            false, ['sign']
+        );
+    }
+
+    async function signRs256(headerB64, payloadB64, pem) {
+        const key = await importRsaKey(pem);
+        const data = new TextEncoder().encode(headerB64 + '.' + payloadB64);
+        const sigBuf = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, data);
+        return base64urlEncode(sigBuf);
+    }
+
+    async function createJwt(clientEmail, pem) {
+        const now = Math.floor(Date.now() / 1000);
+        const header  = { alg: 'RS256', typ: 'JWT' };
+        const payload = {
+            iss:   clientEmail,
+            scope: 'https://www.googleapis.com/auth/drive',
+            aud:   'https://oauth2.googleapis.com/token',
+            iat:   now,
+            exp:   now + 3600
+        };
+        const h64 = base64urlEncode(JSON.stringify(header));
+        const p64 = base64urlEncode(JSON.stringify(payload));
+        const sig = await signRs256(h64, p64, pem);
+        return h64 + '.' + p64 + '.' + sig;
+    }
+
+    // ===== Access-Token-Beschaffung ==========================
+    async function getAccessToken() {
+        if (accessToken && Date.now() < tokenExpiry - 60000) return accessToken;
+        if (getMode() !== 'production') {
+            throw new Error('Drive-Service im Fallback-Modus - kein Token');
+        }
+        const cfg = global.TWMAConfig.DRIVE_SERVICE_ACCOUNT;
+        clientEmail   = cfg.client_email;
+        privateKeyPem = cfg.private_key;
+        stagingRootId = cfg.staging_root_folder_id || null;
+
+        const jwt = await createJwt(clientEmail, privateKeyPem);
+
+        const res = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + encodeURIComponent(jwt)
+        });
+        if (!res.ok) {
+            throw new Error('OAuth failed: ' + res.status + ' ' + await res.text());
+        }
+        const data = await res.json();
+        accessToken = data.access_token;
+        tokenExpiry = Date.now() + (data.expires_in * 1000);
+        return accessToken;
+    }
+
+    // ===== Drive-API-Wrapper ==================================
+    async function driveFetch(path, opts) {
+        const token = await getAccessToken();
+        opts = opts || {};
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + token });
+        const url = path.startsWith('http') ? path : ('https://www.googleapis.com' + path);
+        const res = await fetch(url, opts);
+        if (!res.ok) throw new Error('Drive-API: ' + res.status + ' ' + await res.text());
+        return res;
+    }
+
+    // ===== listFolder: listet Dateien in einem Ordner ========
+    // folderId = Drive-Folder-ID (oder null -> Staging-Root)
+    async function listFolder(folderId) {
+        if (getMode() !== 'production') {
+            throw new Error('Fallback-Modus - listFolder nicht verfuegbar, nutze Firebase-Fallback');
+        }
+        const parent = folderId || stagingRootId;
+        if (!parent) throw new Error('Kein Ordner angegeben und kein Staging-Root gesetzt');
+        const q = encodeURIComponent("'" + parent + "' in parents and trashed = false");
+        const fields = encodeURIComponent('files(id,name,mimeType,size,modifiedTime,thumbnailLink)');
+        const res = await driveFetch('/drive/v3/files?q=' + q + '&fields=' + fields + '&pageSize=200');
+        const data = await res.json();
+        return data.files || [];
+    }
+
+    // ===== downloadFile: Datei-Inhalt als Blob ===============
+    async function downloadFile(fileId) {
+        if (getMode() !== 'production') {
+            throw new Error('Fallback-Modus - downloadFile nicht verfuegbar');
+        }
+        const res = await driveFetch('/drive/v3/files/' + fileId + '?alt=media');
+        return res.blob();
+    }
+
+    // ===== uploadFile (Etappe 5 vorbereitet) =================
+    // Multipart-Upload einer Datei in einen Ordner.
+    async function uploadFile(parentFolderId, fileName, mimeType, blob, metadata) {
+        if (getMode() !== 'production') {
+            throw new Error('Fallback-Modus - uploadFile nicht verfuegbar');
+        }
+        const token = await getAccessToken();
+        const meta = Object.assign({
+            name:     fileName,
+            mimeType: mimeType,
+            parents:  [parentFolderId]
+        }, metadata || {});
+
+        const boundary = 'tw-ma-' + Date.now();
+        const delim = '\r\n--' + boundary + '\r\n';
+        const closeDelim = '\r\n--' + boundary + '--';
+
+        const bodyHead = delim +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+            JSON.stringify(meta) + delim +
+            'Content-Type: ' + mimeType + '\r\n\r\n';
+
+        // Blob-Komposition
+        const fullBody = new Blob([bodyHead, blob, closeDelim], { type: 'multipart/related; boundary=' + boundary });
+
+        const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'multipart/related; boundary=' + boundary
+            },
+            body: fullBody
+        });
+        if (!res.ok) throw new Error('Upload-Fehler: ' + res.status + ' ' + await res.text());
+        return res.json();
+    }
+
+    // ===== findOrCreateFolder ================================
+    async function findOrCreateFolder(parentId, folderName) {
+        if (getMode() !== 'production') {
+            throw new Error('Fallback-Modus - findOrCreateFolder nicht verfuegbar');
+        }
+        const q = encodeURIComponent(
+            "'" + parentId + "' in parents and name = '" + folderName.replace(/'/g, "\\'") +
+            "' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        );
+        const res = await driveFetch('/drive/v3/files?q=' + q + '&fields=files(id,name)');
+        const data = await res.json();
+        if (data.files && data.files.length > 0) return data.files[0].id;
+        // Anlegen
+        const token = await getAccessToken();
+        const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type':  'application/json'
+            },
+            body: JSON.stringify({
+                name:     folderName,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents:  [parentId]
+            })
+        });
+        if (!createRes.ok) throw new Error('Folder-Create: ' + createRes.status);
+        const created = await createRes.json();
+        return created.id;
+    }
+
+    // ===== Public API =========================================
+    global.TWMADriveService = {
+        getMode:             getMode,
+        isReady:             function() { return accessToken !== null && Date.now() < tokenExpiry; },
+        getAccessToken:      getAccessToken,
+        listFolder:          listFolder,
+        downloadFile:        downloadFile,
+        uploadFile:          uploadFile,
+        findOrCreateFolder:  findOrCreateFolder
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'DriveService', 'Modus: ' + getMode());
+})(window);
+
+/* ========== js/tw-ma-translation.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Translation-Engine (Etappe 7 Phase A)
+// ============================================================
+// Wrapper fuer Gemini Flash Uebersetzungen.
+//
+// API:
+//   TWMATranslate.translate(text, fromLang, toLang)
+//       -> Promise<{text, success, error?, cached?}>
+//   TWMATranslate.detectLanguage(text) -> Promise<string>
+//   TWMATranslate.uiLabel(key, lang) -> string  (sofort, ohne API)
+//   TWMATranslate.setApiKey(key)     -> fuer Onboarding / Entschluesselung
+//   TWMATranslate.hasApiKey()        -> boolean
+//
+// Caching: IndexedDB-Store 'translation_cache'
+//   key: '{fromLang}_{toLang}_{hash(text)}'
+//   value: { key, text, ts }
+//   TTL: 90 Tage
+//
+// Fallback-Strategie:
+//   1. Cache-Treffer -> sofort
+//   2. Gemini Flash (schnell, billig)
+//   3. Gemini Pro (langsamer, zuverlaessiger)
+//   4. Total-Ausfall -> Original-Text + success:false
+//
+// API-Key: verschluesselt in TWMAConfig.ENCRYPTED_KEYS.gemini (AES-256)
+//   Entschluesselung beim App-Start via AES-Decrypt (Web Crypto API)
+//   Key liegt NUR in Closure, niemals in localStorage/window
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    // ---- Konstanten ----
+    const GEMINI_FLASH_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    const GEMINI_PRO_URL   = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent';
+    const CACHE_TTL_MS     = 90 * 24 * 60 * 60 * 1000; // 90 Tage
+    const REQUEST_TIMEOUT  = 8000;                     // 8s pro Gemini-Call
+
+    // ---- API-Key (Closure, nie global) ----
+    let apiKey = null;
+
+    // ---- UI-Label (unveraendert aus Etappe 0) ----
+    function uiLabel(key, lang) {
+        if (global.TWMAConfig && global.TWMAConfig.t) return global.TWMAConfig.t(key, lang);
+        return key;
+    }
+
+    // ---- API-Key setzen / pruefen ----
+    function setApiKey(key) {
+        if (typeof key === 'string' && key.length > 0) {
+            apiKey = key;
+            if (global.TWMACore) TWMACore.log('info', 'Translation', 'API-Key gesetzt');
+            return true;
+        }
+        return false;
+    }
+    function hasApiKey() { return !!apiKey; }
+
+    // ---- AES-Decrypt (Web Crypto API, Base64-Input) ----
+    // Format: salt(16) || iv(12) || ciphertext
+    // Passphrase wird via PBKDF2 auf 256-bit-Key gedehnt.
+    async function aesDecryptBase64(base64, passphrase) {
+        if (!base64 || !passphrase) return null;
+        try {
+            const bin = Uint8Array.from(atob(base64), function(c){ return c.charCodeAt(0); });
+            if (bin.length < 28) throw new Error('Ciphertext zu kurz');
+            const salt = bin.slice(0, 16);
+            const iv   = bin.slice(16, 28);
+            const ct   = bin.slice(28);
+
+            const enc = new TextEncoder();
+            const keyMat = await crypto.subtle.importKey(
+                'raw', enc.encode(passphrase), { name: 'PBKDF2' }, false, ['deriveKey']
+            );
+            const derivedKey = await crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt: salt, iterations: 100000, hash: 'SHA-256' },
+                keyMat,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['decrypt']
+            );
+            const plainBuf = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv }, derivedKey, ct
+            );
+            return new TextDecoder().decode(plainBuf);
+        } catch (err) {
+            if (global.TWMACore) TWMACore.log('warn', 'Translation', 'AES-Decrypt fehlgeschlagen', err.message);
+            return null;
+        }
+    }
+
+    // ---- Beim Start: Key aus Config entschluesseln (falls vorhanden) ----
+    async function initKeyFromConfig() {
+        if (apiKey) return true;
+        if (!global.TWMAConfig || !TWMAConfig.ENCRYPTED_KEYS) return false;
+        const enc  = TWMAConfig.ENCRYPTED_KEYS.gemini;
+        const pass = TWMAConfig.ENCRYPTED_KEYS.masterPassword;
+        if (!enc || !pass) return false;
+
+        const plain = await aesDecryptBase64(enc, pass);
+        if (plain) { apiKey = plain.trim(); return true; }
+        return false;
+    }
+
+    // ---- Cache-Hash (djb2, stabil ueber Sessions) ----
+    function hashText(s) {
+        let h = 5381;
+        for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+        return ('00000000' + (h >>> 0).toString(16)).slice(-8);
+    }
+    function cacheKey(from, to, text) {
+        return from + '_' + to + '_' + hashText(text);
+    }
+
+    // ---- Cache-Zugriff ----
+    async function cacheGet(key) {
+        if (!global.TWMAStorage || !TWMAStorage.openDb) return null;
+        try {
+            const db = await TWMAStorage.openDb();
+            return await new Promise(function(resolve) {
+                const req = db.transaction('translation_cache', 'readonly')
+                              .objectStore('translation_cache').get(key);
+                req.onsuccess = function() {
+                    const v = req.result;
+                    if (!v) { resolve(null); return; }
+                    if (Date.now() - (v.ts || 0) > CACHE_TTL_MS) { resolve(null); return; }
+                    resolve(v.text);
+                };
+                req.onerror = function() { resolve(null); };
+            });
+        } catch (_) { return null; }
+    }
+    async function cachePut(key, text) {
+        if (!global.TWMAStorage || !TWMAStorage.openDb) return;
+        try {
+            const db = await TWMAStorage.openDb();
+            const tx = db.transaction('translation_cache', 'readwrite');
+            tx.objectStore('translation_cache').put({ key: key, text: text, ts: Date.now() });
+        } catch (_) {}
+    }
+
+    // ---- Sprach-Name fuer Prompt ----
+    const LANG_NAMES = {
+        de: 'German', cz: 'Czech', sk: 'Slovak', pl: 'Polish',
+        en: 'English', ro: 'Romanian', ua: 'Ukrainian', ru: 'Russian'
+    };
+    function langName(code) { return LANG_NAMES[code] || code; }
+
+    // ---- Fetch mit Timeout ----
+    function fetchTimeout(url, opts, ms) {
+        return new Promise(function(resolve, reject) {
+            const ctrl = new AbortController();
+            const timer = setTimeout(function() { ctrl.abort(); reject(new Error('Timeout')); }, ms);
+            fetch(url, Object.assign({}, opts, { signal: ctrl.signal }))
+                .then(function(r){ clearTimeout(timer); resolve(r); })
+                .catch(function(e){ clearTimeout(timer); reject(e); });
+        });
+    }
+
+    // ---- Gemini-Aufruf (einzeln) ----
+    async function callGemini(url, text, fromLang, toLang) {
+        if (!apiKey) throw new Error('Kein API-Key');
+
+        const prompt = 'Translate the following text from ' + langName(fromLang)
+                     + ' to ' + langName(toLang)
+                     + '. Return ONLY the translated text. No explanations, no quotes, no commentary.\n\n'
+                     + 'TEXT:\n' + text;
+
+        const body = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: 0.2,
+                maxOutputTokens: 800,
+                topP: 0.9
+            }
+        };
+
+        const res = await fetchTimeout(url + '?key=' + encodeURIComponent(apiKey), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        }, REQUEST_TIMEOUT);
+
+        if (!res.ok) {
+            const err = await res.text().catch(function(){ return ''; });
+            throw new Error('Gemini ' + res.status + ': ' + err.slice(0, 120));
+        }
+        const data = await res.json();
+        const parts = data && data.candidates && data.candidates[0]
+                    && data.candidates[0].content && data.candidates[0].content.parts;
+        if (!parts || !parts[0] || !parts[0].text) throw new Error('Leere Gemini-Antwort');
+
+        return parts[0].text.trim();
+    }
+
+    // ---- HAUPT-FUNKTION: Uebersetzen mit Fallback-Kette ----
+    async function translate(text, fromLang, toLang) {
+        // Leerer Input -> durchreichen
+        if (!text || typeof text !== 'string' || text.trim().length === 0) {
+            return { text: text || '', success: true };
+        }
+        // Gleiche Sprache -> keine Uebersetzung noetig
+        if (fromLang === toLang) {
+            return { text: text, success: true };
+        }
+
+        const key = cacheKey(fromLang, toLang, text);
+
+        // 1. Cache
+        const cached = await cacheGet(key);
+        if (cached !== null) {
+            return { text: cached, success: true, cached: true };
+        }
+
+        // Key lazy-init
+        if (!apiKey) await initKeyFromConfig();
+        if (!apiKey) {
+            return { text: text, success: false, error: 'Kein API-Key konfiguriert' };
+        }
+
+        // 2. Gemini Flash
+        let lastErr = null;
+        try {
+            const tr = await callGemini(GEMINI_FLASH_URL, text, fromLang, toLang);
+            await cachePut(key, tr);
+            return { text: tr, success: true };
+        } catch (err) {
+            lastErr = err;
+            if (global.TWMACore) TWMACore.log('warn', 'Translation', 'Flash fehlgeschlagen', err.message);
+        }
+
+        // 3. Gemini Pro (Fallback)
+        try {
+            const tr = await callGemini(GEMINI_PRO_URL, text, fromLang, toLang);
+            await cachePut(key, tr);
+            return { text: tr, success: true };
+        } catch (err) {
+            if (global.TWMACore) TWMACore.log('error', 'Translation', 'Pro fehlgeschlagen', err.message);
+            lastErr = err;
+        }
+
+        // 4. Total-Ausfall
+        return {
+            text: text,
+            success: false,
+            error: (lastErr && lastErr.message) || 'Unbekannter Fehler'
+        };
+    }
+
+    // ---- Sprach-Erkennung (einmaliger Gemini-Call, direkt ohne callGemini-Prompt) ----
+    async function detectLanguage(text) {
+        if (!text || text.trim().length === 0) return null;
+        if (!apiKey) await initKeyFromConfig();
+        if (!apiKey) return null;
+
+        const prompt = 'What language is this text? Answer with ONLY the ISO 639-1 two-letter code (e.g. "de", "cz", "en"). No explanation.\n\nTEXT:\n' + text.slice(0, 400);
+        try {
+            const res = await fetchTimeout(GEMINI_FLASH_URL + '?key=' + encodeURIComponent(apiKey), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: { temperature: 0, maxOutputTokens: 10 }
+                })
+            }, REQUEST_TIMEOUT);
+            if (!res.ok) return null;
+            const data = await res.json();
+            const parts = data && data.candidates && data.candidates[0]
+                        && data.candidates[0].content && data.candidates[0].content.parts;
+            if (!parts || !parts[0] || !parts[0].text) return null;
+            const m = parts[0].text.toLowerCase().match(/[a-z]{2}/);
+            return m ? m[0] : null;
+        } catch (_) { return null; }
+    }
+
+    // ---- Public API ----
+    global.TWMATranslate = {
+        uiLabel:         uiLabel,
+        translate:       translate,
+        detectLanguage:  detectLanguage,
+        setApiKey:       setApiKey,
+        hasApiKey:       hasApiKey,
+        // Intern nutzbar, aber nicht empfohlen:
+        _initKey:        initKeyFromConfig,
+        _aesDecrypt:     aesDecryptBase64
+    };
+
+    // ---- Lazy-Init beim Laden (non-blocking) ----
+    if (global.TWMAConfig && TWMAConfig.ENCRYPTED_KEYS
+        && TWMAConfig.ENCRYPTED_KEYS.gemini && TWMAConfig.ENCRYPTED_KEYS.masterPassword) {
+        initKeyFromConfig().then(function(ok) {
+            if (ok && global.TWMACore) TWMACore.log('info', 'Translation', 'Gemini-Key beim Start entschluesselt');
+        });
+    }
+
+    if (global.TWMACore) TWMACore.log('info', 'Translation', 'TWMATranslate v0.7 geladen');
+})(window);
+
+/* ========== js/tw-ma-pdf.js ========== */
+// ============================================================
+// TW Baustellen-App  -  PDF-Generator (Etappe 6)
+// ============================================================
+// Erzeugt Stundenzettel-PDFs via jsPDF (CDN).
+// Briefkopf-Layout folgt dem Master-App-Muster (analog
+// SKILL-jspdf-briefkopf.md). Koordinaten sind gut lesbar
+// dokumentiert, damit Thomas das Layout spaeter 1:1 an die
+// Master-App angleichen kann.
+//
+// API:
+//   TWMAPdf.erzeugeStundenzettel(stunde) -> Promise<Blob>
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    // ---- Firmen-Stammdaten (analog Master-App) ----
+    // Duerfen von Thomas vor dem Deployment an Master-App angepasst werden.
+    const FIRMA = {
+        name:     'Thomas Willwacher Fliesenlegermeister e.K.',
+        strasse:  'Am Breitenberg 5',
+        plz_ort:  '56472 Nisterau',
+        tel:      '02661 / 952 980',
+        mail:     'info@fliesen-willwacher.de',
+        web:      'www.fliesen-willwacher.de'
+    };
+
+    // ---- Farben (analog Master-App Design-System) ----
+    const COLOR_PRIMARY   = [30, 136, 229];   // #1E88E5
+    const COLOR_DARK      = [33, 37, 41];     // #212529
+    const COLOR_MUTED     = [108, 117, 125];  // #6c757d
+    const COLOR_BORDER    = [222, 226, 230];  // #dee2e6
+    const COLOR_ACCENT    = [196, 30, 30];    // rot fuer Titel
+
+    function checkLibs() {
+        if (!(window.jspdf && window.jspdf.jsPDF)) {
+            throw new Error('jsPDF ist nicht geladen (CDN fehlt?)');
+        }
+        return window.jspdf.jsPDF;
+    }
+
+    function fmtDatum(iso) {
+        if (!iso) return '';
+        const parts = iso.split('-');
+        if (parts.length !== 3) return iso;
+        return parts[2] + '.' + parts[1] + '.' + parts[0];
+    }
+
+    function fmtMinAsStd(mins) {
+        if (!mins && mins !== 0) return '';
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return h + ':' + (m < 10 ? '0' + m : m) + ' h';
+    }
+
+    // ===== Haupt-Funktion =====
+    async function erzeugeStundenzettel(stunde) {
+        const JSPDF = checkLibs();
+        const doc = new JSPDF({ unit: 'mm', format: 'a4' });
+        const pageW = doc.internal.pageSize.getWidth();
+        let y = 15;
+
+        // ---------- BRIEFKOPF ----------
+        // Firmenlogo (Kreis links mit TW-Monogramm)
+        doc.setFillColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        doc.circle(22, y + 8, 10, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('TW', 22, y + 10, { align: 'center' });
+
+        // Firmenadresse rechts vom Logo
+        doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.text(FIRMA.name, 38, y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        doc.text(FIRMA.strasse + ', ' + FIRMA.plz_ort, 38, y + 10);
+        doc.text('Tel: ' + FIRMA.tel + '  \u2022  ' + FIRMA.mail, 38, y + 14);
+        doc.text(FIRMA.web, 38, y + 18);
+
+        y += 24;
+
+        // Trennlinie
+        doc.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+        doc.setLineWidth(0.3);
+        doc.line(15, y, pageW - 15, y);
+        y += 6;
+
+        // ---------- DOKUMENT-TITEL ----------
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(20);
+        doc.setTextColor(COLOR_ACCENT[0], COLOR_ACCENT[1], COLOR_ACCENT[2]);
+        doc.text('Stundenzettel', 15, y + 4);
+
+        // Datum rechts
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+        doc.text(fmtDatum(stunde.datum), pageW - 15, y + 4, { align: 'right' });
+
+        y += 12;
+
+        // ---------- KOPFDATEN-TABELLE ----------
+        const nettoStd = fmtMinAsStd(stunde.netto_min);
+        const kopfRows = [
+            ['Baustelle', stunde.baustelle_name || '-'],
+            ['Mitarbeiter', stunde.mitarbeiter_name || stunde.mitarbeiter_id || '-'],
+            ['Arbeitszeit', (stunde.anfang || '-') + ' \u2013 ' + (stunde.ende || '-')
+                + '    Pause: ' + (stunde.pause_min || 0) + ' min'
+                + '    Netto: ' + nettoStd],
+            ['Wetter', stunde.wetter || '-']
+        ];
+
+        if (doc.autoTable) {
+            doc.autoTable({
+                startY: y,
+                head: [],
+                body: kopfRows,
+                theme: 'grid',
+                styles: { fontSize: 10, cellPadding: 2.5 },
+                columnStyles: {
+                    0: { cellWidth: 40, fontStyle: 'bold', fillColor: [245, 247, 250] },
+                    1: { cellWidth: 'auto' }
+                },
+                margin: { left: 15, right: 15 }
+            });
+            y = doc.lastAutoTable.finalY + 6;
+        } else {
+            // Fallback ohne autoTable
+            doc.setFontSize(10);
+            kopfRows.forEach(function(row) {
+                doc.setFont('helvetica', 'bold');
+                doc.text(row[0] + ':', 15, y);
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(row[1]), 55, y);
+                y += 5;
+            });
+            y += 4;
+        }
+
+        // ---------- TAETIGKEITEN ----------
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        doc.text('Taetigkeiten', 15, y);
+        y += 2;
+        doc.setDrawColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+        doc.setLineWidth(0.4);
+        doc.line(15, y + 1, 55, y + 1);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+        const taetLines = (stunde.taetigkeiten || []).map(function(t){ return '\u2022 ' + t; });
+        if (taetLines.length === 0) taetLines.push('\u2013');
+        taetLines.forEach(function(line) {
+            doc.text(line, 18, y);
+            y += 5;
+        });
+        y += 3;
+
+        // ---------- MATERIAL (falls vorhanden) ----------
+        if (stunde.material && stunde.material.length > 0) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+            doc.text('Verwendetes Material', 15, y);
+            doc.setDrawColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+            doc.line(15, y + 1, 75, y + 1);
+            y += 4;
+
+            const matRows = stunde.material.map(function(m) {
+                return [m.name, String(m.menge || ''), m.einheit || ''];
+            });
+
+            if (doc.autoTable) {
+                doc.autoTable({
+                    startY: y,
+                    head: [['Material', 'Menge', 'Einheit']],
+                    body: matRows,
+                    theme: 'striped',
+                    headStyles: { fillColor: COLOR_PRIMARY, textColor: 255, fontSize: 10 },
+                    styles: { fontSize: 9, cellPadding: 2 },
+                    columnStyles: {
+                        0: { cellWidth: 'auto' },
+                        1: { cellWidth: 25, halign: 'right' },
+                        2: { cellWidth: 25 }
+                    },
+                    margin: { left: 15, right: 15 }
+                });
+                y = doc.lastAutoTable.finalY + 6;
+            } else {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+                matRows.forEach(function(r) {
+                    doc.text(r[0] + '   ' + r[1] + ' ' + r[2], 18, y);
+                    y += 4.5;
+                });
+                y += 3;
+            }
+        }
+
+        // ---------- BEMERKUNG ----------
+        if ((stunde.bemerkung_deutsch && stunde.bemerkung_deutsch.trim())
+            || (stunde.bemerkung_original && stunde.bemerkung_original.text && stunde.bemerkung_original.text.trim())) {
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+            doc.text('Bemerkung', 15, y);
+            doc.setDrawColor(COLOR_PRIMARY[0], COLOR_PRIMARY[1], COLOR_PRIMARY[2]);
+            doc.line(15, y + 1, 45, y + 1);
+            y += 6;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(COLOR_DARK[0], COLOR_DARK[1], COLOR_DARK[2]);
+
+            const deutsch = (stunde.bemerkung_deutsch || '').trim();
+            if (deutsch) {
+                const lines = doc.splitTextToSize(deutsch, pageW - 30);
+                lines.forEach(function(l) { doc.text(l, 15, y); y += 5; });
+            }
+
+            // Original-Sprache als kursiver Untertitel
+            const orig = stunde.bemerkung_original;
+            if (orig && orig.text && orig.text.trim() && orig.sprache !== 'de') {
+                y += 2;
+                doc.setFont('helvetica', 'italic');
+                doc.setFontSize(9);
+                doc.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+                doc.text('Original (' + (orig.sprache || '').toUpperCase() + '):', 15, y);
+                y += 4;
+                const origLines = doc.splitTextToSize(orig.text.trim(), pageW - 30);
+                origLines.forEach(function(l) { doc.text(l, 18, y); y += 4.5; });
+            }
+            y += 4;
+        }
+
+        // ---------- FOOTER ----------
+        const footerY = doc.internal.pageSize.getHeight() - 10;
+        doc.setDrawColor(COLOR_BORDER[0], COLOR_BORDER[1], COLOR_BORDER[2]);
+        doc.setLineWidth(0.2);
+        doc.line(15, footerY - 4, pageW - 15, footerY - 4);
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(COLOR_MUTED[0], COLOR_MUTED[1], COLOR_MUTED[2]);
+        const nowStr = new Date().toLocaleString('de-DE');
+        doc.text('Erstellt mit TW Baustellen-App am ' + nowStr, 15, footerY);
+        doc.text('Geraet: ' + (stunde.mitarbeiter_id || '?').slice(-8), pageW - 15, footerY, { align: 'right' });
+
+        // ---------- BLOB ----------
+        return doc.output('blob');
+    }
+
+    // ===== Public API =====
+    global.TWMAPdf = {
+        erzeugeStundenzettel: erzeugeStundenzettel,
+        FIRMA: FIRMA
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'PDF', 'TWMAPdf v0.6 geladen');
+})(window);
+
+/* ========== js/tw-ma-sync.js ========== */
+// ============================================================
+// TW Baustellen-App  -  Sync-Orchestrator (Etappe 5)
+// ============================================================
+// Versucht regelmaessig Fotos aus der IndexedDB Sync-Queue nach
+// Drive Staging hochzuladen (Service-Account).
+//
+// Logik:
+//  - Polling alle 60 Sek, wenn Pending-Items da
+//  - Online-Check via navigator.onLine + Test-Ping
+//  - Drive-Upload via TWMADriveService
+//  - Pfad: Staging/{baustelleName}/Bilder/{phase}/{raumName}/{upload_name}.jpg
+//  - Zusaetzlich: gleichnamige .json mit Metadaten
+//  - Bei Fehler: Exponential Backoff (30s, 2m, 8m, 30m, 2h)
+//  - Nach 5 fehlgeschlagenen Versuchen -> sync_status = 'fehler'
+//  - Fallback-Mode: kein Upload, Items bleiben in Queue
+//
+// Emittiert CustomEvent 'tw-ma-sync-progress' mit
+//   { pending, success, fehler } am window.
+// ============================================================
+
+(function(global) {
+    'use strict';
+
+    const POLL_INTERVAL_MS = 60 * 1000;
+    const MAX_ATTEMPTS     = 5;
+    const BACKOFF_MS       = [30_000, 120_000, 480_000, 1_800_000, 7_200_000];
+
+    let pollTimer = null;
+    let laeuftGerade = false;
+    let baustellenCache = {};   // baustelleId -> { name, folderId(gecached) }
+    let raumCache = {};         // raumId -> name
+
+    function emitProgress(data) {
+        try {
+            window.dispatchEvent(new CustomEvent('tw-ma-sync-progress', { detail: data }));
+        } catch (_) {}
+    }
+
+    async function updateProgress() {
+        const pending = await TWMAStorage.countPendingSyncItems().catch(() => 0);
+        const fehler  = await TWMAStorage.countFotosByStatus('fehler').catch(() => 0);
+        const uploaded = await TWMAStorage.countFotosByStatus('uploaded').catch(() => 0);
+        emitProgress({ pending: pending, fehler: fehler, uploaded: uploaded });
+    }
+
+    // ===== Baustellen-Name auflösen =====
+    async function resolveBaustellenName(baustelleId) {
+        if (baustellenCache[baustelleId]) return baustellenCache[baustelleId].name;
+        // Aus Firebase lesen
+        if (window.TWMAFirebase && TWMAFirebase.db && TWMAFirebase.db()) {
+            try {
+                const snap = await TWMAFirebase.db().ref('aktive_baustellen/' + baustelleId).once('value');
+                const v = snap.val();
+                if (v && v.name) {
+                    baustellenCache[baustelleId] = { name: v.name };
+                    return v.name;
+                }
+            } catch (_) {}
+        }
+        return baustelleId; // Fallback
+    }
+
+    async function resolveRaumName(raumId) {
+        if (raumCache[raumId]) return raumCache[raumId];
+        try {
+            const r = await TWMAStorage.getRaum(raumId);
+            if (r && r.bezeichnung) {
+                raumCache[raumId] = r.bezeichnung;
+                return r.bezeichnung;
+            }
+        } catch (_) {}
+        return raumId;
+    }
+
+    // ===== Pfad: Staging-Root -> Baustelle -> Bilder -> Phase -> Raum =====
+    async function ensureDrivePath(baustelleName, phase, raumName) {
+        const cfg = TWMAConfig.DRIVE_SERVICE_ACCOUNT;
+        if (!cfg || !cfg.staging_root_folder_id) throw new Error('Kein Staging-Root konfiguriert');
+        const rootId = cfg.staging_root_folder_id;
+        const bstId  = await TWMADriveService.findOrCreateFolder(rootId, sanitize(baustelleName));
+        const bilderId = await TWMADriveService.findOrCreateFolder(bstId, 'Bilder');
+        const phaseId  = await TWMADriveService.findOrCreateFolder(bilderId, phaseLabel(phase));
+        const raumId   = await TWMADriveService.findOrCreateFolder(phaseId, sanitize(raumName));
+        return raumId;
+    }
+
+    function phaseLabel(phase) {
+        if (phase === 'rohzustand')    return '1_Rohzustand';
+        if (phase === 'abdichtung')    return '2_Abdichtung';
+        if (phase === 'fertigstellung') return '3_Fertigstellung';
+        if (phase === 'allgemein')     return '0_Allgemein';
+        return phase || 'sonstige';
+    }
+
+    function sanitize(name) {
+        return (name || 'ohne_name').replace(/[\\\/:*?"<>|]/g, '_').trim();
+    }
+
+    // ===== Einzelnes Sync-Item abarbeiten =====
+    // Ermittelt den Item-Typ ('foto' | 'stunde'). Alte Foto-Items hatten kein typ-Feld.
+    function itemTyp(item) {
+        if (item.typ) return item.typ;
+        if (item.stunde_id) return 'stunde';
+        return 'foto';
+    }
+
+    async function processItem(item) {
+        const typ = itemTyp(item);
+        if (typ === 'stunde') return processStundenItem(item);
+        return processFotoItem(item);
+    }
+
+    // ---- Foto-Item verarbeiten (unveraendert zu E5) ----
+    async function processFotoItem(item) {
+        const foto = await TWMAStorage.getFoto(item.foto_id);
+        if (!foto) {
+            // Foto wurde geloescht -> Item raus
+            await TWMAStorage.removeSyncItem(item.id);
+            return 'deleted';
+        }
+        if (foto.sync_status === 'uploaded') {
+            await TWMAStorage.removeSyncItem(item.id);
+            return 'already_uploaded';
+        }
+
+        const baustelleName = await resolveBaustellenName(foto.baustelle_id);
+        const raumName      = foto.raum_id && foto.raum_id !== 'allgemein'
+                              ? await resolveRaumName(foto.raum_id)
+                              : 'Allgemein';
+
+        const folderId = await ensureDrivePath(baustelleName, foto.phase, raumName);
+
+        // 1. Foto hochladen
+        const uploadName = foto.upload_name || (foto.id + '.jpg');
+        const fotoRes = await TWMADriveService.uploadFile(
+            folderId, uploadName, foto.foto_blob, 'image/jpeg'
+        );
+
+        // 2. Notiz-JSON hochladen (gleicher Name + .json)
+        const metaName = uploadName.replace(/\.jpg$/i, '') + '.json';
+        const metaObj = {
+            id:              foto.id,
+            baustelle_id:    foto.baustelle_id,
+            raum_id:         foto.raum_id,
+            phase:           foto.phase,
+            wand_id:         foto.wand_id,
+            wand_label:      foto.wand_label || null,
+            notiz_original:  foto.notiz_original || null,
+            notiz_deutsch:   foto.notiz_deutsch || null,
+            aufgenommen_am:  foto.aufgenommen_am,
+            aufgenommen_von: foto.aufgenommen_von,
+            drive_file_id:   fotoRes.id,
+            schema_version:  1
+        };
+        const metaBlob = new Blob([JSON.stringify(metaObj, null, 2)], { type: 'application/json' });
+        await TWMADriveService.uploadFile(folderId, metaName, metaBlob, 'application/json');
+
+        // 3. Foto-Status aktualisieren
+        foto.sync_status = 'uploaded';
+        foto.foto_url_drive = 'https://drive.google.com/file/d/' + fotoRes.id + '/view';
+        foto.foto_blob = null;  // Blob freigeben zur Speicherschonung (Metadaten bleiben)
+        await TWMAStorage.saveFoto(foto);
+
+        // 4. Queue-Item entfernen
+        await TWMAStorage.removeSyncItem(item.id);
+
+        TWMACore.log('info', 'Sync', 'Foto hochgeladen: ' + uploadName);
+        return 'ok';
+    }
+
+    // ---- Stunden-Item verarbeiten (Etappe 6) ----
+    //   Pfad: Staging/Stunden/{geraet}_Stundenzettel_{datum}.pdf
+    async function processStundenItem(item) {
+        const stunde = await TWMAStorage.getStunde(item.stunde_id);
+        if (!stunde) {
+            await TWMAStorage.removeSyncItem(item.id);
+            return 'deleted';
+        }
+        if (stunde.sync_status === 'uploaded') {
+            await TWMAStorage.removeSyncItem(item.id);
+            return 'already_uploaded';
+        }
+        if (!stunde.pdf_blob) {
+            throw new Error('Kein PDF-Blob in Stunde ' + stunde.id);
+        }
+
+        const cfg = TWMAConfig.DRIVE_SERVICE_ACCOUNT;
+        if (!cfg || !cfg.staging_root_folder_id) throw new Error('Kein Staging-Root konfiguriert');
+
+        // Stunden-Ordner (pro Baustelle) + Unterordner "Stunden"
+        const rootId = cfg.staging_root_folder_id;
+        const baustelleName = await resolveBaustellenName(stunde.baustelle_id);
+        const bstId    = await TWMADriveService.findOrCreateFolder(rootId, sanitize(baustelleName));
+        const stundId  = await TWMADriveService.findOrCreateFolder(bstId, 'Stunden');
+
+        const uploadName = stunde.upload_name || (stunde.id + '.pdf');
+        const pdfRes = await TWMADriveService.uploadFile(
+            stundId, uploadName, stunde.pdf_blob, 'application/pdf'
+        );
+
+        stunde.sync_status = 'uploaded';
+        stunde.drive_file_id = pdfRes.id;
+        stunde.drive_url     = 'https://drive.google.com/file/d/' + pdfRes.id + '/view';
+        // PDF-Blob behalten, da fuer lokale Ansicht weiter gebraucht (kleiner als Foto)
+        await TWMAStorage.saveStunde(stunde);
+
+        await TWMAStorage.removeSyncItem(item.id);
+        TWMACore.log('info', 'Sync', 'Stundenzettel hochgeladen: ' + uploadName);
+        return 'ok';
+    }
+
+    async function handleItemError(item, error) {
+        const neueVersuche = (item.attempts || 0) + 1;
+        const typ = itemTyp(item);
+        if (neueVersuche >= MAX_ATTEMPTS) {
+            // Definitiv fehlgeschlagen -> Entitaet auf 'fehler' setzen
+            if (typ === 'foto') {
+                const foto = await TWMAStorage.getFoto(item.foto_id).catch(() => null);
+                if (foto) {
+                    foto.sync_status = 'fehler';
+                    foto.sync_error  = String(error && error.message || error).slice(0, 200);
+                    await TWMAStorage.saveFoto(foto).catch(() => {});
+                }
+                TWMACore.log('error', 'Sync', 'Foto endgueltig gescheitert id=' + item.foto_id, error);
+            } else if (typ === 'stunde') {
+                const st = await TWMAStorage.getStunde(item.stunde_id).catch(() => null);
+                if (st) {
+                    st.sync_status = 'fehler';
+                    st.sync_error  = String(error && error.message || error).slice(0, 200);
+                    await TWMAStorage.saveStunde(st).catch(() => {});
+                }
+                TWMACore.log('error', 'Sync', 'Stunde endgueltig gescheitert id=' + item.stunde_id, error);
+            }
+            await TWMAStorage.removeSyncItem(item.id).catch(() => {});
+        } else {
+            const backoff = BACKOFF_MS[Math.min(neueVersuche, BACKOFF_MS.length - 1)];
+            await TWMAStorage.updateSyncItem(item.id, {
+                attempts: neueVersuche,
+                last_error: String(error && error.message || error).slice(0, 200),
+                next_try_at: Date.now() + backoff
+            }).catch(() => {});
+            TWMACore.log('warn', 'Sync', 'Retry in ' + (backoff/1000) + 's typ=' + typ, error);
+        }
+    }
+
+    // ===== Haupt-Zyklus =====
+    async function runCycle() {
+        if (laeuftGerade) return;
+        if (!navigator.onLine) return;
+        if (TWMADriveService.getMode() !== 'production') return;  // Fallback: nichts tun
+
+        laeuftGerade = true;
+        try {
+            const items = await TWMAStorage.listPendingSyncItems(20);
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                try {
+                    await processItem(item);
+                    await updateProgress();
+                } catch (err) {
+                    await handleItemError(item, err);
+                    await updateProgress();
+                }
+            }
+        } catch (err) {
+            TWMACore.log('error', 'Sync', 'Zyklusfehler', err);
+        } finally {
+            laeuftGerade = false;
+        }
+    }
+
+    function start() {
+        if (pollTimer) return;
+        runCycle();
+        pollTimer = setInterval(runCycle, POLL_INTERVAL_MS);
+        window.addEventListener('online', runCycle);
+        updateProgress();
+        TWMACore.log('info', 'Sync', 'Auto-Sync gestartet (60s Intervall)');
+    }
+
+    function stop() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = null;
+        window.removeEventListener('online', runCycle);
+    }
+
+    function triggerNow() {
+        return runCycle();
+    }
+
+    // ===== Public API =====
+    global.TWMASync = {
+        start:         start,
+        stop:          stop,
+        triggerNow:    triggerNow,
+        updateProgress: updateProgress
+    };
+
+    if (window.TWMACore) TWMACore.log('info', 'Sync', 'TWMASync v0.5 geladen');
+})(window);
+    </script>
+
 </head>
 <body>
     <div id="root"></div>
