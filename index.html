@@ -813,136 +813,6 @@
         return hashArray.map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
     }
 
-    /* Erweiterte UI-Labels für Auth-Bildschirme */
-    Object.assign(UI_LABELS, {
-        auth_titel_code: {
-            de: 'Anmelde-Code',
-            cs: 'Prihlasovaci kod',
-            sk: 'Prihlasovaci kod',
-            pl: 'Kod logowania',
-            en: 'Login Code',
-            ro: 'Cod de conectare',
-            uk: 'Kod vkhodu'
-        },
-        auth_text_code: {
-            de: 'Gib diesen Code an Thomas weiter (Anruf oder WhatsApp). Sobald er dich freischaltet, geht es automatisch weiter.',
-            cs: 'Predej tento kod Thomasovi (telefon nebo WhatsApp). Jakmile te povoli, automaticky se pokracuje.',
-            sk: 'Odovzdaj tento kod Thomasovi (telefon alebo WhatsApp). Akonahle ta povoli, automaticky pokracuje.',
-            pl: 'Przekaz ten kod Thomasowi (telefon lub WhatsApp). Po zatwierdzeniu automatycznie przejdziesz dalej.',
-            en: 'Share this code with Thomas (call or WhatsApp). Once approved, the app continues automatically.',
-            ro: 'Trimite acest cod lui Thomas (telefon sau WhatsApp). Dupa aprobare, aplicatia continua automat.',
-            uk: 'Pereday tsey kod Thomasovi (telefon abo WhatsApp). Pislya zatverdzhennya prodovzhytsya avtomatychno.'
-        },
-        auth_warten: {
-            de: 'Warte auf Freigabe',
-            cs: 'Cekam na schvaleni',
-            sk: 'Cakam na schvalenie',
-            pl: 'Oczekiwanie na zatwierdzenie',
-            en: 'Waiting for approval',
-            ro: 'Astept aprobarea',
-            uk: 'Ochikuyu zatverdzhennya'
-        },
-        auth_titel_pin_setup: {
-            de: 'PIN festlegen',
-            cs: 'Nastav PIN',
-            sk: 'Nastav PIN',
-            pl: 'Ustaw PIN',
-            en: 'Set PIN',
-            ro: 'Seteaza PIN',
-            uk: 'Vstanovyty PIN'
-        },
-        auth_text_pin_setup: {
-            de: 'Waehle eine 4-6-stellige PIN. Mit dieser PIN meldest du dich kuenftig in der App an.',
-            cs: 'Vyber 4-6 mistny PIN. Timto PIN se budes do aplikace prihlasovat.',
-            sk: 'Vyber 4-6 ciselny PIN. Tymto PINom sa budes do aplikacie prihlasovat.',
-            pl: 'Wybierz 4-6 cyfrowy PIN. Tym PIN-em bedziesz logowal sie do aplikacji.',
-            en: 'Choose a 4-6 digit PIN. You will use this PIN to log in to the app.',
-            ro: 'Alege un PIN de 4-6 cifre. Cu acest PIN te vei conecta la aplicatie.',
-            uk: 'Vyberit PIN z 4-6 tsyfr. Z tsym PIN-om vy bude vkhodyty v dodatok.'
-        },
-        auth_pin_eingeben: {
-            de: 'PIN eingeben',
-            cs: 'Zadejte PIN',
-            sk: 'Zadajte PIN',
-            pl: 'Wprowadz PIN',
-            en: 'Enter PIN',
-            ro: 'Introdu PIN',
-            uk: 'Vvedit PIN'
-        },
-        auth_pin_bestaetigen: {
-            de: 'PIN wiederholen',
-            cs: 'Zopakovat PIN',
-            sk: 'Zopakovat PIN',
-            pl: 'Powtorz PIN',
-            en: 'Repeat PIN',
-            ro: 'Repeta PIN',
-            uk: 'Povtorit PIN'
-        },
-        auth_pin_falsch: {
-            de: 'Falsche PIN',
-            cs: 'Spatny PIN',
-            sk: 'Nespravny PIN',
-            pl: 'Bledny PIN',
-            en: 'Wrong PIN',
-            ro: 'PIN gresit',
-            uk: 'Nepravylnyy PIN'
-        },
-        auth_pin_keine_uebereinstimmung: {
-            de: 'PINs stimmen nicht ueberein',
-            cs: 'PINy se neshoduji',
-            sk: 'PINy sa nezhoduju',
-            pl: 'PINy sie nie zgadzaja',
-            en: 'PINs do not match',
-            ro: 'PIN-urile nu coincid',
-            uk: 'PIN-y ne spivpadayut'
-        },
-        auth_speichern: {
-            de: 'Speichern',
-            cs: 'Ulozit',
-            sk: 'Ulozit',
-            pl: 'Zapisz',
-            en: 'Save',
-            ro: 'Salveaza',
-            uk: 'Zberehty'
-        },
-        auth_anmelden: {
-            de: 'Anmelden',
-            cs: 'Prihlasit',
-            sk: 'Prihlasit',
-            pl: 'Zaloguj',
-            en: 'Login',
-            ro: 'Conectare',
-            uk: 'Uviyty'
-        },
-        auth_versuche_uebrig: {
-            de: 'Versuche uebrig: ',
-            cs: 'Zbyvajici pokusy: ',
-            sk: 'Zostavajuce pokusy: ',
-            pl: 'Pozostalo prob: ',
-            en: 'Attempts left: ',
-            ro: 'Incercari ramase: ',
-            uk: 'Sproby zalyshylysya: '
-        },
-        auth_gewipt: {
-            de: 'Geraet wurde zurueckgesetzt. Bitte erneut einrichten.',
-            cs: 'Zarizeni bylo resetovano. Prosim nastavte znovu.',
-            sk: 'Zariadenie bolo resetovane. Prosim nastavte znova.',
-            pl: 'Urzadzenie zostalo zresetowane. Skonfiguruj ponownie.',
-            en: 'Device has been reset. Please set up again.',
-            ro: 'Dispozitivul a fost resetat. Te rog configureaza din nou.',
-            uk: 'Prystriy bulo skydanno. Bud laska, nalashtuyte znovu.'
-        },
-        auth_fb_fehler: {
-            de: 'Keine Verbindung zum Server. Bitte Internet pruefen.',
-            cs: 'Zadne pripojeni k serveru. Zkontroluj internet.',
-            sk: 'Ziadne pripojenie k serveru. Skontroluj internet.',
-            pl: 'Brak polaczenia z serwerem. Sprawdz internet.',
-            en: 'No server connection. Please check internet.',
-            ro: 'Fara conexiune la server. Verifica internetul.',
-            uk: 'Nemaye zvyazku z serverom. Perevirit internet.'
-        }
-    });
-
     /* ═══════════════════════════════════════════════════════════
        AUTH-COMPONENTS (Etappe 3)
        ═══════════════════════════════════════════════════════════ */
@@ -1352,7 +1222,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe3';
+    const APP_VERSION = '1.0.0-etappe3-fix1';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -1396,7 +1266,38 @@
             en: 'Current stage: 1 of 8 — Home & Navigation',
             ro: 'Etapa curenta: 1 din 8 — Pagina principala si navigare',
             uk: 'Potochnyy etap: 1 z 8 — Holovna storinka ta navigatsiya'
-        }
+        },
+        // Auth-Labels (Etappe 3)
+        auth_titel_code: { de: 'Anmelde-Code', cs: 'Prihlasovaci kod', sk: 'Prihlasovaci kod', pl: 'Kod logowania', en: 'Login Code', ro: 'Cod de conectare', uk: 'Kod vkhodu' },
+        auth_text_code: {
+            de: 'Gib diesen Code an Thomas weiter (Anruf oder WhatsApp). Sobald er dich freischaltet, geht es automatisch weiter.',
+            cs: 'Predej tento kod Thomasovi (telefon nebo WhatsApp). Jakmile te povoli, automaticky se pokracuje.',
+            sk: 'Odovzdaj tento kod Thomasovi (telefon alebo WhatsApp). Akonahle ta povoli, automaticky pokracuje.',
+            pl: 'Przekaz ten kod Thomasowi (telefon lub WhatsApp). Po zatwierdzeniu automatycznie przejdziesz dalej.',
+            en: 'Share this code with Thomas (call or WhatsApp). Once approved, the app continues automatically.',
+            ro: 'Trimite acest cod lui Thomas (telefon sau WhatsApp). Dupa aprobare, aplicatia continua automat.',
+            uk: 'Pereday tsey kod Thomasovi (telefon abo WhatsApp). Pislya zatverdzhennya prodovzhytsya avtomatychno.'
+        },
+        auth_warten: { de: 'Warte auf Freigabe', cs: 'Cekam na schvaleni', sk: 'Cakam na schvalenie', pl: 'Oczekiwanie na zatwierdzenie', en: 'Waiting for approval', ro: 'Astept aprobarea', uk: 'Ochikuyu zatverdzhennya' },
+        auth_titel_pin_setup: { de: 'PIN festlegen', cs: 'Nastav PIN', sk: 'Nastav PIN', pl: 'Ustaw PIN', en: 'Set PIN', ro: 'Seteaza PIN', uk: 'Vstanovyty PIN' },
+        auth_text_pin_setup: {
+            de: 'Waehle eine 4-6-stellige PIN. Mit dieser PIN meldest du dich kuenftig in der App an.',
+            cs: 'Vyber 4-6 mistny PIN. Timto PIN se budes do aplikace prihlasovat.',
+            sk: 'Vyber 4-6 ciselny PIN. Tymto PINom sa budes do aplikacie prihlasovat.',
+            pl: 'Wybierz 4-6 cyfrowy PIN. Tym PIN-em bedziesz logowal sie do aplikacji.',
+            en: 'Choose a 4-6 digit PIN. You will use this PIN to log in to the app.',
+            ro: 'Alege un PIN de 4-6 cifre. Cu acest PIN te vei conecta la aplicatie.',
+            uk: 'Vyberit PIN z 4-6 tsyfr. Z tsym PIN-om vy bude vkhodyty v dodatok.'
+        },
+        auth_pin_eingeben: { de: 'PIN eingeben', cs: 'Zadejte PIN', sk: 'Zadajte PIN', pl: 'Wprowadz PIN', en: 'Enter PIN', ro: 'Introdu PIN', uk: 'Vvedit PIN' },
+        auth_pin_bestaetigen: { de: 'PIN wiederholen', cs: 'Zopakovat PIN', sk: 'Zopakovat PIN', pl: 'Powtorz PIN', en: 'Repeat PIN', ro: 'Repeta PIN', uk: 'Povtorit PIN' },
+        auth_pin_falsch: { de: 'Falsche PIN', cs: 'Spatny PIN', sk: 'Nespravny PIN', pl: 'Bledny PIN', en: 'Wrong PIN', ro: 'PIN gresit', uk: 'Nepravylnyy PIN' },
+        auth_pin_keine_uebereinstimmung: { de: 'PINs stimmen nicht ueberein', cs: 'PINy se neshoduji', sk: 'PINy sa nezhoduju', pl: 'PINy sie nie zgadzaja', en: 'PINs do not match', ro: 'PIN-urile nu coincid', uk: 'PIN-y ne spivpadayut' },
+        auth_speichern: { de: 'Speichern', cs: 'Ulozit', sk: 'Ulozit', pl: 'Zapisz', en: 'Save', ro: 'Salveaza', uk: 'Zberehty' },
+        auth_anmelden: { de: 'Anmelden', cs: 'Prihlasit', sk: 'Prihlasit', pl: 'Zaloguj', en: 'Login', ro: 'Conectare', uk: 'Uviyty' },
+        auth_versuche_uebrig: { de: 'Versuche uebrig: ', cs: 'Zbyvajici pokusy: ', sk: 'Zostavajuce pokusy: ', pl: 'Pozostalo prob: ', en: 'Attempts left: ', ro: 'Incercari ramase: ', uk: 'Sproby zalyshylysya: ' },
+        auth_gewipt: { de: 'Geraet wurde zurueckgesetzt. Bitte erneut einrichten.', cs: 'Zarizeni bylo resetovano. Prosim nastavte znovu.', sk: 'Zariadenie bolo resetovane. Prosim nastavte znova.', pl: 'Urzadzenie zostalo zresetowane. Skonfiguruj ponownie.', en: 'Device has been reset. Please set up again.', ro: 'Dispozitivul a fost resetat. Te rog configureaza din nou.', uk: 'Prystriy bulo skydanno. Bud laska, nalashtuyte znovu.' },
+        auth_fb_fehler: { de: 'Keine Verbindung zum Server. Bitte Internet pruefen.', cs: 'Zadne pripojeni k serveru. Zkontroluj internet.', sk: 'Ziadne pripojenie k serveru. Skontroluj internet.', pl: 'Brak polaczenia z serwerem. Sprawdz internet.', en: 'No server connection. Please check internet.', ro: 'Fara conexiune la server. Verifica internetul.', uk: 'Nemaye zvyazku z serverom. Perevirit internet.' }
     };
 
     function t(key, lang) {
