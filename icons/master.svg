@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- TW Baustellen-App Master-Icon -->
+  <!-- Design: Bauhelm (Baustellengelb) vor blauem Gradient-Hintergrund, TW-Monogramm im Helm -->
+
+  <defs>
+    <!-- Hintergrund-Gradient (kraeftiges Firmenblau) -->
+    <radialGradient id="bgGrad" cx="35%" cy="30%" r="85%">
+      <stop offset="0%"   stop-color="#42A5F5"/>
+      <stop offset="55%"  stop-color="#1E88E5"/>
+      <stop offset="100%" stop-color="#0D47A1"/>
+    </radialGradient>
+
+    <!-- Helm-Gradient (Baustellengelb mit Volumen) -->
+    <linearGradient id="helmGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#FFE082"/>
+      <stop offset="45%"  stop-color="#FFC107"/>
+      <stop offset="100%" stop-color="#F57F17"/>
+    </linearGradient>
+
+    <!-- Helmkrempe (etwas dunkler) -->
+    <linearGradient id="brimGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#F9A825"/>
+      <stop offset="100%" stop-color="#E65100"/>
+    </linearGradient>
+
+    <!-- Reflex oben (Glanzlicht) -->
+    <radialGradient id="shineGrad" cx="50%" cy="30%" r="60%">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- TW-Monogramm-Gradient -->
+    <linearGradient id="tw-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#BBDEFB"/>
+    </linearGradient>
+
+    <!-- Drop-Shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="6" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.35"/></feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- === Hintergrund: abgerundetes Quadrat === -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bgGrad)"/>
+
+  <!-- Dezente Glanz-Kugel oben links -->
+  <ellipse cx="150" cy="120" rx="200" ry="140" fill="#FFFFFF" opacity="0.10"/>
+
+  <!-- === Bauhelm-Gruppe === -->
+  <g filter="url(#shadow)">
+
+    <!-- Helmkrempe (breites Oval unten) -->
+    <ellipse cx="256" cy="340" rx="175" ry="28" fill="url(#brimGrad)"/>
+
+    <!-- Hauptkoerper: halber Ellipsoid -->
+    <path d="
+      M 95 340
+      Q 95 175  256 150
+      Q 417 175  417 340
+      Z
+    " fill="url(#helmGrad)"/>
+
+    <!-- Seitliche Belueftungs-Schlitze (dezent) -->
+    <rect x="140" y="250" width="25" height="5" rx="2" fill="#E65100" opacity="0.45"/>
+    <rect x="140" y="265" width="25" height="5" rx="2" fill="#E65100" opacity="0.45"/>
+
+    <rect x="347" y="250" width="25" height="5" rx="2" fill="#E65100" opacity="0.45"/>
+    <rect x="347" y="265" width="25" height="5" rx="2" fill="#E65100" opacity="0.45"/>
+
+    <!-- Zentraler Kamm (Verstaerkungsrippe) -->
+    <path d="
+      M 256 152
+      Q 262 200  262 320
+      L 250 320
+      Q 250 200  256 152
+      Z
+    " fill="#E65100" opacity="0.35"/>
+
+    <!-- Reflex / Glanzlicht oben -->
+    <ellipse cx="210" cy="195" rx="65" ry="30" fill="url(#shineGrad)"/>
+
+  </g>
+
+  <!-- === TW-Monogramm zentral im Helm === -->
+  <g transform="translate(256, 265)">
+    <!-- Schatten fuer den Text -->
+    <text
+      x="3" y="3"
+      text-anchor="middle"
+      dominant-baseline="central"
+      font-family="Oswald, 'Arial Black', sans-serif"
+      font-weight="700"
+      font-size="100"
+      fill="#000000"
+      opacity="0.25"
+      letter-spacing="2">TW</text>
+
+    <!-- Eigentlicher Text -->
+    <text
+      x="0" y="0"
+      text-anchor="middle"
+      dominant-baseline="central"
+      font-family="Oswald, 'Arial Black', sans-serif"
+      font-weight="700"
+      font-size="100"
+      fill="url(#tw-grad)"
+      letter-spacing="2">TW</text>
+  </g>
+
+  <!-- Kleiner Akzent: "BAUSTELLE" unter dem Helm (nur bei grossen Icons sichtbar) -->
+  <text
+    x="256" y="430"
+    text-anchor="middle"
+    font-family="Oswald, sans-serif"
+    font-weight="500"
+    font-size="34"
+    fill="#FFFFFF"
+    opacity="0.85"
+    letter-spacing="5">BAUSTELLE</text>
+
+</svg>
