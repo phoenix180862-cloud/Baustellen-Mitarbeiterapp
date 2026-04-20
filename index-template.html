@@ -1,87 +1,122 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1.0, user-scalable=no"/>
+    <meta name="theme-color" content="#1E88E5"/>
+    <meta name="description" content="TW Baustellen-App - Mobile Begleiter-App fuer Baustellenmitarbeiter"/>
+
     <title>TW Baustellen-App</title>
 
-    <!-- ===== PWA Meta ===== -->
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1E88E5">
-    <meta name="description" content="Baustellen-App von Thomas Willwacher Fliesenlegermeister e.K.">
-
-    <!-- iOS-spezifisch -->
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="TW Baustelle">
-
     <!-- Favicon -->
-    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="icon" href="icons/favicon.ico" type="image/x-icon"/>
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png"/>
 
-    <!-- ===== Fonts (identisch Master-App) ===== -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- PWA / Manifest -->
+    <link rel="manifest" href="manifest.json"/>
 
-    <!-- ===== Eigenes Design-System ===== -->
-    <link rel="stylesheet" href="css/tw-ma-design.css">
+    <!-- iOS: Standalone-Mode -->
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="TW Baustellen"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <link rel="apple-touch-icon" href="icons/icon-192.png"/>
+    <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png"/>
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
 
-    <!-- ===== React + Babel (CDN) ===== -->
+    <!-- iOS: Splash-Screens (Startup-Bilder) -->
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_15_pro_max-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_15_pro-1179x2556.png"     media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_14_plus-1284x2778.png"    media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_14-1170x2532.png"         media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_x_11_12_13-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-iphone_8_se-750x1334.png"        media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-ipad_pro_12_9-2048x2732.png"     media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"/>
+    <link rel="apple-touch-startup-image" href="icons/splash-ipad_pro_11-1668x2388.png"       media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)"/>
+
+    <!-- Google Fonts: Oswald (Headlines) + Source Sans 3 (Body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+
+    <!-- Design-System -->
+    <link rel="stylesheet" href="css/tw-ma-design.css"/>
+
+    <!-- React + ReactDOM (UMD, wird von Babel verwendet) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- Babel (Browser) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- ===== Firebase SDK (Compat-Mode wie Master-App) ===== -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <!-- Firebase (Compat-Bundle, analog Master-App) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 
-    <!-- ===== jsPDF (fuer Stundenzettel-PDF) ===== -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.0/jspdf.plugin.autotable.min.js"></script>
-
-    <!-- ===== Globaler Error-Handler ===== -->
-    <script>
-    window.onerror = function(msg, url, line, col, err) {
-        console.error('App Error:', msg, 'Line:', line, err);
-        var d = document.getElementById('crash-info');
-        if (!d) {
-            d = document.createElement('div');
-            d.id = 'crash-info';
-            d.style.cssText = 'position:fixed;top:20px;left:20px;right:20px;padding:20px;background:#1a2638;color:#ff4757;border:2px solid #c41e1e;border-radius:14px;z-index:99999;font-family:monospace;font-size:13px;max-height:80vh;overflow:auto;';
-            document.body.appendChild(d);
-        }
-        d.innerHTML = '<b>Fehler:</b> ' + msg + '<br><b>Zeile:</b> ' + line +
-            '<br><button onclick="this.parentNode.remove()" style="margin-top:10px;padding:8px 16px;background:#1E88E5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:bold">Schliessen</button>';
-    };
-    </script>
-
-    <!-- ===== Service-Worker-Registrierung ===== -->
-    <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(function(reg) { console.log('SW registriert:', reg.scope); })
-                .catch(function(err) { console.warn('SW Fehler:', err); });
-        });
-    }
-    </script>
-
-    <!-- ===== JS-Module (vor Babel-Block) ===== -->
+    <!-- JS-Module (externe Dateien, vor Babel-Block) -->
     <script src="js/tw-ma-core.js"></script>
     <script src="js/tw-ma-storage.js"></script>
     <script src="js/tw-ma-config.js"></script>
     <script src="js/tw-ma-firebase.js"></script>
-    <script src="js/tw-ma-auth.js"></script>
     <script src="js/tw-ma-drive-service.js"></script>
     <script src="js/tw-ma-translation.js"></script>
-    <script src="js/tw-ma-pdf.js"></script>
-    <script src="js/tw-ma-sync.js"></script>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root">
+        <!-- Loading-Placeholder bis React gerendert hat -->
+        <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:sans-serif;background:linear-gradient(180deg,#E3F2FD 0%,#F4F6F8 100%);color:#1E88E5;">
+            <div style="text-align:center;">
+                <div style="width:96px;height:96px;margin:0 auto 16px;border-radius:24px;background:linear-gradient(135deg,#1E88E5,#0D47A1);display:flex;align-items:center;justify-content:center;color:#fff;font-size:2.6rem;font-weight:700;letter-spacing:3px;box-shadow:0 8px 24px rgba(30,136,229,0.35);">TW</div>
+                <div style="font-size:0.9rem;color:#666;">Lade Baustellen-App ...</div>
+            </div>
+        </div>
+    </div>
 
-    <!-- ===== Hier injected build.bat den Babel-Block + Render-Aufruf ===== -->
+    <!-- Service Worker Registration mit Update-Benachrichtigung -->
+    <script>
+        (function(){
+            if (!('serviceWorker' in navigator)) return;
+
+            window.addEventListener('load', function(){
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(function(reg){
+                        console.log('[SW] registriert:', reg.scope);
+
+                        // Listener fuer Update-Benachrichtigung
+                        reg.addEventListener('updatefound', function(){
+                            var newWorker = reg.installing;
+                            if (!newWorker) return;
+                            newWorker.addEventListener('statechange', function(){
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // Neue Version ist da, alter SW laeuft noch
+                                    window.dispatchEvent(new CustomEvent('tw-ma-sw-update-ready'));
+                                }
+                            });
+                        });
+                    })
+                    .catch(function(err){ console.warn('[SW] Registrierung fehlgeschlagen:', err); });
+
+                // Messages vom SW entgegennehmen
+                navigator.serviceWorker.addEventListener('message', function(event){
+                    if (event.data && event.data.type === 'SW_UPDATED') {
+                        console.log('[SW] aktiviert Version', event.data.version);
+                    }
+                });
+            });
+
+            // Initial-Tab aus URL-Query lesen (fuer Manifest-Shortcuts)
+            window.__TW_MA_INITIAL_TAB__ = (function(){
+                try {
+                    var params = new URLSearchParams(window.location.search);
+                    var tab = params.get('tab');
+                    var valid = ['start','baustellen','nachrichten'];
+                    if (tab && valid.indexOf(tab) >= 0) return tab;
+                } catch (e) {}
+                return 'start';
+            })();
+        })();
+    </script>
+</body>
+</html>

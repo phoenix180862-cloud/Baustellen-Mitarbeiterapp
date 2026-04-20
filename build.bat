@@ -1,87 +1,61 @@
 @echo off
-REM ==========================================================
-REM  Build-Skript fuer TW Baustellen-App (Mitarbeiter-App)
-REM  Konkateniert alle JSX-Dateien in der korrekten Reihenfolge
-REM  in eine fertige index.html.
-REM
-REM  Voraussetzung: index-template.html mit Marker
-REM    <!-- BABEL_BLOCK_INSERT_HERE -->
-REM  an der Stelle, wo der Babel-Block landen soll.
-REM ==========================================================
+REM ============================================================
+REM  TW Baustellen-App - Build-Skript
+REM ============================================================
+REM  Konkateniert alle JSX-Dateien in korrekter Reihenfolge
+REM  in die index.html. Erzeugt aus index-template.html +
+REM  Babel-Block die fertige index.html.
+REM ============================================================
 
 echo.
-echo ===============================================
-echo  TW Baustellen-App  -  Build
-echo ===============================================
+echo ==========================================
+echo   TW Baustellen-App - Build
+echo ==========================================
 echo.
 
-REM 1. Sicherstellen, dass alle Quelldateien da sind
-set MISSING=0
-for %%F in (
-    jsx\tw-ma-shared-components.jsx
-    jsx\tw-ma-onboarding.jsx
-    jsx\tw-ma-startseite.jsx
-    jsx\tw-ma-baustellen.jsx
-    jsx\tw-ma-kalender.jsx
-    jsx\tw-ma-fotos.jsx
-    jsx\tw-ma-stunden.jsx
-    jsx\tw-ma-nachrichten.jsx
-    jsx\tw-ma-app.jsx
-    index-template.html
-) do (
-    if not exist "%%F" (
-        echo FEHLT: %%F
-        set MISSING=1
-    )
-)
-
-if "%MISSING%"=="1" (
-    echo.
-    echo Build abgebrochen - es fehlen Dateien.
+REM 1. Template kopieren (ueberschreibt vorherige index.html)
+echo [1/4] Kopiere Template ...
+copy /Y index-template.html index.html > nul
+if errorlevel 1 (
+    echo FEHLER: index-template.html nicht gefunden!
     pause
     exit /b 1
 )
 
-REM 2. Template kopieren
-echo Schritt 1/4: Template kopieren ...
-copy /Y index-template.html index.html >nul
+REM 2. Babel-Block oeffnen (wird VOR dem </body> in index.html eingefuegt)
+REM    Einfach ans Ende anhaengen - Browser ist robust genug.
+echo [2/4] Haenge Babel-Block an ...
+echo. >> index.html
+echo ^<script type="text/babel"^> >> index.html
 
-REM 3. Babel-Block oeffnen
-echo Schritt 2/4: Babel-Block oeffnen ...
-echo.>> index.html
-echo ^<script type="text/babel"^>>> index.html
-
-REM 4. JSX-Dateien in der korrekten Reihenfolge anhaengen
-echo Schritt 3/4: JSX-Module anhaengen ...
+REM 3. JSX-Dateien in korrekter Reihenfolge anhaengen
+echo [3/4] Haenge JSX-Module an ...
 type jsx\tw-ma-shared-components.jsx >> index.html
-echo.>> index.html
+echo. >> index.html
+type jsx\tw-ma-auth.jsx >> index.html
+echo. >> index.html
 type jsx\tw-ma-onboarding.jsx >> index.html
-echo.>> index.html
+echo. >> index.html
 type jsx\tw-ma-startseite.jsx >> index.html
-echo.>> index.html
+echo. >> index.html
 type jsx\tw-ma-baustellen.jsx >> index.html
-echo.>> index.html
-type jsx\tw-ma-kalender.jsx >> index.html
-echo.>> index.html
-type jsx\tw-ma-fotos.jsx >> index.html
-echo.>> index.html
-type jsx\tw-ma-stunden.jsx >> index.html
-echo.>> index.html
+echo. >> index.html
 type jsx\tw-ma-nachrichten.jsx >> index.html
-echo.>> index.html
+echo. >> index.html
 type jsx\tw-ma-app.jsx >> index.html
-echo.>> index.html
 
-REM 5. Babel-Block schliessen + Render-Aufruf
-echo Schritt 4/4: Render-Aufruf anhaengen ...
-echo ReactDOM.createRoot(document.getElementById('root')).render(^<MAApp /^>);>> index.html
-echo ^</script^>>> index.html
-echo ^</body^>>> index.html
-echo ^</html^>>> index.html
+REM 4. Babel-Block schliessen + Render-Aufruf
+echo [4/4] Schreibe Render-Aufruf ...
+echo. >> index.html
+echo ^</script^> >> index.html
+echo. >> index.html
+echo ^<script type="text/babel"^> >> index.html
+echo   ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(MAApp)); >> index.html
+echo ^</script^> >> index.html
 
 echo.
-echo ===============================================
-echo  Fertig: index.html ist gebaut.
-echo ===============================================
+echo ==========================================
+echo   Fertig: index.html ist bereit
+echo ==========================================
 echo.
 pause

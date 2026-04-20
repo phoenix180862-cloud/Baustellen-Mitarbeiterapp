@@ -1,110 +1,111 @@
-# TW Baustellen-App (Mitarbeiter-App)
+# TW Baustellen-App
 
-**Thomas Willwacher Fliesenlegermeister e.K.**
-Mobile Begleitung fuer Mitarbeiter auf der Baustelle.
-
----
-
-## Architektur
-
-Eigenstaendige PWA (Progressive Web App) als Schwester der **TW Business Suite** (Buero-App).
-Datenaustausch ausschliesslich ueber:
-- **Firebase Realtime Database** (`einkaufsliste-98199`) — Nachrichten, Geraete-Whitelist, Kalender
-- **Google Drive Staging-Bereich** (Service-Account) — Fotos, Stundenzettel-PDFs, Zeichnungen
-
-Mitarbeiter-Handys haben **keinen Zugriff** auf die Original-Kundenordner.
+**Mobile Begleiter-App fuer Baustellenmitarbeiter**
+Teil der TW Business Suite · Thomas Willwacher Fliesenlegermeister e.K.
 
 ---
 
-## Module (V1)
+## Was ist das?
 
-| # | Modul | Funktion | Stand |
-|---|---|---|---|
-| 1 | Start | Uhr, Sprach-Wahl, Status | E1 |
-| 2 | Baustellen | Liste freigegebener Baustellen, 4-Ordner-Detail | E4 |
-| 3 | Kalender | Eigener Schichtplan (read-only) | **E8** |
-| 4 | Fotos | Wand-/Phasen-Dokumentation mit Sprach-Notiz | E5 |
-| 5 | Stunden | Stundenzettel-PDF mit Material-Popup | E6 |
-| 6 | Nachrichten | Live-uebersetzter Chat mit Buero | **E7 (Phasen A+B+C)** |
+Die Baustellen-App ist eine eigenstaendige PWA (Progressive Web App), die auf
+Mitarbeiter-Handys laeuft. Sie synchronisiert ueber Firebase und einen
+Drive-Staging-Bereich mit der Buero-App (TW Business Suite).
+
+**Architektur in einem Satz:** Mitarbeiter sehen nur das, was das Buero
+freigibt — keine Google-Logins, keine Original-Drive-Zugriffe, alles ueber
+Service-Account und PIN-geschuetzte Geraete.
 
 ---
 
-## Build
+## Dateistruktur
 
-```cmd
-build.bat
+```
+Baustellen-Mitarbeiterapp/
+├── README.md                         (diese Datei)
+├── build.bat                         Build-Skript (Windows)
+├── index-template.html               Template mit Script-Tags
+├── index.html                        Build-Output
+├── manifest.json                     PWA-Manifest
+├── service-worker.js                 Offline-Cache
+├── icons/                            10 PNG-Icons (72-512px)
+├── js/
+│   ├── tw-ma-core.js                 Logger, Device-ID, Datum-Helpers
+│   ├── tw-ma-storage.js              IndexedDB-Wrapper
+│   ├── tw-ma-config.js               i18n + App-Config
+│   ├── tw-ma-firebase.js             Realtime-DB-Anbindung (Stub)
+│   ├── tw-ma-drive-service.js        Drive-Staging-Anbindung (Stub)
+│   └── tw-ma-translation.js          Gemini-Wrapper (Stub)
+├── jsx/
+│   ├── tw-ma-shared-components.jsx   Logo, Animation, Uhr, Sprach-Pill
+│   ├── tw-ma-startseite.jsx          Startseite
+│   ├── tw-ma-baustellen.jsx          Modul (Platzhalter)
+│   ├── tw-ma-kalender.jsx            Modul (Platzhalter)
+│   ├── tw-ma-fotos.jsx               Modul (Platzhalter)
+│   ├── tw-ma-stunden.jsx             Modul (Platzhalter)
+│   ├── tw-ma-nachrichten.jsx         Modul (Platzhalter)
+│   └── tw-ma-app.jsx                 Root + Routing + Navi
+├── css/
+│   └── tw-ma-design.css              Design-System (Farben, Radius, etc.)
+└── docs/
+    ├── MASTER-BAUSTELLEN-APP.md      Master-Dokument / Skill
+    └── konzeptbaustellenappmodul.pdf Sicherheits-/Architektur-Basis
 ```
 
-Konkateniert alle JSX-Dateien aus `jsx/` in der korrekten Reihenfolge in eine fertige `index.html` (Babel laeuft im Browser).
+---
 
-JS-Module aus `js/` werden vom Template per `<script src="...">` geladen.
+## Build ausfuehren
+
+**Windows:** Doppelklick auf `build.bat`
+
+**macOS/Linux:** Das Skript ist .bat — Alternative:
+```bash
+cp index-template.html index.html
+echo '<script type="text/babel">' >> index.html
+cat jsx/tw-ma-shared-components.jsx jsx/tw-ma-startseite.jsx \
+    jsx/tw-ma-baustellen.jsx jsx/tw-ma-kalender.jsx \
+    jsx/tw-ma-fotos.jsx jsx/tw-ma-stunden.jsx \
+    jsx/tw-ma-nachrichten.jsx jsx/tw-ma-app.jsx >> index.html
+echo '</script>' >> index.html
+echo '<script type="text/babel">ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(MAApp));</script>' >> index.html
+```
 
 ---
 
 ## Deployment
 
-GitHub Pages auf Branch `main`.
-Live-URL: https://phoenix180862-cloud.github.io/Baustellen-Mitarbeiterapp/
+GitHub Pages auf Repo `phoenix180862-cloud/Baustellen-Mitarbeiterapp`:
+
+1. `build.bat` ausfuehren
+2. `git add -A && git commit -m "Etappe X" && git push`
+3. Nach 1-2 Minuten ist die neue Version live
+4. Service Worker erkennt neue Version und triggert Update beim naechsten Start
 
 ---
 
-## Spezifikation
+## Etappenplan (siehe `docs/MASTER-BAUSTELLEN-APP.md` Kapitel 15)
 
-Vollstaendige Spec: `docs/MASTER-BAUSTELLEN-APP.md`
-
-Bei Konflikt zwischen Code und Master-Dokument gewinnt das Master-Dokument.
+| Etappe | Titel | Status |
+|--------|-------|--------|
+| 0 | Repo-Audit & Projekt-Setup | ✓ |
+| 1 | Startseite + Navigationsleiste | ✓ |
+| 2 | Icon-Set finalisieren + Service Worker + PWA-Test | teils ✓ |
+| 3 | Geraete-Onboarding + PIN-Login | offen |
+| 4 | Modul Baustellen (Liste + 4 Kacheln + Browser) | offen |
+| 5 | Modul Fotos (kompletter Workflow) | offen |
+| 6 | Modul Stunden (PDF + Material-Popup) | offen |
+| 7 | Modul Nachrichten + Anweisungen + Uebersetzung | offen |
+| 8 | Modul Kalender + Fein-Schliff + Tests | offen |
 
 ---
 
-## Stand
+## Conventions
 
-**Etappe 6 abgeschlossen** — Modul "Stunden" (Stundenzettel-PDF) voll funktional.
+- **Komponenten-Praefix:** Alle JSX-Komponenten beginnen mit `MA` (z.B. `MAStartseite`)
+- **Input-Felder:** Nie `type="number"` — immer `type="text"` mit `inputMode`
+- **Umlaute in Kommentaren:** vermeiden (ae/oe/ue/ss) — Babel-Encoding-Problem
+- **Fragment-Syntax:** `<React.Fragment>` statt `<>...</>`
+- **Sprache:** UI-Texte mehrsprachig (7 Sprachen), Code-Kommentare auf Deutsch/ASCII
 
-### Stunden-Modul (E6)
-- **3-Tab-Navigation:** Heute (Formular), Diese Woche (Historie), Letzte 30 Tage (Historie)
-- **Formular-Felder:** Datum (heute), Baustelle (Dropdown, letzte gemerkt), Anfang/Ende als Time-Picker mit 15-Min-Schritten, Pause-Dropdown (0/15/30/45/60 Min), Netto-Stunden live-berechnet
-- **Taetigkeits-Pickliste:** 12 Standard-Taetigkeiten (Fliesen Wand/Boden, Verfugen, Silikon, Abdichtung, Estrich, Demontage, Material, Vorbereitung, Endreinigung, Kundengespraech, Fahrzeit) + Freitext "Sonstiges"
-- **Material-Popup:** 8 Kategorie-Tabs, Suchfeld, 30 vorinstallierte Fliesenleger-Materialien; pro Eintrag Mengen-Input + Einheit + Speech-Mic fuer schnelle Zahlen-Eingabe
-- **Bemerkung** mit Web-Speech-API in MA-Sprache + automatischem Deutsch-Feld (editierbar)
-- **Wetter:** 4 Tap-Kategorien (Sonnig/Bewoelkt/Regen/Schnee) ODER Auto-Button via Open-Meteo-API (Geolocation + WMO-Weathercode-Mapping, kein API-Key noetig)
-- **WIP-AutoSave:** nach jeder Aenderung (debounced 800ms), beim Wiedereintritt Toast "Entwurf wiederhergestellt"
-- **PDF-Generator** (`tw-ma-pdf.js`): jsPDF + autoTable, TW-Briefkopf mit Logo-Kreis, Firmendaten, Titel "Stundenzettel", Kopfdaten-Tabelle (Baustelle, MA, Arbeitszeit, Wetter), Taetigkeiten-Liste, Material-Tabelle, Bemerkung (Deutsch + Original kursiv wenn anders), Footer
-- **Drive-Upload-Pfad:** `Staging/{Baustelle}/Stunden/{geraet}_Stundenzettel_{yyyymmdd}.pdf`
-- **Sync-Orchestrator** um Item-Typ erweitert (`typ: 'foto' | 'stunde'`), Backoff-Logik weiter aktiv
-- **Stunden-Historie:** Einzel-Tap oeffnet PDF-Vorschau (iframe), Status-Icon (gruen=uploaded / orange=pending / rot=fehler)
+---
 
-### Modul "Fotos" (E5)
-- **Stufe 1:** Baustellen-Auswahl (Live-Liste aus Firebase)
-- **Stufe 2:** Raum-Auswahl mit Dialog "Neuer Raum" (Bezeichnung + Spracheingabe, Raum-Nr, Geschoss KG/EG/OG/DG, Wandzahl 3-8)
-- **Stufe 3:** Phase-Wahl (Rohzustand/Abdichtung/Fertigstellung) mit Live-Fortschritts-Badge
-- **Stufe 4:** Wand-Raster (2x2 / 3x2 / 4x2) plus Boden plus optional Decke; Foto-Thumbnails inline; Status-Punkt
-- **Stufe 5:** Kamera oeffnet automatisch, Vorschau, Wiederholen
-- **Stufe 6:** Sprach-Notiz via Web Speech API in MA-Sprache, Auto-Uebersetzung Deutsch, beide Versionen editierbar
-- Allgemeine Fotos: bis zu 20 pro Baustelle, eigener Tab
-
-### Offline-First-Stack
-- **IndexedDB** mit Stores `fotos`, `raeume`, `stunden`, `sync_queue` (DB-Version 3)
-- **Foto-Kompression** auf max. 1920px lange Seite, JPEG q=0.85; Thumbnails 320px
-- **Sync-Queue** mit Exponential Backoff (30s -> 2m -> 8m -> 30m -> 2h, max 5 Versuche)
-- **Auto-Sync** alle 60 Sekunden + Trigger bei online-Event
-- **Item-Typen:** `foto` (Bild + JSON) und `stunde` (PDF)
-
-**Davor:** E4 (Baustellen + Drive-Service), E3 (Onboarding/PIN), E2 (Icons/PWA), E1 (Startseite/Nav), E0 (Skelett).
-
-Naechste Etappe: **E7** — Modul "Nachrichten" (WhatsApp-Style mit Live-Uebersetzung).
-
-## Firebase-Fallback-Format fuer Testen
-
-Lege testweise in Firebase folgende Struktur an:
-```
-/aktive_baustellen
-  bst_001: { name: "Meyer Bad", adresse: "Muehlweg 3, Nisterau", bauherr: "Fam. Meyer", status: "aktiv", zuletzt_geaendert: 1729012345000 }
-
-/baustellen_dateien/bst_001
-  zeichnungen:
-    z1: { name: "Grundriss.pdf", mime: "application/pdf", size: 450000, ts: 1729012345000, url: "https://..." }
-  bilder:
-    b1: { name: "Vorort.jpg", mime: "image/jpeg", size: 120000, ts: 1729012345000, url: "https://..." }
-  nachrichten:
-    n1: { name: "ANWEISUNG_Sicherheit.pdf", mime: "application/pdf", size: 80000, ts: ..., url: "https://..." }
-```
+**Bei Fragen:** siehe `docs/MASTER-BAUSTELLEN-APP.md`

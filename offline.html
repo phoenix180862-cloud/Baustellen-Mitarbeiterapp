@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="theme-color" content="#1E88E5"/>
+    <title>Offline - TW Baustellen-App</title>
+    <link rel="stylesheet" href="css/tw-ma-design.css"/>
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 24px;
+            background: linear-gradient(180deg, #E3F2FD 0%, #F4F6F8 100%);
+            margin: 0;
+        }
+        .offline-card {
+            max-width: 420px;
+            text-align: center;
+            background: #fff;
+            padding: 40px 28px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(30,136,229,0.2);
+        }
+        .offline-icon {
+            width: 120px; height: 120px; margin: 0 auto 20px;
+        }
+        h1 {
+            font-family: 'Oswald', sans-serif;
+            color: #1E88E5;
+            margin: 0 0 12px;
+            font-size: 1.8rem;
+            letter-spacing: 1px;
+        }
+        p {
+            color: #555;
+            font-size: 1rem;
+            line-height: 1.5;
+            margin: 12px 0;
+        }
+        button {
+            margin-top: 20px;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #1E88E5, #1565C0);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Oswald', sans-serif;
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(30,136,229,0.35);
+        }
+        button:active { transform: scale(0.97); }
+
+        .status-dot {
+            display: inline-block;
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #E53935;
+            margin-right: 6px;
+            animation: pulse 1.6s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-card">
+        <img src="icons/icon-192.png" alt="TW" class="offline-icon"/>
+        <h1>Offline</h1>
+        <p>
+            <span class="status-dot"></span>
+            Aktuell keine Internet-Verbindung.
+        </p>
+        <p>
+            Sobald wieder Empfang da ist, laedt die App automatisch die neueste Version.
+            Deine bereits aufgenommenen Fotos und Stundenzettel bleiben sicher gespeichert
+            und werden beim naechsten Online-Gehen synchronisiert.
+        </p>
+        <button onclick="location.reload()">Erneut versuchen</button>
+
+        <script>
+            // Auto-Reload sobald wieder Online
+            window.addEventListener('online', function(){
+                location.reload();
+            });
+        </script>
+    </div>
+</body>
+</html>

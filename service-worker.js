@@ -1,181 +1,235 @@
-// ============================================================
-// TW Baustellen-App  -  Service Worker (Etappe 2)
-// ============================================================
-// - App-Shell-Cache fuer Offline-Faehigkeit
-// - Cache-Versionierung (Update triggert Neuladen alter Caches)
-// - Cache-First fuer statische Assets
-// - Network-First fuer HTML (damit Code-Updates schnell kommen)
-// - Firebase/Drive/Gemini NIE gecached (Live-Daten)
-// - Push-Handler-Skelett fuer Etappe 7
-// ============================================================
+/* ============================================================
+   TW Baustellen-App - Service Worker (Etappe 2)
+   ============================================================
+   Strategie:
+   - App-Shell (HTML/CSS/JS/Icons):     cache-first, mit Netz-Revalidate
+   - Google Fonts:                      stale-while-revalidate
+   - Firebase/Googleapis:               network-only (Echtzeit-Sync)
+   - Navigations-Requests:              network-first mit offline.html Fallback
+   - Bilder:                            cache-first mit LRU-Limit (50 Entries)
 
-const CACHE_VERSION = 'v0.8.2-keys-builtin';
-const CACHE_NAME    = 'tw-ma-' + CACHE_VERSION;
+   Update-Flow:
+   1. SW install: neues Bundle im Cache
+   2. SW activate: alte Caches loeschen + Clients informieren
+   3. Clients koennen per Message 'skipWaiting' ein Update forcen
+   ============================================================
+*/
 
-// App-Shell: statische Assets, die offline verfuegbar sein muessen.
-// Single-File-Build: alle JS-Module sind INLINE in index.html -> kein js/-Eintrag noetig.
-// Wir cachen OPTIMISTISCH - falls eine Datei fehlt, bricht install nicht ab.
+const CACHE_VERSION   = 'tw-ma-v1.0.1';
+const SHELL_CACHE     = CACHE_VERSION + '-shell';
+const RUNTIME_CACHE   = CACHE_VERSION + '-runtime';
+const IMG_CACHE       = CACHE_VERSION + '-img';
+const IMG_CACHE_MAX   = 50;
+
 const APP_SHELL = [
     './',
     './index.html',
+    './offline.html',
     './manifest.json',
     './css/tw-ma-design.css',
+    './js/tw-ma-core.js',
+    './js/tw-ma-storage.js',
+    './js/tw-ma-config.js',
+    './js/tw-ma-firebase.js',
+    './js/tw-ma-drive-service.js',
+    './js/tw-ma-translation.js',
     './icons/icon-72.png',
     './icons/icon-96.png',
     './icons/icon-128.png',
     './icons/icon-144.png',
     './icons/icon-152.png',
-    './icons/icon-180.png',
     './icons/icon-192.png',
     './icons/icon-384.png',
     './icons/icon-512.png',
     './icons/icon-maskable-192.png',
     './icons/icon-maskable-512.png',
-    './icons/apple-touch-icon.png'
+    './icons/favicon.ico'
 ];
 
-// ===== Install ===============================================
-self.addEventListener('install', function(event) {
+// ============================================================
+// Install
+// ============================================================
+
+self.addEventListener('install', function(event){
+    console.log('[SW ' + CACHE_VERSION + '] install');
     event.waitUntil(
-        caches.open(CACHE_NAME).then(function(cache) {
-            // Jede Datei einzeln cachen, damit ein Fehler nicht alles kippt
-            return Promise.all(APP_SHELL.map(function(url) {
-                return cache.add(url).catch(function(err) {
-                    console.warn('SW: konnte nicht cachen:', url, err.message);
+        caches.open(SHELL_CACHE).then(function(cache){
+            return Promise.all(APP_SHELL.map(function(url){
+                return cache.add(url).catch(function(err){
+                    console.warn('[SW] Konnte nicht cachen:', url, err.message);
                 });
             }));
+        }).then(function(){
+            return self.skipWaiting();
         })
     );
-    // Sofort aktiv werden
-    self.skipWaiting();
 });
 
-// ===== Activate: alte Caches loeschen ========================
-self.addEventListener('activate', function(event) {
+// ============================================================
+// Activate: alte Caches loeschen + Clients informieren
+// ============================================================
+
+self.addEventListener('activate', function(event){
+    console.log('[SW ' + CACHE_VERSION + '] activate');
     event.waitUntil(
-        caches.keys().then(function(names) {
-            return Promise.all(
-                names.filter(function(n) { return n.startsWith('tw-ma-') && n !== CACHE_NAME; })
-                     .map(function(n) {
-                         console.log('SW: alten Cache loeschen:', n);
-                         return caches.delete(n);
-                     })
-            );
-        }).then(function() {
-            return self.clients.claim();
-        })
-    );
-});
-
-// ===== Fetch-Strategie =======================================
-self.addEventListener('fetch', function(event) {
-    const req = event.request;
-    const url = new URL(req.url);
-
-    // Nur GET-Requests behandeln
-    if (req.method !== 'GET') return;
-
-    // Firebase, Drive, Gemini: NIE cachen (Live-Daten)
-    const liveDomains = ['firebaseio.com', 'googleapis.com', 'gstatic.com',
-                         'google.com', 'googleusercontent.com', 'cloudfunctions.net'];
-    if (liveDomains.some(function(d) { return url.hostname.indexOf(d) !== -1; })) {
-        return; // Browser uebernimmt direkt
-    }
-
-    // CDN-Assets (React, Babel, jsPDF): Cache-First
-    const cdnDomains = ['unpkg.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
-    const isCdn = cdnDomains.some(function(d) { return url.hostname.indexOf(d) !== -1; });
-
-    // HTML-Seiten: Network-First (damit Updates schnell wirken)
-    const isHtml = req.headers.get('accept') && req.headers.get('accept').indexOf('text/html') !== -1;
-
-    if (isHtml && !isCdn) {
-        // Network-First
-        event.respondWith(
-            fetch(req).then(function(res) {
-                const clone = res.clone();
-                caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
-                return res;
-            }).catch(function() {
-                return caches.match(req).then(function(cached) {
-                    return cached || caches.match('./index.html');
-                });
-            })
-        );
-        return;
-    }
-
-    // Alles andere (Assets, CDN): Cache-First
-    event.respondWith(
-        caches.match(req).then(function(cached) {
-            if (cached) return cached;
-            return fetch(req).then(function(res) {
-                // Nur erfolgreiche Responses cachen
-                if (res && res.status === 200 && res.type !== 'opaque') {
-                    const clone = res.clone();
-                    caches.open(CACHE_NAME).then(function(cache) { cache.put(req, clone); });
+        caches.keys().then(function(keys){
+            return Promise.all(keys.map(function(k){
+                if (k.indexOf(CACHE_VERSION) !== 0) {
+                    console.log('[SW] Loesche alten Cache:', k);
+                    return caches.delete(k);
                 }
-                return res;
-            }).catch(function() {
-                // Offline + nicht im Cache
-                return new Response('Offline', {
-                    status: 503,
-                    headers: { 'Content-Type': 'text/plain' }
+            }));
+        }).then(function(){
+            return self.clients.claim();
+        }).then(function(){
+            return self.clients.matchAll({ type: 'window' }).then(function(clients){
+                clients.forEach(function(client){
+                    client.postMessage({ type: 'SW_UPDATED', version: CACHE_VERSION });
                 });
             });
         })
     );
 });
 
-// ===== Nachrichten zwischen App und SW =======================
-self.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+// ============================================================
+// Fetch
+// ============================================================
+
+self.addEventListener('fetch', function(event){
+    const req = event.request;
+    if (req.method !== 'GET') return;
+
+    const url = new URL(req.url);
+
+    // 1) Firebase / Googleapis: network-only
+    if (url.hostname.indexOf('firebaseio.com') >= 0 ||
+        url.hostname.indexOf('firebasedatabase.app') >= 0 ||
+        url.hostname.indexOf('googleapis.com') >= 0 ||
+        url.hostname.indexOf('firebaseapp.com') >= 0) {
+        return;
     }
-    if (event.data && event.data.type === 'GET_VERSION') {
-        event.ports[0].postMessage({ version: CACHE_VERSION });
+
+    // 2) Navigations-Requests: network-first, sonst offline.html
+    if (req.mode === 'navigate') {
+        event.respondWith(handleNavigation(req));
+        return;
     }
-    if (event.data && event.data.type === 'CLEAR_CACHE') {
-        event.waitUntil(
-            caches.keys().then(function(names) {
-                return Promise.all(names.map(function(n) { return caches.delete(n); }));
-            })
+
+    // 3) Bilder: cache-first mit LRU
+    if (req.destination === 'image') {
+        event.respondWith(cacheFirstWithLimit(req, IMG_CACHE, IMG_CACHE_MAX));
+        return;
+    }
+
+    // 4) App-Shell: cache-first
+    if (isInAppShell(url.pathname)) {
+        event.respondWith(cacheFirst(req, SHELL_CACHE));
+        return;
+    }
+
+    // 5) Google Fonts + CDN: stale-while-revalidate
+    event.respondWith(staleWhileRevalidate(req, RUNTIME_CACHE));
+});
+
+// ============================================================
+// Strategien
+// ============================================================
+
+async function handleNavigation(request) {
+    try {
+        const network = await fetch(request);
+        if (network && network.ok) {
+            const cache = await caches.open(SHELL_CACHE);
+            cache.put('./index.html', network.clone()).catch(function(){});
+            return network;
+        }
+        throw new Error('network not ok');
+    } catch (err) {
+        const cache = await caches.open(SHELL_CACHE);
+        const cached = await cache.match('./index.html');
+        if (cached) return cached;
+        const offline = await cache.match('./offline.html');
+        if (offline) return offline;
+        return new Response(
+            '<h1>Offline</h1><p>Keine gecachte Version verfuegbar.</p>',
+            { status: 503, headers: { 'Content-Type': 'text/html' } }
         );
     }
-});
+}
 
-// ===== Push-Handler (Skelett - Vollausbau Etappe 7) ==========
-self.addEventListener('push', function(event) {
-    let payload = { title: 'TW Baustelle', body: 'Neue Nachricht' };
-    if (event.data) {
-        try { payload = event.data.json(); }
-        catch (e) { payload.body = event.data.text(); }
+async function cacheFirst(request, cacheName) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    try {
+        const response = await fetch(request);
+        if (response && response.ok) cache.put(request, response.clone()).catch(function(){});
+        return response;
+    } catch (err) {
+        return new Response('Offline und nicht im Cache', { status: 503 });
     }
+}
 
-    event.waitUntil(
-        self.registration.showNotification(payload.title || 'TW Baustelle', {
-            body: payload.body || '',
-            icon: './icons/icon-192.png',
-            badge: './icons/icon-96.png',
-            tag: payload.tag || 'tw-default',
-            vibrate: [150, 80, 150],
-            data: payload.data || {}
-        })
-    );
-});
+async function cacheFirstWithLimit(request, cacheName, maxEntries) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+            cache.put(request, response.clone()).then(function(){
+                trimCache(cacheName, maxEntries);
+            });
+        }
+        return response;
+    } catch (err) {
+        return new Response('', { status: 503 });
+    }
+}
 
-// ===== Notification-Click =====================================
-self.addEventListener('notificationclick', function(event) {
-    event.notification.close();
-    const targetUrl = (event.notification.data && event.notification.data.url) || './';
-    event.waitUntil(
-        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // Offenes Fenster fokussieren wenn vorhanden
-            for (const client of windowClients) {
-                if ('focus' in client) return client.focus();
-            }
-            // Sonst neues Fenster oeffnen
-            if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
-        })
-    );
+async function staleWhileRevalidate(request, cacheName) {
+    const cache = await caches.open(cacheName);
+    const cached = await cache.match(request);
+    const networkPromise = fetch(request).then(function(response){
+        if (response && response.ok) cache.put(request, response.clone()).catch(function(){});
+        return response;
+    }).catch(function(){ return null; });
+    return cached || networkPromise || new Response('Offline', { status: 503 });
+}
+
+async function trimCache(cacheName, maxEntries) {
+    const cache = await caches.open(cacheName);
+    const keys = await cache.keys();
+    if (keys.length > maxEntries) {
+        for (let i = 0; i < keys.length - maxEntries; i++) {
+            await cache.delete(keys[i]);
+        }
+    }
+}
+
+// ============================================================
+// Helper
+// ============================================================
+
+function isInAppShell(pathname) {
+    return APP_SHELL.some(function(shellUrl){
+        if (shellUrl === './') return pathname === '/' || pathname.endsWith('/');
+        const clean = shellUrl.replace(/^\.\//, '');
+        return pathname.endsWith(clean);
+    });
+}
+
+// ============================================================
+// Message-Handler
+// ============================================================
+
+self.addEventListener('message', function(event){
+    if (event.data && event.data.action === 'skipWaiting') {
+        self.skipWaiting();
+    }
+    if (event.data && event.data.action === 'getVersion') {
+        if (event.ports && event.ports[0]) {
+            event.ports[0].postMessage({ version: CACHE_VERSION });
+        }
+    }
 });
