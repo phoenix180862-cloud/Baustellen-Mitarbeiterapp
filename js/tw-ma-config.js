@@ -48,7 +48,7 @@
     // HINWEIS: Diese Werte sind NICHT geheim (sie werden ohnehin zum Browser
     // ausgeliefert). Die Sicherheit kommt aus den Firebase Security Rules.
     const FIREBASE_CONFIG = {
-        apiKey: 'AIzaSyBUH0r2dM2H-sUnhNODoVSerM224vPsC_E',
+        apiKey: 'AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E',
         authDomain: 'einkaufsliste-98199.firebaseapp.com',
         databaseURL: 'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app',
         projectId: 'einkaufsliste-98199',
