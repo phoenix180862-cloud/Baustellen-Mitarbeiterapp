@@ -1449,31 +1449,140 @@
         padding: 10px 12px;
         display: flex;
         gap: 8px;
-        align-items: center;
+        align-items: flex-end;
+    }
+    .ma-nach-input-row.dringend-aktiv {
+        background: rgba(230,53,53,0.08);
+        border-top-color: var(--accent-red);
+    }
+
+    .ma-nach-input-wrap {
+        flex: 1;
+        position: relative;
+        display: flex;
+        align-items: flex-end;
     }
     .ma-nach-input {
         flex: 1;
-        padding: 10px 14px;
+        padding: 10px 48px 10px 14px;
         background: var(--bg-primary);
         border: 1px solid var(--border-color);
         border-radius: 20px;
         color: var(--text-primary);
         font-family: 'Source Sans 3', sans-serif;
         font-size: 0.95rem;
+        line-height: 1.35;
+        resize: none;
+        max-height: 104px; /* ca. 4 Zeilen */
+        min-height: 40px;
+        box-sizing: border-box;
+    }
+    .ma-nach-input:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+    }
+    .ma-nach-input[disabled] {
         opacity: 0.5;
         cursor: not-allowed;
     }
+    .ma-nach-input-mikro {
+        position: absolute;
+        right: 6px;
+        bottom: 6px;
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        color: var(--text-light);
+        cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px;
+    }
+    .ma-nach-input-mikro.aktiv {
+        background: var(--accent-red);
+        color: #fff;
+        border-color: var(--accent-red);
+        animation: ma-pulse 1.2s ease-in-out infinite;
+    }
+
+    .ma-nach-dringend-toggle {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: var(--bg-primary);
+        color: var(--text-muted);
+        border: 1px solid var(--border-color);
+        font-size: 18px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        touch-action: manipulation;
+    }
+    .ma-nach-dringend-toggle.aktiv {
+        background: var(--accent-red);
+        color: #fff;
+        border-color: var(--accent-red);
+        box-shadow: 0 0 0 2px rgba(230,53,53,0.25);
+    }
+    .ma-nach-dringend-toggle:active { transform: scale(0.93); }
+
     .ma-nach-senden-btn {
         width: 40px; height: 40px;
         border-radius: 50%;
-        background: var(--text-muted);
+        background: linear-gradient(135deg, var(--accent-blue), #2d7cc7);
         color: #fff;
         border: none;
         font-size: 18px;
         display: flex; align-items: center; justify-content: center;
-        opacity: 0.5;
-        cursor: not-allowed;
+        cursor: pointer;
+        flex-shrink: 0;
+        touch-action: manipulation;
+        box-shadow: 0 3px 10px rgba(77,166,255,0.3);
     }
+    .ma-nach-senden-btn.dringend {
+        background: linear-gradient(135deg, var(--accent-red), #c41e1e);
+        box-shadow: 0 3px 10px rgba(230,53,53,0.4);
+    }
+    .ma-nach-senden-btn:active { transform: scale(0.93); }
+    .ma-nach-senden-btn[disabled] {
+        opacity: 0.35;
+        cursor: not-allowed;
+        box-shadow: none;
+    }
+
+    .ma-nach-dringend-banner {
+        padding: 6px 14px;
+        background: var(--accent-red);
+        color: #fff;
+        text-align: center;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.72rem;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    .ma-nach-fehler-banner {
+        padding: 10px 14px;
+        background: rgba(230,53,53,0.12);
+        border-top: 1px solid var(--accent-red);
+        color: var(--accent-red-light);
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .ma-nach-fehler-banner .text { flex: 1; }
+    .ma-nach-fehler-banner button {
+        padding: 6px 12px;
+        background: var(--accent-red);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.72rem;
+        cursor: pointer;
+        letter-spacing: 0.5px;
+    }
+
     .ma-nach-senden-hinweis {
         text-align: center;
         padding: 6px 12px;
@@ -1915,7 +2024,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b4-nachrichten-ui';
+    const APP_VERSION = '1.0.0-etappe5-b5-chat-senden';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -2161,7 +2270,11 @@
         nach_original_aus:    { de: 'Original ausblenden', cs: 'Skryt original', sk: 'Skryt original', pl: 'Ukryj oryginal', en: 'Hide original', ro: 'Ascunde originalul', uk: 'Skhovaty oryhinal' },
         nach_senden_kommt:    { de: 'Senden folgt in Baustein 5.', cs: 'Odeslani prijde v bloku 5.', sk: 'Odoslanie pride v bloku 5.', pl: 'Wysylanie w module 5.', en: 'Sending coming in module 5.', ro: 'Trimitere urmeaza in blocul 5.', uk: 'Vidpravka u bloci 5.' },
         nach_senden_placeholder: { de: 'Nachricht schreiben ...', cs: 'Napsat zpravu ...', sk: 'Napisat spravu ...', pl: 'Napisz wiadomosc ...', en: 'Type a message ...', ro: 'Scrie un mesaj ...', uk: 'Napysaty povidomlennya ...' },
-        nach_ungelesen:       { de: 'ungelesen',  cs: 'neprectene', sk: 'neprecitane', pl: 'nieprzeczytane', en: 'unread', ro: 'necitit', uk: 'neprochytani' }
+        nach_ungelesen:       { de: 'ungelesen',  cs: 'neprectene', sk: 'neprecitane', pl: 'nieprzeczytane', en: 'unread', ro: 'necitit', uk: 'neprochytani' },
+        nach_senden_fehler:   { de: 'Senden fehlgeschlagen. Nochmal versuchen?', cs: 'Odeslani se nezdarilo. Zkusit znovu?', sk: 'Odoslanie zlyhalo. Skusit znova?', pl: 'Wyslanie nie powiodlo sie. Sprobowac ponownie?', en: 'Sending failed. Try again?', ro: 'Trimitere esuata. Incerci din nou?', uk: 'Vidpravka ne vdalasya. Sprobuvaty shche raz?' },
+        nach_dringend_hint:   { de: 'Dringend senden (loest Push beim Buero aus)', cs: 'Odeslat jako urgentni (vyvola push v kancelari)', sk: 'Odoslat ako naliehave (spusti push v kancelarii)', pl: 'Wyslij jako pilne (wywola push w biurze)', en: 'Send as urgent (triggers push in office)', ro: 'Trimite ca urgent (declanseaza push in birou)', uk: 'Vidpravyty terminovo (zapustyt push u ofisi)' },
+        nach_dringend_aktiv:  { de: 'Naechste Nachricht wird als DRINGEND gesendet', cs: 'Dalsi zprava se odesle jako URGENTNI', sk: 'Dalsia sprava sa odosle ako NALIEHAVA', pl: 'Nastepna wiadomosc bedzie PILNA', en: 'Next message will be sent as URGENT', ro: 'Urmatorul mesaj va fi trimis ca URGENT', uk: 'Nastupne povidomlennya bude TERMINOVE' },
+        nach_sende:           { de: 'Sende ...',  cs: 'Odesilam ...', sk: 'Odosielam ...', pl: 'Wysylam ...', en: 'Sending ...', ro: 'Trimit ...', uk: 'Vidpravlyayu ...' }
     };
 
     function t(key, lang) {
@@ -5173,15 +5286,20 @@ function nachTagKey(ts) {
 function MANachrichtenModul() {
     const lang = useSprache();
     const [maId, setMaId]               = useState(null);
+    const [absenderName, setAbsenderName] = useState('');
     const [nachrichten, setNachrichten] = useState(null); // null = laedt, [] = leer
     const threadRef = useRef(null);
 
-    // Mitarbeiter-ID einmalig aufloesen
+    // Mitarbeiter-ID + Stammdaten einmalig aufloesen
     useEffect(function(){
         let abgebrochen = false;
-        if (window.TWMaFirebase && TWMaFirebase.getMeineMaId) {
-            TWMaFirebase.getMeineMaId().then(function(id){
-                if (!abgebrochen) setMaId(id || null);
+        if (window.TWMaFirebase && TWMaFirebase.ladeMeinenMitarbeiter) {
+            TWMaFirebase.ladeMeinenMitarbeiter().then(function(ma){
+                if (abgebrochen) return;
+                if (ma) {
+                    setMaId(ma.ma_id || null);
+                    setAbsenderName(ma.name || 'Mitarbeiter');
+                }
             }).catch(function(){ if (!abgebrochen) setMaId(null); });
         }
         return function(){ abgebrochen = true; };
@@ -5199,7 +5317,6 @@ function MANachrichtenModul() {
     // Auto-Scroll zum unteren Ende bei neuen Nachrichten
     useEffect(function(){
         if (threadRef.current && Array.isArray(nachrichten) && nachrichten.length > 0) {
-            // nach naechstem Paint scrollen, damit DOM aktuell ist
             requestAnimationFrame(function(){
                 if (threadRef.current) {
                     threadRef.current.scrollTop = threadRef.current.scrollHeight;
@@ -5215,7 +5332,6 @@ function MANachrichtenModul() {
             return n && n.von === 'buero' && n.gelesen !== true;
         });
         if (ungeleseneBuero.length === 0) return;
-        // Nach 1,2s als gelesen markieren (User hat Zeit zum Anschauen)
         const timer = setTimeout(function(){
             ungeleseneBuero.forEach(function(n){
                 if (TWMaFirebase.markiereNachrichtGelesen) {
@@ -5249,7 +5365,10 @@ function MANachrichtenModul() {
                 )}
             </div>
 
-            <MANachrichtenInputStub lang={lang}/>
+            <MANachrichtenInput
+                maId={maId}
+                absenderName={absenderName}
+                lang={lang}/>
         </div>
     );
 }
@@ -5384,22 +5503,192 @@ function MAChatBubble({ nachricht, lang }) {
     );
 }
 
-function MANachrichtenInputStub({ lang }) {
-    // Disabled Input-Zeile + Hinweis. Senden wird in Baustein 5 aktiviert.
+function MANachrichtenInput({ maId, absenderName, lang }) {
+    const [text, setText]           = useState('');
+    const [dringend, setDringend]   = useState(false);
+    const [sendet, setSendet]       = useState(false);
+    const [fehler, setFehler]       = useState(null); // { text, retryData } oder null
+    const [horcht, setHorcht]       = useState(false);
+    const textareaRef   = useRef(null);
+    const recognitionRef = useRef(null);
+
+    // Auto-Resize der Textarea (max 4 Zeilen)
+    useEffect(function(){
+        if (!textareaRef.current) return;
+        const el = textareaRef.current;
+        el.style.height = 'auto';
+        const neueHoehe = Math.min(el.scrollHeight, 104);
+        el.style.height = neueHoehe + 'px';
+    }, [text]);
+
+    // Cleanup: Spracherkennung bei Unmount
+    useEffect(function(){
+        return function(){
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch(e){}
+                recognitionRef.current = null;
+            }
+        };
+    }, []);
+
+    function istSendbereit() {
+        return maId && text.trim().length > 0 && !sendet;
+    }
+
+    function sendeNachricht() {
+        if (!istSendbereit()) return;
+        const inhalt = text.trim();
+        const dringendFlag = dringend;
+        setSendet(true);
+        setFehler(null);
+
+        TWMaFirebase.sendeChatNachricht(maId, absenderName || 'Mitarbeiter', inhalt, lang || 'de', dringendFlag)
+            .then(function(){
+                // Erfolg: Input leeren, Dringend-Flag zuruecksetzen
+                setText('');
+                setDringend(false);
+                setSendet(false);
+                // Focus zurueck auf Textarea fuer schnelles Weitertippen
+                if (textareaRef.current) {
+                    requestAnimationFrame(function(){
+                        if (textareaRef.current) textareaRef.current.focus();
+                    });
+                }
+            })
+            .catch(function(err){
+                console.error('[Chat] Senden fehlgeschlagen:', err);
+                setSendet(false);
+                setFehler({
+                    text:   t('nach_senden_fehler', lang),
+                    inhalt: inhalt,
+                    dringend: dringendFlag
+                });
+                // Text bleibt im Feld, User kann Retry
+            });
+    }
+
+    function retrySenden() {
+        if (!fehler) return;
+        // Text wieder in den Zustand setzen und sofort senden
+        setText(fehler.inhalt);
+        setDringend(fehler.dringend);
+        setFehler(null);
+        // Kurz warten bis State gesetzt, dann senden
+        setTimeout(function(){ sendeNachricht(); }, 50);
+    }
+
+    function onTextChange(e) {
+        setText(e.target.value);
+    }
+
+    function onKeyDown(e) {
+        // Desktop-Shortcut: Strg+Enter sendet. Normales Enter macht Zeilenumbruch auf Mobile.
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            sendeNachricht();
+        }
+    }
+
+    function toggleDringend() {
+        setDringend(!dringend);
+    }
+
+    function starteSpracheingabe() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            setFehler({ text: t('kal_modal_mikro_aus', lang), inhalt: text, dringend: dringend });
+            return;
+        }
+        if (horcht && recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch(e){}
+            return;
+        }
+        const rec = new SR();
+        rec.lang = langZuSpeechApiLang(lang);
+        rec.interimResults = false;
+        rec.maxAlternatives = 1;
+        rec.continuous = false;
+
+        rec.onstart = function(){ setHorcht(true); };
+        rec.onresult = function(ev){
+            const erkannt = (ev.results && ev.results[0] && ev.results[0][0]) ? ev.results[0][0].transcript : '';
+            if (erkannt) {
+                setText(function(prev){
+                    return prev ? (prev.replace(/\s+$/,'') + ' ' + erkannt) : erkannt;
+                });
+            }
+        };
+        rec.onerror = function(){
+            setFehler({ text: t('kal_modal_mikro_aus', lang), inhalt: text, dringend: dringend });
+        };
+        rec.onend = function(){
+            setHorcht(false);
+            recognitionRef.current = null;
+        };
+
+        try {
+            rec.start();
+            recognitionRef.current = rec;
+        } catch(e) {
+            setFehler({ text: t('kal_modal_mikro_aus', lang), inhalt: text, dringend: dringend });
+        }
+    }
+
+    const inputDisabled = !maId || sendet;
+    const rowCls = 'ma-nach-input-row' + (dringend ? ' dringend-aktiv' : '');
+
     return (
         <React.Fragment>
-            <div className="ma-nach-input-row">
-                <input
-                    type="text"
-                    className="ma-nach-input"
-                    placeholder={t('nach_senden_placeholder', lang)}
-                    disabled/>
-                <button className="ma-nach-senden-btn" disabled aria-label="send">
+            {fehler && (
+                <div className="ma-nach-fehler-banner">
+                    <span className="text">{'\u26A0 '}{fehler.text}</span>
+                    <button type="button" onClick={retrySenden}>{'\u21BB'}</button>
+                    <button type="button" onClick={function(){ setFehler(null); }}>{'\u00D7'}</button>
+                </div>
+            )}
+            {dringend && (
+                <div className="ma-nach-dringend-banner">
+                    {'\u{1F514} '}{t('nach_dringend_aktiv', lang)}
+                </div>
+            )}
+            <div className={rowCls}>
+                <button
+                    type="button"
+                    className={'ma-nach-dringend-toggle' + (dringend ? ' aktiv' : '')}
+                    onClick={toggleDringend}
+                    disabled={inputDisabled}
+                    title={t('nach_dringend_hint', lang)}
+                    aria-label="urgent toggle">
+                    {'\u{1F514}'}
+                </button>
+                <div className="ma-nach-input-wrap">
+                    <textarea
+                        ref={textareaRef}
+                        className="ma-nach-input"
+                        rows={1}
+                        placeholder={sendet ? t('nach_sende', lang) : t('nach_senden_placeholder', lang)}
+                        value={text}
+                        onChange={onTextChange}
+                        onKeyDown={onKeyDown}
+                        disabled={inputDisabled}/>
+                    <button
+                        type="button"
+                        className={'ma-nach-input-mikro' + (horcht ? ' aktiv' : '')}
+                        onClick={starteSpracheingabe}
+                        disabled={inputDisabled}
+                        title={t('kal_modal_diktat', lang)}
+                        aria-label="voice input">
+                        {'\u{1F3A4}'}
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    className={'ma-nach-senden-btn' + (dringend ? ' dringend' : '')}
+                    onClick={sendeNachricht}
+                    disabled={!istSendbereit()}
+                    aria-label="send">
                     {'\u27A4'}
                 </button>
-            </div>
-            <div className="ma-nach-senden-hinweis">
-                {t('nach_senden_kommt', lang)}
             </div>
         </React.Fragment>
     );
