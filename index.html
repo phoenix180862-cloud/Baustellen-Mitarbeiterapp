@@ -1220,6 +1220,270 @@
     }
     .ma-kal-modal-btn.abbrechen:active { background: var(--bg-primary); }
 
+    /* ═══════════════════════════════════════════════════════════
+       ETAPPE 5 · B4 · NACHRICHTEN-MODUL (Chat)
+       ═══════════════════════════════════════════════════════════ */
+    .ma-nach-wrapper {
+        display: flex;
+        flex-direction: column;
+        min-height: calc(100vh - var(--header-h, 64px));
+        background: var(--bg-primary);
+    }
+
+    .ma-nach-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border-color);
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .ma-nach-header-icon {
+        width: 36px; height: 36px;
+        border-radius: 50%;
+        background: var(--accent-red);
+        color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+    .ma-nach-header-text {
+        flex: 1;
+        min-width: 0;
+    }
+    .ma-nach-header-titel {
+        font-family: 'Oswald', sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        color: var(--text-white);
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+    .ma-nach-header-sub {
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+    .ma-nach-badge {
+        background: var(--accent-red);
+        color: #fff;
+        border-radius: 12px;
+        padding: 3px 9px;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        flex-shrink: 0;
+    }
+
+    .ma-nach-thread {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 10px 20px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .ma-nach-trenner {
+        align-self: center;
+        margin: 10px 0 6px 0;
+        padding: 4px 12px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        letter-spacing: 0.5px;
+    }
+
+    .ma-nach-bubble-row {
+        display: flex;
+        width: 100%;
+        padding: 0 2px;
+    }
+    .ma-nach-bubble-row.buero { justify-content: flex-start; }
+    .ma-nach-bubble-row.ma    { justify-content: flex-end; }
+
+    .ma-nach-bubble {
+        max-width: 82%;
+        padding: 8px 12px 6px 12px;
+        border-radius: 14px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        position: relative;
+    }
+    .ma-nach-bubble.buero {
+        background: var(--bg-card);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+        border-bottom-left-radius: 4px;
+    }
+    .ma-nach-bubble.ma {
+        background: linear-gradient(135deg, var(--accent-blue), #2d7cc7);
+        color: #fff;
+        border-bottom-right-radius: 4px;
+    }
+    .ma-nach-bubble.dringend {
+        border: 2px solid var(--accent-red);
+        box-shadow: 0 0 0 2px rgba(230,53,53,0.15);
+    }
+
+    .ma-nach-dringend-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--accent-red);
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-bottom: 6px;
+    }
+
+    .ma-nach-absender {
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: var(--accent-red-light);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+    }
+    .ma-nach-bubble.ma .ma-nach-absender { color: rgba(255,255,255,0.85); }
+
+    .ma-nach-text {
+        font-size: 0.95rem;
+        line-height: 1.4;
+        white-space: pre-wrap;
+    }
+
+    .ma-nach-text.uebersetze {
+        font-style: italic;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+    }
+
+    .ma-nach-original-toggle {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 0;
+        background: transparent;
+        border: none;
+        color: var(--accent-blue);
+        font-size: 0.75rem;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .ma-nach-bubble.ma .ma-nach-original-toggle { color: rgba(255,255,255,0.85); }
+
+    .ma-nach-original-text {
+        margin-top: 6px;
+        padding-top: 6px;
+        border-top: 1px dashed rgba(255,255,255,0.18);
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        font-style: italic;
+    }
+    .ma-nach-bubble.ma .ma-nach-original-text {
+        border-top-color: rgba(255,255,255,0.25);
+        color: rgba(255,255,255,0.7);
+    }
+
+    .ma-nach-meta {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 4px;
+        margin-top: 4px;
+        font-size: 0.68rem;
+        color: var(--text-muted);
+    }
+    .ma-nach-bubble.ma .ma-nach-meta { color: rgba(255,255,255,0.75); }
+
+    .ma-nach-check {
+        font-size: 0.75rem;
+        line-height: 1;
+    }
+    .ma-nach-check.gelesen { color: var(--success); }
+
+    .ma-nach-empty {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 48px 24px;
+        text-align: center;
+    }
+    .ma-nach-empty-icon {
+        font-size: 3.5rem;
+        opacity: 0.5;
+        margin-bottom: 14px;
+    }
+    .ma-nach-empty-titel {
+        font-family: 'Oswald', sans-serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text-white);
+        margin-bottom: 8px;
+    }
+    .ma-nach-empty-text {
+        font-size: 0.88rem;
+        color: var(--text-light);
+        line-height: 1.5;
+        max-width: 320px;
+    }
+
+    .ma-nach-input-row {
+        position: sticky;
+        bottom: 0;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border-color);
+        padding: 10px 12px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+    .ma-nach-input {
+        flex: 1;
+        padding: 10px 14px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        color: var(--text-primary);
+        font-family: 'Source Sans 3', sans-serif;
+        font-size: 0.95rem;
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .ma-nach-senden-btn {
+        width: 40px; height: 40px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        color: #fff;
+        border: none;
+        font-size: 18px;
+        display: flex; align-items: center; justify-content: center;
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .ma-nach-senden-hinweis {
+        text-align: center;
+        padding: 6px 12px;
+        background: var(--bg-card);
+        border-top: 1px solid var(--border-color);
+        color: var(--text-muted);
+        font-size: 0.7rem;
+        font-style: italic;
+    }
+
     </style>
 </head>
 <body>
@@ -1651,7 +1915,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b3-tages-modal';
+    const APP_VERSION = '1.0.0-etappe5-b4-nachrichten-ui';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -1880,7 +2144,24 @@
         kal_wt_do: { de: 'Do', cs: 'Ct', sk: 'St', pl: 'Cz', en: 'Th', ro: 'Jo', uk: 'Ct' },
         kal_wt_fr: { de: 'Fr', cs: 'Pa', sk: 'Pi', pl: 'Pt', en: 'Fr', ro: 'Vi', uk: 'Pt' },
         kal_wt_sa: { de: 'Sa', cs: 'So', sk: 'So', pl: 'So', en: 'Sa', ro: 'Sa', uk: 'Sb' },
-        kal_wt_so: { de: 'So', cs: 'Ne', sk: 'Ne', pl: 'Nd', en: 'Su', ro: 'Du', uk: 'Nd' }
+        kal_wt_so: { de: 'So', cs: 'Ne', sk: 'Ne', pl: 'Nd', en: 'Su', ro: 'Du', uk: 'Nd' },
+
+        // ═══════════════════════ ETAPPE 5 · B4 — Nachrichten ═══════════════════════
+        nach_titel:           { de: 'Nachrichten',       cs: 'Zpravy',        sk: 'Spravy',       pl: 'Wiadomosci',    en: 'Messages',     ro: 'Mesaje',      uk: 'Povidomlennya' },
+        nach_untertitel:      { de: 'Chat mit dem Buero', cs: 'Chat s kancelari', sk: 'Chat s kancelariou', pl: 'Chat z biurem', en: 'Chat with office', ro: 'Chat cu biroul', uk: 'Chat z ofisom' },
+        nach_lade:            { de: 'Lade Chat ...',     cs: 'Nacitam chat ...', sk: 'Nacitavam chat ...', pl: 'Laduje chat ...', en: 'Loading chat ...', ro: 'Se incarca chat ...', uk: 'Zavantazhennya chatu ...' },
+        nach_empty_titel:     { de: 'Noch keine Nachrichten', cs: 'Zatim zadne zpravy', sk: 'Zatial ziadne spravy', pl: 'Jeszcze brak wiadomosci', en: 'No messages yet', ro: 'Inca nicio stire', uk: 'Poky nemaye povidomlen' },
+        nach_empty_text:      { de: 'Sobald das Buero dir schreibt, erscheint die Nachricht hier.', cs: 'Jakmile ti kancelar napise, zprava se objevi zde.', sk: 'Akonahle ti kancelaria napise, sprava sa objavi tu.', pl: 'Gdy biuro do ciebie napisze, wiadomosc pojawi sie tutaj.', en: 'As soon as the office writes to you, the message will appear here.', ro: 'De indata ce biroul iti scrie, mesajul va aparea aici.', uk: 'Yak tilky ofis napyshe tobi, povidomlennya zyavytsya tut.' },
+        nach_heute:           { de: 'Heute',    cs: 'Dnes',   sk: 'Dnes',   pl: 'Dzis',    en: 'Today',     ro: 'Astazi',  uk: 'Sogodni' },
+        nach_gestern:         { de: 'Gestern',  cs: 'Vcera',  sk: 'Vcera',  pl: 'Wczoraj', en: 'Yesterday', ro: 'Ieri',    uk: 'Vchora' },
+        nach_dringend:        { de: 'DRINGEND', cs: 'URGENTNI', sk: 'NALIEHAVE', pl: 'PILNE', en: 'URGENT',  ro: 'URGENT', uk: 'TERMINOVO' },
+        nach_buero:           { de: 'Buero',    cs: 'Kancelar', sk: 'Kancelaria', pl: 'Biuro', en: 'Office', ro: 'Birou', uk: 'Ofis' },
+        nach_uebersetze:      { de: 'Uebersetze ...', cs: 'Prekladam ...', sk: 'Prekladam ...', pl: 'Tlumacze ...', en: 'Translating ...', ro: 'Se traduce ...', uk: 'Perekladayu ...' },
+        nach_original_an:     { de: 'Original anzeigen', cs: 'Zobrazit original', sk: 'Zobrazit original', pl: 'Pokaz oryginal', en: 'Show original', ro: 'Arata originalul', uk: 'Pokazaty oryhinal' },
+        nach_original_aus:    { de: 'Original ausblenden', cs: 'Skryt original', sk: 'Skryt original', pl: 'Ukryj oryginal', en: 'Hide original', ro: 'Ascunde originalul', uk: 'Skhovaty oryhinal' },
+        nach_senden_kommt:    { de: 'Senden folgt in Baustein 5.', cs: 'Odeslani prijde v bloku 5.', sk: 'Odoslanie pride v bloku 5.', pl: 'Wysylanie w module 5.', en: 'Sending coming in module 5.', ro: 'Trimitere urmeaza in blocul 5.', uk: 'Vidpravka u bloci 5.' },
+        nach_senden_placeholder: { de: 'Nachricht schreiben ...', cs: 'Napsat zpravu ...', sk: 'Napisat spravu ...', pl: 'Napisz wiadomosc ...', en: 'Type a message ...', ro: 'Scrie un mesaj ...', uk: 'Napysaty povidomlennya ...' },
+        nach_ungelesen:       { de: 'ungelesen',  cs: 'neprectene', sk: 'neprecitane', pl: 'nieprzeczytane', en: 'unread', ro: 'necitit', uk: 'neprochytani' }
     };
 
     function t(key, lang) {
@@ -4841,6 +5122,290 @@ function MAKalenderTagesModal({ iso, eintrag, maId, baustellen, lang, onClose })
 }
 
 // ============================================================
+// ETAPPE 5 · B4 · NACHRICHTEN-MODUL (Chat-Thread, Empfangen-Only)
+// ============================================================
+// Live-Listener auf /chats/{ma-id}/. Eingehende vom Buero links grau,
+// ausgehende vom MA rechts blau. Uebersetzungs-Anzeige mit Toggle zum
+// Original. Dringend-Markierung (roter Rahmen + Badge). Senden kommt
+// in Baustein 5; die Eingabezeile unten ist bewusst disabled.
+
+function nachIstHeute(ts) {
+    const d = new Date(ts);
+    const h = new Date();
+    return d.getFullYear() === h.getFullYear()
+        && d.getMonth()    === h.getMonth()
+        && d.getDate()     === h.getDate();
+}
+
+function nachIstGestern(ts) {
+    const d = new Date(ts);
+    const g = new Date();
+    g.setDate(g.getDate() - 1);
+    return d.getFullYear() === g.getFullYear()
+        && d.getMonth()    === g.getMonth()
+        && d.getDate()     === g.getDate();
+}
+
+function nachFormatUhrzeit(ts) {
+    const d = new Date(ts);
+    return kalPadZero(d.getHours()) + ':' + kalPadZero(d.getMinutes());
+}
+
+function nachDatumTrennerText(ts, lang) {
+    if (nachIstHeute(ts))   return t('nach_heute',   lang);
+    if (nachIstGestern(ts)) return t('nach_gestern', lang);
+    const d = new Date(ts);
+    // Wenn innerhalb der letzten 7 Tage: Wochentag
+    const diff = (Date.now() - ts) / (1000 * 60 * 60 * 24);
+    if (diff < 7) {
+        const wtMap = ['kal_wtl_so','kal_wtl_mo','kal_wtl_di','kal_wtl_mi','kal_wtl_do','kal_wtl_fr','kal_wtl_sa'];
+        return t(wtMap[d.getDay()], lang);
+    }
+    // Sonst: Tag. Monat Jahr
+    return d.getDate() + '. ' + t('kal_monat_' + kalPadZero(d.getMonth()+1), lang) + ' ' + d.getFullYear();
+}
+
+function nachTagKey(ts) {
+    const d = new Date(ts);
+    return d.getFullYear() + '-' + kalPadZero(d.getMonth()+1) + '-' + kalPadZero(d.getDate());
+}
+
+function MANachrichtenModul() {
+    const lang = useSprache();
+    const [maId, setMaId]               = useState(null);
+    const [nachrichten, setNachrichten] = useState(null); // null = laedt, [] = leer
+    const threadRef = useRef(null);
+
+    // Mitarbeiter-ID einmalig aufloesen
+    useEffect(function(){
+        let abgebrochen = false;
+        if (window.TWMaFirebase && TWMaFirebase.getMeineMaId) {
+            TWMaFirebase.getMeineMaId().then(function(id){
+                if (!abgebrochen) setMaId(id || null);
+            }).catch(function(){ if (!abgebrochen) setMaId(null); });
+        }
+        return function(){ abgebrochen = true; };
+    }, []);
+
+    // Chat-Thread live abonnieren
+    useEffect(function(){
+        if (!maId || !window.TWMaFirebase || !TWMaFirebase.subscribeChat) return;
+        const unsub = TWMaFirebase.subscribeChat(maId, function(arr){
+            setNachrichten(Array.isArray(arr) ? arr : []);
+        });
+        return function(){ try { unsub(); } catch(e){} };
+    }, [maId]);
+
+    // Auto-Scroll zum unteren Ende bei neuen Nachrichten
+    useEffect(function(){
+        if (threadRef.current && Array.isArray(nachrichten) && nachrichten.length > 0) {
+            // nach naechstem Paint scrollen, damit DOM aktuell ist
+            requestAnimationFrame(function(){
+                if (threadRef.current) {
+                    threadRef.current.scrollTop = threadRef.current.scrollHeight;
+                }
+            });
+        }
+    }, [nachrichten ? nachrichten.length : 0]);
+
+    // Ungelesene Buero-Nachrichten nach kurzer Verzoegerung als gelesen markieren
+    useEffect(function(){
+        if (!maId || !Array.isArray(nachrichten) || nachrichten.length === 0) return;
+        const ungeleseneBuero = nachrichten.filter(function(n){
+            return n && n.von === 'buero' && n.gelesen !== true;
+        });
+        if (ungeleseneBuero.length === 0) return;
+        // Nach 1,2s als gelesen markieren (User hat Zeit zum Anschauen)
+        const timer = setTimeout(function(){
+            ungeleseneBuero.forEach(function(n){
+                if (TWMaFirebase.markiereNachrichtGelesen) {
+                    TWMaFirebase.markiereNachrichtGelesen(maId, n.id).catch(function(){});
+                }
+            });
+        }, 1200);
+        return function(){ clearTimeout(timer); };
+    }, [maId, nachrichten]);
+
+    const ungelesenCount = Array.isArray(nachrichten)
+        ? nachrichten.filter(function(n){ return n && n.von === 'buero' && n.gelesen !== true; }).length
+        : 0;
+
+    return (
+        <div className="ma-nach-wrapper">
+            <MANachrichtenHeader lang={lang} ungelesen={ungelesenCount}/>
+
+            <div className="ma-nach-thread" ref={threadRef}>
+                {nachrichten === null && (
+                    <div className="ma-nach-empty">
+                        <div className="ma-nach-empty-icon">{'\u{1F4AC}'}</div>
+                        <div className="ma-nach-empty-text">{t('nach_lade', lang)}</div>
+                    </div>
+                )}
+                {Array.isArray(nachrichten) && nachrichten.length === 0 && (
+                    <MANachrichtenEmpty lang={lang}/>
+                )}
+                {Array.isArray(nachrichten) && nachrichten.length > 0 && (
+                    <MAChatThread nachrichten={nachrichten} lang={lang}/>
+                )}
+            </div>
+
+            <MANachrichtenInputStub lang={lang}/>
+        </div>
+    );
+}
+
+function MANachrichtenHeader({ lang, ungelesen }) {
+    return (
+        <div className="ma-nach-header">
+            <div className="ma-nach-header-icon">{'\u{1F4AC}'}</div>
+            <div className="ma-nach-header-text">
+                <div className="ma-nach-header-titel">{t('nach_untertitel', lang)}</div>
+                {ungelesen > 0 && (
+                    <div className="ma-nach-header-sub">
+                        {ungelesen + ' ' + t('nach_ungelesen', lang)}
+                    </div>
+                )}
+            </div>
+            {ungelesen > 0 && (
+                <div className="ma-nach-badge">{ungelesen}</div>
+            )}
+        </div>
+    );
+}
+
+function MANachrichtenEmpty({ lang }) {
+    return (
+        <div className="ma-nach-empty">
+            <div className="ma-nach-empty-icon">{'\u{1F4EC}'}</div>
+            <div className="ma-nach-empty-titel">{t('nach_empty_titel', lang)}</div>
+            <div className="ma-nach-empty-text">{t('nach_empty_text', lang)}</div>
+        </div>
+    );
+}
+
+function MAChatThread({ nachrichten, lang }) {
+    // Gruppiere Nachrichten nach Tag fuer Datum-Trenner
+    const elemente = [];
+    let letzterTag = null;
+    nachrichten.forEach(function(n, i){
+        const tagKey = nachTagKey(n.timestamp);
+        if (tagKey !== letzterTag) {
+            elemente.push(
+                <div key={'trenner-' + tagKey} className="ma-nach-trenner">
+                    {nachDatumTrennerText(n.timestamp, lang)}
+                </div>
+            );
+            letzterTag = tagKey;
+        }
+        elemente.push(
+            <MAChatBubble
+                key={n.id}
+                nachricht={n}
+                lang={lang}/>
+        );
+    });
+    return <React.Fragment>{elemente}</React.Fragment>;
+}
+
+function MAChatBubble({ nachricht, lang }) {
+    const [zeigeOriginal, setZeigeOriginal] = useState(false);
+
+    const istMa = nachricht.von === 'ma';
+    const istBuero = nachricht.von === 'buero';
+    const dringend = nachricht.dringend === true;
+
+    // Uebersetzungs-Logik:
+    // - Wenn Uebersetzung fuer aktuelle Sprache existiert und sich vom Original unterscheidet: zeige Uebersetzung + Toggle
+    // - Wenn gleiche Sprache ODER keine Uebersetzung: zeige Original
+    // - Wenn Uebersetzung noch laeuft (Buero-Nachricht, kein text_uebersetzt): zeige "Uebersetze ..." Hinweis
+    const uebersetztObj = nachricht.text_uebersetzt || {};
+    const uebersetzt = uebersetztObj[lang];
+    const originalSprache = nachricht.sprache_original || 'de';
+    const brauchtUebersetzung = (originalSprache !== lang);
+    const zeigeUebersetzungLoading = istBuero && brauchtUebersetzung && !uebersetzt;
+    const hatUebersetzung = brauchtUebersetzung && typeof uebersetzt === 'string' && uebersetzt.length > 0;
+
+    let anzeigeText = nachricht.text_original || '';
+    if (hatUebersetzung) anzeigeText = uebersetzt;
+
+    let bubbleCls = 'ma-nach-bubble ' + (istMa ? 'ma' : 'buero');
+    if (dringend) bubbleCls += ' dringend';
+
+    // Lesestatus nur fuer eigene (MA-)Nachrichten anzeigen
+    let statusCheck = null;
+    if (istMa) {
+        if (nachricht.gelesen === true) {
+            statusCheck = <span className="ma-nach-check gelesen">{'\u2713\u2713'}</span>;
+        } else {
+            statusCheck = <span className="ma-nach-check">{'\u2713'}</span>;
+        }
+    }
+
+    return (
+        <div className={'ma-nach-bubble-row ' + (istMa ? 'ma' : 'buero')}>
+            <div className={bubbleCls}>
+                {dringend && (
+                    <div className="ma-nach-dringend-badge">
+                        <span>{'\u{1F514}'}</span>
+                        <span>{t('nach_dringend', lang)}</span>
+                    </div>
+                )}
+                {istBuero && (
+                    <div className="ma-nach-absender">
+                        {nachricht.absender_name || t('nach_buero', lang)}
+                    </div>
+                )}
+                {zeigeUebersetzungLoading ? (
+                    <div className="ma-nach-text uebersetze">
+                        {t('nach_uebersetze', lang)}
+                    </div>
+                ) : (
+                    <div className="ma-nach-text">{anzeigeText}</div>
+                )}
+                {hatUebersetzung && (
+                    <React.Fragment>
+                        <button
+                            type="button"
+                            className="ma-nach-original-toggle"
+                            onClick={function(){ setZeigeOriginal(!zeigeOriginal); }}>
+                            {zeigeOriginal ? t('nach_original_aus', lang) : t('nach_original_an', lang)}
+                        </button>
+                        {zeigeOriginal && (
+                            <div className="ma-nach-original-text">{nachricht.text_original}</div>
+                        )}
+                    </React.Fragment>
+                )}
+                <div className="ma-nach-meta">
+                    <span>{nachFormatUhrzeit(nachricht.timestamp)}</span>
+                    {statusCheck}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function MANachrichtenInputStub({ lang }) {
+    // Disabled Input-Zeile + Hinweis. Senden wird in Baustein 5 aktiviert.
+    return (
+        <React.Fragment>
+            <div className="ma-nach-input-row">
+                <input
+                    type="text"
+                    className="ma-nach-input"
+                    placeholder={t('nach_senden_placeholder', lang)}
+                    disabled/>
+                <button className="ma-nach-senden-btn" disabled aria-label="send">
+                    {'\u27A4'}
+                </button>
+            </div>
+            <div className="ma-nach-senden-hinweis">
+                {t('nach_senden_kommt', lang)}
+            </div>
+        </React.Fragment>
+    );
+}
+
+// ============================================================
 // Shared: Sub-Header mit Zurueck-Button
 // ============================================================
 
@@ -4982,7 +5547,7 @@ const maEmptyStateStyle = {
                     <ModulPlatzhalter lang={lang} titel={t('stunden', lang)} IconComp={Icon.Uhr}/>
                 )}
                 {aktiverTab === 'nachrichten' && (
-                    <ModulPlatzhalter lang={lang} titel={t('nachrichten', lang)} IconComp={Icon.Sprechblase}/>
+                    <MANachrichtenModul/>
                 )}
 
                 {sprachModalOffen && (
