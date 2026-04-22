@@ -30,6 +30,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
     <!-- ===== Auth-Modul (Login Code+PIN gegen Master-App-Schema) ===== -->
     <script src="js/tw-ma-auth.js"></script>
@@ -1593,6 +1594,142 @@
         font-style: italic;
     }
 
+    /* ═══════════════════════════════════════════════════════════
+       ETAPPE 5 · B6 · PUSH, BADGE & STATUS-INDIKATOR
+       ═══════════════════════════════════════════════════════════ */
+    .ma-nav-tab-badge {
+        position: absolute;
+        top: 4px;
+        right: 50%;
+        transform: translateX(calc(100% - 4px));
+        min-width: 18px;
+        height: 18px;
+        padding: 0 5px;
+        border-radius: 9px;
+        background: var(--accent-red);
+        color: #fff;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.65rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid var(--bg-primary);
+        line-height: 1;
+        pointer-events: none;
+    }
+    .modul-tab { position: relative; }
+
+    .ma-push-banner {
+        margin: 12px 10px 0 10px;
+        padding: 14px 14px 12px 14px;
+        background: linear-gradient(135deg, rgba(77,166,255,0.15), rgba(77,166,255,0.05));
+        border: 1px solid rgba(77,166,255,0.45);
+        border-radius: var(--radius-md);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .ma-push-banner-top {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+    }
+    .ma-push-banner-icon {
+        font-size: 1.5rem;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+    .ma-push-banner-body {
+        flex: 1;
+        min-width: 0;
+    }
+    .ma-push-banner-titel {
+        font-family: 'Oswald', sans-serif;
+        font-weight: 600;
+        font-size: 0.95rem;
+        color: var(--text-white);
+        letter-spacing: 0.3px;
+        margin-bottom: 4px;
+    }
+    .ma-push-banner-text {
+        font-size: 0.82rem;
+        color: var(--text-light);
+        line-height: 1.4;
+    }
+    .ma-push-banner-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    .ma-push-btn {
+        padding: 8px 16px;
+        border-radius: var(--radius-sm);
+        border: none;
+        font-family: 'Oswald', sans-serif;
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+        touch-action: manipulation;
+    }
+    .ma-push-btn.primary {
+        background: var(--accent-blue);
+        color: #fff;
+    }
+    .ma-push-btn.primary:active { transform: scale(0.95); }
+    .ma-push-btn.secondary {
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+    }
+    .ma-push-banner.blocked {
+        background: rgba(230,53,53,0.12);
+        border-color: rgba(230,53,53,0.4);
+    }
+
+    .ma-start-indikator {
+        margin: 14px 12px 0 12px;
+        padding: 12px 16px;
+        background: linear-gradient(135deg, var(--accent-red), #c41e1e);
+        border-radius: var(--radius-md);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        box-shadow: 0 6px 20px rgba(230,53,53,0.35);
+        touch-action: manipulation;
+        animation: ma-indikator-pulse 2.5s ease-in-out infinite;
+    }
+    .ma-start-indikator:active { transform: scale(0.98); }
+    .ma-start-indikator-icon {
+        font-size: 1.4rem;
+        flex-shrink: 0;
+    }
+    .ma-start-indikator-zahl {
+        font-family: 'Oswald', sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .ma-start-indikator-text {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.88rem;
+        line-height: 1.3;
+    }
+    .ma-start-indikator-pfeil {
+        font-size: 1.2rem;
+        opacity: 0.7;
+        flex-shrink: 0;
+    }
+    @keyframes ma-indikator-pulse {
+        0%,100% { box-shadow: 0 6px 20px rgba(230,53,53,0.35); }
+        50%     { box-shadow: 0 6px 30px rgba(230,53,53,0.6); }
+    }
+
     </style>
 </head>
 <body>
@@ -2024,7 +2161,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b5-chat-senden';
+    const APP_VERSION = '1.0.0-etappe5-b6-fcm-badge';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -2274,7 +2411,17 @@
         nach_senden_fehler:   { de: 'Senden fehlgeschlagen. Nochmal versuchen?', cs: 'Odeslani se nezdarilo. Zkusit znovu?', sk: 'Odoslanie zlyhalo. Skusit znova?', pl: 'Wyslanie nie powiodlo sie. Sprobowac ponownie?', en: 'Sending failed. Try again?', ro: 'Trimitere esuata. Incerci din nou?', uk: 'Vidpravka ne vdalasya. Sprobuvaty shche raz?' },
         nach_dringend_hint:   { de: 'Dringend senden (loest Push beim Buero aus)', cs: 'Odeslat jako urgentni (vyvola push v kancelari)', sk: 'Odoslat ako naliehave (spusti push v kancelarii)', pl: 'Wyslij jako pilne (wywola push w biurze)', en: 'Send as urgent (triggers push in office)', ro: 'Trimite ca urgent (declanseaza push in birou)', uk: 'Vidpravyty terminovo (zapustyt push u ofisi)' },
         nach_dringend_aktiv:  { de: 'Naechste Nachricht wird als DRINGEND gesendet', cs: 'Dalsi zprava se odesle jako URGENTNI', sk: 'Dalsia sprava sa odosle ako NALIEHAVA', pl: 'Nastepna wiadomosc bedzie PILNA', en: 'Next message will be sent as URGENT', ro: 'Urmatorul mesaj va fi trimis ca URGENT', uk: 'Nastupne povidomlennya bude TERMINOVE' },
-        nach_sende:           { de: 'Sende ...',  cs: 'Odesilam ...', sk: 'Odosielam ...', pl: 'Wysylam ...', en: 'Sending ...', ro: 'Trimit ...', uk: 'Vidpravlyayu ...' }
+        nach_sende:           { de: 'Sende ...',  cs: 'Odesilam ...', sk: 'Odosielam ...', pl: 'Wysylam ...', en: 'Sending ...', ro: 'Trimit ...', uk: 'Vidpravlyayu ...' },
+
+        // ═══════════════════════ ETAPPE 5 · B6 — Push & Badge ═══════════════════════
+        push_banner_titel:    { de: 'Push-Benachrichtigungen aktivieren',  cs: 'Povolit push oznameni', sk: 'Povolit push oznamenia', pl: 'Wlacz powiadomienia push', en: 'Enable push notifications', ro: 'Activeaza notificarile push', uk: 'Uvimknuty push-spovishchennya' },
+        push_banner_text:     { de: 'Damit du dringende Nachrichten vom Buero auch bei geschlossener App bekommst.', cs: 'Abys dostaval urgentni zpravy z kancelare i pri zavrene aplikaci.', sk: 'Aby si dostaval naliehave spravy z kancelarie aj pri zatvorenej aplikacii.', pl: 'Abys otrzymywal pilne wiadomosci z biura nawet gdy aplikacja jest zamknieta.', en: 'So you get urgent messages from the office even when the app is closed.', ro: 'Ca sa primesti mesaje urgente de la birou chiar si cand aplicatia este inchisa.', uk: 'Shchob otrymuvaty terminovi povidomlennya vid ofisu navit koly prohrama zakryta.' },
+        push_aktivieren:      { de: 'Aktivieren',  cs: 'Aktivovat',  sk: 'Aktivovat', pl: 'Wlacz', en: 'Enable', ro: 'Activeaza', uk: 'Uvimknuty' },
+        push_spaeter:         { de: 'Spaeter',     cs: 'Pozdeji',    sk: 'Neskor',   pl: 'Pozniej', en: 'Later',  ro: 'Mai tarziu', uk: 'Piznishe' },
+        push_abgelehnt:       { de: 'Push wurde blockiert — in den Browser-Einstellungen aktivieren.', cs: 'Push byl zablokovan — aktivuj v nastaveni prohlizece.', sk: 'Push bol zablokovany — aktivuj v nastaveniach prehliadaca.', pl: 'Push zostal zablokowany — wlacz w ustawieniach przegladarki.', en: 'Push was blocked — enable it in browser settings.', ro: 'Push a fost blocat — activeaza-l in setarile browser-ului.', uk: 'Push bulo zablokovano — uvimkny v nalashtuvannyakh brauzera.' },
+        push_bereit:          { de: 'Push aktiv',  cs: 'Push aktivni', sk: 'Push aktivny', pl: 'Push aktywny', en: 'Push active', ro: 'Push activ', uk: 'Push aktyvnyy' },
+        start_indikator_nach: { de: 'neue Nachricht vom Buero', cs: 'nova zprava z kancelare', sk: 'nova sprava z kancelarie', pl: 'nowa wiadomosc z biura', en: 'new message from office', ro: 'mesaj nou de la birou', uk: 'nove povidomlennya z ofisu' },
+        start_indikator_nach_plural: { de: 'neue Nachrichten vom Buero', cs: 'nove zpravy z kancelare', sk: 'nove spravy z kancelarie', pl: 'nowe wiadomosci z biura', en: 'new messages from office', ro: 'mesaje noi de la birou', uk: 'novi povidomlennya z ofisu' }
     };
 
     function t(key, lang) {
@@ -5768,6 +5915,96 @@ const maEmptyStateStyle = {
     display:'flex', flexDirection:'column', alignItems:'center',
     justifyContent:'center', padding:'48px 20px', textAlign:'center'
 };
+
+// ============================================================
+// ETAPPE 5 · B6 · PUSH-BANNER, UNGELESEN-BADGE, STATUS-INDIKATOR
+// ============================================================
+
+/**
+ * Globaler Hook: liefert Ungelesen-Zaehler und ma_id.
+ * Wird einmal pro MainApp-Lifecycle verwendet (siehe dort).
+ * Gibt { ungelesenCount, maId } zurueck.
+ */
+function useGlobaleChatSubscription() {
+    const [maId, setMaId]                 = useState(null);
+    const [ungelesenCount, setUngelesen]  = useState(0);
+
+    useEffect(function(){
+        let abgebrochen = false;
+        if (window.TWMaFirebase && TWMaFirebase.getMeineMaId) {
+            TWMaFirebase.getMeineMaId().then(function(id){
+                if (!abgebrochen) setMaId(id || null);
+            }).catch(function(){});
+        }
+        return function(){ abgebrochen = true; };
+    }, []);
+
+    useEffect(function(){
+        if (!maId || !window.TWMaFirebase || !TWMaFirebase.subscribeChat) return;
+        const unsub = TWMaFirebase.subscribeChat(maId, function(arr){
+            if (!Array.isArray(arr)) { setUngelesen(0); return; }
+            const n = arr.filter(function(m){
+                return m && m.von === 'buero' && m.gelesen !== true;
+            }).length;
+            setUngelesen(n);
+        });
+        return function(){ try { unsub(); } catch(e){} };
+    }, [maId]);
+
+    return { maId: maId, ungelesenCount: ungelesenCount };
+}
+
+function MAUngelesenBadge({ count }) {
+    if (!count || count <= 0) return null;
+    const anzeige = count > 99 ? '99+' : String(count);
+    return <span className="ma-nav-tab-badge">{anzeige}</span>;
+}
+
+function MAStartIndikator({ count, lang, onKlick }) {
+    if (!count || count <= 0) return null;
+    const textKey = count === 1 ? 'start_indikator_nach' : 'start_indikator_nach_plural';
+    return (
+        <div className="ma-start-indikator" onClick={onKlick} role="button" tabIndex={0}>
+            <div className="ma-start-indikator-icon">{'\u{1F514}'}</div>
+            <div className="ma-start-indikator-zahl">{count}</div>
+            <div className="ma-start-indikator-text">{t(textKey, lang)}</div>
+            <div className="ma-start-indikator-pfeil">{'\u203A'}</div>
+        </div>
+    );
+}
+
+function MAPushPermissionBanner({ lang, status, onAktivieren, onSpaeter }) {
+    // status: 'default' (noch nicht gefragt), 'denied' (blockiert), 'granted' (ok, kein Banner),
+    //         'dismissed' (User hat "Spaeter" gewaehlt — nur fuer diese Session weg)
+    if (status === 'granted' || status === 'dismissed' || status === 'unsupported') return null;
+
+    const istBlocked = status === 'denied';
+
+    return (
+        <div className={'ma-push-banner' + (istBlocked ? ' blocked' : '')}>
+            <div className="ma-push-banner-top">
+                <div className="ma-push-banner-icon">{istBlocked ? '\u{1F515}' : '\u{1F514}'}</div>
+                <div className="ma-push-banner-body">
+                    <div className="ma-push-banner-titel">{t('push_banner_titel', lang)}</div>
+                    <div className="ma-push-banner-text">
+                        {istBlocked ? t('push_abgelehnt', lang) : t('push_banner_text', lang)}
+                    </div>
+                </div>
+            </div>
+            {!istBlocked && (
+                <div className="ma-push-banner-actions">
+                    <button type="button" className="ma-push-btn secondary" onClick={onSpaeter}>
+                        {t('push_spaeter', lang)}
+                    </button>
+                    <button type="button" className="ma-push-btn primary" onClick={onAktivieren}>
+                        {t('push_aktivieren', lang)}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
     /* ═══════════════════════════════════════════════════════════
        MAIN APP — der eigentliche App-Inhalt nach erfolgreichem Login
        (vorher hieß diese Komponente MAApp)
@@ -5777,6 +6014,17 @@ const maEmptyStateStyle = {
         const [fontLarge, setFontLarge] = useState(() => localStorage.getItem('tw_font_scale') === 'large');
         const [aktiverTab, setAktiverTab] = useState('start');
         const [sprachModalOffen, setSprachModalOffen] = useState(false);
+
+        // Etappe 5 · B6 — globale Chat-Subscription fuer Badge + Status-Indikator
+        const { ungelesenCount } = useGlobaleChatSubscription();
+
+        // Etappe 5 · B6 — Push-Permission-State
+        const [pushStatus, setPushStatus] = useState(function(){
+            if (typeof Notification === 'undefined') return 'unsupported';
+            // "dismissed" wird in sessionStorage gemerkt (nur fuer diese Session)
+            if (sessionStorage.getItem('tw_ma_push_dismissed') === '1') return 'dismissed';
+            return Notification.permission; // 'granted' | 'denied' | 'default'
+        });
 
         useEffect(() => {
             if (fontLarge) {
@@ -5792,13 +6040,77 @@ const maEmptyStateStyle = {
             localStorage.setItem('tw-ma-sprache', lang);
         }, [lang]);
 
+        // FCM beim App-Start initialisieren, falls bereits Permission granted ist
+        useEffect(function(){
+            if (pushStatus !== 'granted') return;
+            if (!window.TWMaFirebase || !TWMaFirebase.initFcm) return;
+            const vapidKey = (window.TWMaConfig && TWMaConfig.getFcmVapidKey)
+                ? TWMaConfig.getFcmVapidKey()
+                : (window.TW_FCM_VAPID_KEY || '');
+            TWMaFirebase.initFcm(vapidKey).then(function(result){
+                if (result.status === 'granted') {
+                    console.log('[MA] FCM registriert');
+                } else {
+                    console.log('[MA] FCM Status:', result.status, result.reason || '');
+                }
+            });
+        }, [pushStatus]);
+
+        // Foreground-FCM-Handler (App offen, Notification soll nicht vom OS kommen)
+        useEffect(function(){
+            if (pushStatus !== 'granted' || !window.TWMaFirebase || !TWMaFirebase.subscribeFcmForeground) return;
+            const unsub = TWMaFirebase.subscribeFcmForeground(function(payload){
+                // Wenn Nachrichten-Tab offen: Live-Listener hat es ohnehin,
+                // also keine Doppel-Notification noetig.
+                console.log('[MA] Foreground FCM:', payload);
+            });
+            return function(){ if (typeof unsub === 'function') unsub(); };
+        }, [pushStatus]);
+
+        // Service-Worker-Message-Handler: Tap auf Hintergrund-Notification
+        // oeffnet den Nachrichten-Tab
+        useEffect(function(){
+            if (!('serviceWorker' in navigator)) return;
+            function handler(ev) {
+                const data = ev.data;
+                if (data && data.type === 'fcm-notification-click') {
+                    setAktiverTab('nachrichten');
+                }
+            }
+            navigator.serviceWorker.addEventListener('message', handler);
+            return function(){ navigator.serviceWorker.removeEventListener('message', handler); };
+        }, []);
+
+        function pushAktivieren() {
+            if (!window.TWMaFirebase || !TWMaFirebase.initFcm) {
+                setPushStatus('unsupported');
+                return;
+            }
+            const vapidKey = (window.TWMaConfig && TWMaConfig.getFcmVapidKey)
+                ? TWMaConfig.getFcmVapidKey()
+                : (window.TW_FCM_VAPID_KEY || '');
+            if (!vapidKey) {
+                console.warn('[MA] VAPID-Key fehlt - FCM kann nicht aktiviert werden');
+                setPushStatus('unsupported');
+                return;
+            }
+            TWMaFirebase.initFcm(vapidKey).then(function(result){
+                setPushStatus(result.status);
+            });
+        }
+
+        function pushSpaeter() {
+            sessionStorage.setItem('tw_ma_push_dismissed', '1');
+            setPushStatus('dismissed');
+        }
+
         const tabs = [
             { id: 'start',       label: t('start', lang),       Icon: Icon.Home },
             { id: 'baustellen',  label: t('baustellen', lang),  Icon: Icon.Helm },
             { id: 'kalender',    label: t('kalender', lang),    Icon: Icon.Kalender },
             { id: 'fotos',       label: t('fotos', lang),       Icon: Icon.Kamera },
             { id: 'stunden',     label: t('stunden', lang),     Icon: Icon.Uhr },
-            { id: 'nachrichten', label: t('nachrichten', lang), Icon: Icon.Sprechblase }
+            { id: 'nachrichten', label: t('nachrichten', lang), Icon: Icon.Sprechblase, badge: ungelesenCount }
         ];
 
         return (
@@ -5816,9 +6128,26 @@ const maEmptyStateStyle = {
                                 onClick={() => setAktiverTab(tab.id)}>
                             <tab.Icon/>
                             <span>{tab.label}</span>
+                            {tab.badge > 0 && <MAUngelesenBadge count={tab.badge}/>}
                         </button>
                     ))}
                 </div>
+
+                {aktiverTab === 'start' && (
+                    <>
+                        <MAPushPermissionBanner
+                            lang={lang}
+                            status={pushStatus}
+                            onAktivieren={pushAktivieren}
+                            onSpaeter={pushSpaeter}/>
+                        {ungelesenCount > 0 && (
+                            <MAStartIndikator
+                                count={ungelesenCount}
+                                lang={lang}
+                                onKlick={() => setAktiverTab('nachrichten')}/>
+                        )}
+                    </>
+                )}
 
                 {aktiverTab === 'start' && (
                     <MAStartseite lang={lang} onSprachOeffnen={() => setSprachModalOffen(true)}/>
