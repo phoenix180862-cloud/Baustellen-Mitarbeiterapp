@@ -15,7 +15,7 @@
    ============================================================
 */
 
-const CACHE_VERSION   = 'tw-ma-v1.0.1';
+const CACHE_VERSION   = 'tw-ma-v1.0.2';
 const SHELL_CACHE     = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE   = CACHE_VERSION + '-runtime';
 const IMG_CACHE       = CACHE_VERSION + '-img';

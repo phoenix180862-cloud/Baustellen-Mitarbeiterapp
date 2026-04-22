@@ -2161,7 +2161,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b6-fcm-badge';
+    const APP_VERSION = '1.0.0-etappe5-b6-fcm-badge-hotfix1';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -5437,19 +5437,59 @@ function MANachrichtenModul() {
     const [nachrichten, setNachrichten] = useState(null); // null = laedt, [] = leer
     const threadRef = useRef(null);
 
-    // Mitarbeiter-ID + Stammdaten einmalig aufloesen
+    // Mitarbeiter-ID + Stammdaten aufloesen — mit Retry-Logik und UID-Fallback,
+    // damit auch bei spaetem Auth (App-Start-Race) die Identity nachgezogen wird.
+    // HOTFIX v1.0.0-etappe5-b6-fcm-badge-hotfix1
     useEffect(function(){
         let abgebrochen = false;
-        if (window.TWMaFirebase && TWMaFirebase.ladeMeinenMitarbeiter) {
+        let retryTimer  = null;
+
+        function versucheIdentityLaden(attempt) {
+            if (abgebrochen) return;
+            if (!window.TWMaFirebase || !TWMaFirebase.ladeMeinenMitarbeiter) {
+                if (attempt < 12) {
+                    retryTimer = setTimeout(function(){ versucheIdentityLaden(attempt + 1); }, 500);
+                }
+                return;
+            }
             TWMaFirebase.ladeMeinenMitarbeiter().then(function(ma){
                 if (abgebrochen) return;
-                if (ma) {
-                    setMaId(ma.ma_id || null);
+                if (ma && ma.ma_id) {
+                    setMaId(ma.ma_id);
                     setAbsenderName(ma.name || 'Mitarbeiter');
+                    return;
                 }
-            }).catch(function(){ if (!abgebrochen) setMaId(null); });
+                // Fallback: wenigstens die blanke maId via getMeineMaId holen
+                if (TWMaFirebase.getMeineMaId) {
+                    TWMaFirebase.getMeineMaId().then(function(rawId){
+                        if (abgebrochen) return;
+                        if (rawId) {
+                            setMaId(rawId);
+                            setAbsenderName('Mitarbeiter');
+                        } else if (attempt < 12) {
+                            retryTimer = setTimeout(function(){ versucheIdentityLaden(attempt + 1); }, 600);
+                        }
+                    }).catch(function(){
+                        if (!abgebrochen && attempt < 12) {
+                            retryTimer = setTimeout(function(){ versucheIdentityLaden(attempt + 1); }, 600);
+                        }
+                    });
+                } else if (attempt < 12) {
+                    retryTimer = setTimeout(function(){ versucheIdentityLaden(attempt + 1); }, 600);
+                }
+            }).catch(function(){
+                if (!abgebrochen && attempt < 12) {
+                    retryTimer = setTimeout(function(){ versucheIdentityLaden(attempt + 1); }, 600);
+                }
+            });
         }
-        return function(){ abgebrochen = true; };
+
+        versucheIdentityLaden(0);
+
+        return function(){
+            abgebrochen = true;
+            if (retryTimer) clearTimeout(retryTimer);
+        };
     }, []);
 
     // Chat-Thread live abonnieren
@@ -5781,7 +5821,12 @@ function MANachrichtenInput({ maId, absenderName, lang }) {
         }
     }
 
-    const inputDisabled = !maId || sendet;
+    // HOTFIX v1.0.0-etappe5-b6-fcm-badge-hotfix1:
+    // Frueher: inputDisabled = !maId || sendet  — das hat die Textarea komplett gesperrt,
+    // wenn die Mitarbeiter-Identity noch nicht aufgeloest war (Auth-Race beim App-Start).
+    // Jetzt: Eingabe ist immer moeglich, nur waehrend des Sendens kurz gesperrt.
+    // Der Senden-Button bleibt weiterhin ueber istSendbereit() korrekt gesteuert.
+    const inputDisabled = sendet;
     const rowCls = 'ma-nach-input-row' + (dringend ? ' dringend-aktiv' : '');
 
     return (
