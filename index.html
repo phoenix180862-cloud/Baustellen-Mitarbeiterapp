@@ -2161,7 +2161,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas';
+    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas+e6.1+e6.2';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -4077,13 +4077,7 @@ function MAKachelRouter({ baustelle, kachel, onZurueck }) {
         return <MABaustellendatenView baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}/>;
     }
     if (kachel.id === 'fotos') {
-        return (
-            <MAStubView
-                baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}
-                emoji={'\u{1F4F8}'}
-                titel={tConfig('stub.fotos.titel')}
-                text={tConfig('stub.fotos.text')}/>
-        );
+        return <MAFotosView baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}/>;
     }
     if (kachel.id === 'stunden') {
         return (
@@ -6430,6 +6424,1642 @@ function MAPushPermissionBanner({ lang, status, onAktivieren, onSpaeter }) {
             </>
         );
     }
+
+
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ MODUL FOTOS - Etappe 6 / Bausteine 6.1 + 6.2                          ║
+// ║ Uebernommen aus baustellen-app-etappe-6-b2/jsx/tw-ma-fotos.jsx        ║
+// ║ am 29.04.2026 (Generation-A-Sockel: dunkel, monolithisch, +Thomas)    ║
+// ║ Komponenten: MAFotosView, MARaumListe, MARaumRow, MARaumDialog,       ║
+// ║   MAToggleKachel, MAPhaseAuswahl, MAPhaseKachel, MAWandRaster,        ║
+// ║   MAWandKachel, MAOverlay, MAOverlayBox, MAFotoVorschau, MAFotoDetail ║
+// ║ Editor + Sprach-Notiz folgen in Phase 3.3 / 3.4.                      ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+// ============================================================
+// TW Baustellen-App - Modul Fotos (Etappe 6)
+// ============================================================
+// Master-Dokument Kap. 8: Foto-Dokumentation in 3 Phasen.
+// Workflow: Raum waehlen -> Phase waehlen -> Wand antippen
+//           -> Foto aufnehmen -> Editor -> Sprach-Notiz -> Speichern.
+//
+// Baustein 6.1 (DIESE DATEI):
+//   - MAFotosView (Hauptkomponente, ersetzt den Stub)
+//   - MARaumListe (Liste der angelegten Raeume + Neuer-Raum-Button)
+//   - MARaumDialog (Anlegen / Bearbeiten eines Raumes)
+//   - MAPhaseAuswahl (3 Buttons: Rohzustand / Vorarbeiten / Fertigstellung)
+//   - MAWandRaster (4-8 Wand-Kacheln + Boden + Decke optional)
+//
+// Stufe 5+6 (Foto-Aufnahme + Editor + Sprach-Notiz) folgen in
+// Baustein 6.2 / 6.3 / 6.4. Klick auf Wand-Kachel zeigt vorerst
+// einen "Bald-Verfuegbar"-Hinweis.
+// ============================================================
+
+// 3-Phasen-Definition (1:1 wie Master-App tw-aufmass.jsx Z. 5322)
+const MA_FOTO_PHASEN = [
+    { key: 'rohzustand',     nr: 1, color: '#E67E22' },
+    { key: 'vorarbeiten',    nr: 2, color: '#1E88E5' },
+    { key: 'fertigstellung', nr: 3, color: '#43A047' }
+];
+
+// Zulaessige Wandzahlen
+const MA_WANDZAHLEN = [3, 4, 5, 6, 7, 8];
+
+// Geschoss-Optionen (Master-Dokument 8.4)
+const MA_GESCHOSSE = ['KG', 'EG', 'OG', 'DG'];
+
+// ============================================================
+// MAFotosView - Hauptkomponente, ersetzt den MAStubView fuer Fotos
+// ============================================================
+//
+// Routing-State:
+//   'raumliste'   - Liste aller Raeume + "Neuer Raum"-Button (Stufe 2)
+//   'neuerRaum'   - Dialog zum Anlegen eines Raums
+//   'raumEdit'    - Dialog zum Bearbeiten eines Raums
+//   'phasen'      - 3 Phase-Buttons mit Fortschritt (Stufe 3)
+//   'waende'      - Wand-Raster der gewaehlten Phase (Stufe 4)
+//
+// ============================================================
+
+function MAFotosView({ baustelle, kachel, onZurueck }) {
+    const lang = useSprache();
+    const [stufe, setStufe] = useState('raumliste');
+    const [raeume, setRaeume] = useState([]);
+    const [aktiverRaum, setAktiverRaum] = useState(null);
+    const [aktivePhase, setAktivePhase] = useState(null);
+    const [editRaum, setEditRaum] = useState(null);
+    const [laden, setLaden] = useState(true);
+    // Counter, der bei jeder Foto-Aenderung hochgezaehlt wird; triggert
+    // ein Reload der Phasen-Fortschritte in MAPhaseAuswahl.
+    const [aenderungsKey, setAenderungsKey] = useState(0);
+
+    const baustelleId = baustelle && (baustelle.id || baustelle.staging_folder_id || baustelle.name);
+
+    // Raeume aus IndexedDB laden, wenn Komponente gemountet wird oder
+    // Baustelle wechselt.
+    useEffect(function(){
+        if (!baustelleId || !window.TWMaStorage || !window.TWMaStorage.listRaeume) {
+            setLaden(false);
+            return;
+        }
+        setLaden(true);
+        window.TWMaStorage.listRaeume(baustelleId).then(function(liste){
+            setRaeume(liste || []);
+            setLaden(false);
+        }).catch(function(err){
+            console.warn('[MAFotosView] listRaeume fehlgeschlagen:', err.message);
+            setRaeume([]);
+            setLaden(false);
+        });
+    }, [baustelleId]);
+
+    // Hilfs-Reload nach Anlegen / Aendern / Loeschen
+    function reloadRaeume() {
+        if (!baustelleId || !window.TWMaStorage || !window.TWMaStorage.listRaeume) return;
+        window.TWMaStorage.listRaeume(baustelleId).then(function(liste){
+            setRaeume(liste || []);
+        }).catch(function(){});
+    }
+
+    // ============================================================
+    // Render-Logik nach Stufe
+    // ============================================================
+
+    if (stufe === 'neuerRaum' || stufe === 'raumEdit') {
+        return (
+            <MARaumDialog
+                baustelleId={baustelleId}
+                raum={stufe === 'raumEdit' ? editRaum : null}
+                onAbbrechen={function(){
+                    setEditRaum(null);
+                    setStufe('raumliste');
+                }}
+                onGespeichert={function(neuerRaum){
+                    setEditRaum(null);
+                    reloadRaeume();
+                    setStufe('raumliste');
+                    if (neuerRaum) {
+                        // Direkt zur Phase-Auswahl springen, wenn neuer Raum
+                        setAktiverRaum(neuerRaum);
+                        setStufe('phasen');
+                    }
+                }}/>
+        );
+    }
+
+    if (stufe === 'phasen' && aktiverRaum) {
+        return (
+            <MAPhaseAuswahl
+                baustelle={baustelle}
+                raum={aktiverRaum}
+                aenderungsKey={aenderungsKey}
+                onZurueck={function(){
+                    setAktiverRaum(null);
+                    setStufe('raumliste');
+                }}
+                onPhaseGewaehlt={function(phase){
+                    setAktivePhase(phase);
+                    setStufe('waende');
+                }}/>
+        );
+    }
+
+    if (stufe === 'waende' && aktiverRaum && aktivePhase) {
+        return (
+            <MAWandRaster
+                baustelle={baustelle}
+                raum={aktiverRaum}
+                phase={aktivePhase}
+                onZurueck={function(){
+                    setAktivePhase(null);
+                    setStufe('phasen');
+                }}
+                onAenderung={function(){
+                    setAenderungsKey(function(prev){ return prev + 1; });
+                }}/>
+        );
+    }
+
+    // Default: Raum-Liste (Stufe 2)
+    return (
+        <MARaumListe
+            baustelle={baustelle}
+            raeume={raeume}
+            laden={laden}
+            onZurueck={onZurueck}
+            onNeuerRaum={function(){ setStufe('neuerRaum'); }}
+            onRaumWaehlen={function(raum){
+                setAktiverRaum(raum);
+                setStufe('phasen');
+            }}
+            onRaumBearbeiten={function(raum){
+                setEditRaum(raum);
+                setStufe('raumEdit');
+            }}
+            onRaumLoeschen={function(raum){
+                if (!window.TWMaStorage || !window.TWMaStorage.deleteRaum) return;
+                if (!confirm(t('fotos.raum.loeschen.bestaetigen', { name: raum.bezeichnung }))) return;
+                window.TWMaStorage.deleteRaum(raum.id).then(function(){
+                    reloadRaeume();
+                }).catch(function(err){
+                    alert(t('fotos.raum.loeschen.fehler') + '\n' + err.message);
+                });
+            }}/>
+    );
+}
+
+// ============================================================
+// MARaumListe - Stufe 2: Liste der Raeume + Neuer-Raum-Button
+// ============================================================
+
+function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumWaehlen, onRaumBearbeiten, onRaumLoeschen }) {
+    const lang = useSprache();
+
+    // Sortier-Reihenfolge: KG < EG < OG < DG, dann alphabetisch nach bezeichnung
+    const geschossOrder = { 'KG': 0, 'EG': 1, 'OG': 2, 'DG': 3 };
+    const sortierteRaeume = (raeume || []).slice().sort(function(a, b){
+        const ga = geschossOrder[a.geschoss] !== undefined ? geschossOrder[a.geschoss] : 99;
+        const gb = geschossOrder[b.geschoss] !== undefined ? geschossOrder[b.geschoss] : 99;
+        if (ga !== gb) return ga - gb;
+        return (a.bezeichnung || '').localeCompare(b.bezeichnung || '');
+    });
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={t('fotos.raumliste.titel')}
+                untertitel={baustelle.name || baustelle.id}
+                onZurueck={onZurueck}/>
+
+            <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
+                {/* Hinweis-Box */}
+                <div style={{
+                    padding:'10px 14px',
+                    background:'#FFF8E1',
+                    border:'1px solid #FFE082',
+                    borderRadius:8,
+                    fontSize:'0.85rem',
+                    color:'#5D4037',
+                    marginBottom:14
+                }}>
+                    {t('fotos.raumliste.hinweis')}
+                </div>
+
+                {/* "Neuer Raum"-Button */}
+                <button
+                    onClick={onNeuerRaum}
+                    style={{
+                        width:'100%',
+                        padding:'14px',
+                        marginBottom:14,
+                        background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:12,
+                        fontSize:'1rem',
+                        fontWeight:600,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        cursor:'pointer',
+                        boxShadow:'0 4px 12px rgba(30,136,229,0.3)',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:10,
+                        minHeight:54
+                    }}>
+                    <span style={{fontSize:'1.4rem', lineHeight:1}}>+</span>
+                    <span>{t('fotos.raum.neu')}</span>
+                </button>
+
+                {/* Raum-Liste oder Empty-State */}
+                {laden ? (
+                    <div style={{textAlign:'center', padding:40, color:'#999'}}>
+                        {t('fotos.raumliste.lade')}
+                    </div>
+                ) : sortierteRaeume.length === 0 ? (
+                    <div style={{
+                        textAlign:'center',
+                        padding:'30px 20px',
+                        color:'#999',
+                        background:'#fff',
+                        borderRadius:12,
+                        border:'1px dashed #DDD'
+                    }}>
+                        <div style={{fontSize:'2.5rem', marginBottom:8, opacity:0.5}}>{'\u{1F4D0}'}</div>
+                        <div style={{fontSize:'0.95rem', fontWeight:600, color:'#666', marginBottom:4}}>
+                            {t('fotos.raumliste.leer.titel')}
+                        </div>
+                        <div style={{fontSize:'0.85rem'}}>
+                            {t('fotos.raumliste.leer.text')}
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                        {sortierteRaeume.map(function(r){
+                            return (
+                                <MARaumRow
+                                    key={r.id}
+                                    raum={r}
+                                    onClick={function(){ onRaumWaehlen(r); }}
+                                    onBearbeiten={function(){ onRaumBearbeiten(r); }}
+                                    onLoeschen={function(){ onRaumLoeschen(r); }}/>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// Sub-Komponente: einzelne Raum-Zeile mit Bearbeiten/Loeschen-Buttons
+function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
+    const [pressed, setPressed] = useState(false);
+    return (
+        <div style={{
+            display:'flex',
+            alignItems:'stretch',
+            background:'#fff',
+            borderRadius:10,
+            border:'1px solid #E0E0E0',
+            boxShadow: pressed ? '0 1px 4px rgba(0,0,0,0.06)' : '0 2px 8px rgba(0,0,0,0.04)',
+            overflow:'hidden'
+        }}>
+            <button
+                onClick={onClick}
+                onPointerDown={function(){ setPressed(true); }}
+                onPointerUp={function(){ setPressed(false); }}
+                onPointerLeave={function(){ setPressed(false); }}
+                style={{
+                    flex:1,
+                    display:'flex',
+                    alignItems:'center',
+                    gap:12,
+                    padding:'14px 14px',
+                    background:'transparent',
+                    border:'none',
+                    textAlign:'left',
+                    cursor:'pointer',
+                    minHeight:64
+                }}>
+                {/* Geschoss-Badge */}
+                <div style={{
+                    minWidth:42,
+                    height:42,
+                    borderRadius:'50%',
+                    background:'linear-gradient(135deg, #455A64, #263238)',
+                    color:'#fff',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    fontSize:'0.85rem',
+                    fontWeight:700,
+                    fontFamily:'var(--font-headline, Oswald)',
+                    flexShrink:0
+                }}>
+                    {raum.geschoss || '-'}
+                </div>
+
+                <div style={{flex:1, minWidth:0}}>
+                    <div style={{
+                        fontFamily:'var(--font-headline, Oswald)',
+                        fontSize:'1rem',
+                        fontWeight:600,
+                        color:'#212121',
+                        marginBottom:2
+                    }}>
+                        {raum.bezeichnung}
+                        {raum.nummer ? <span style={{color:'#999', fontWeight:400, marginLeft:6}}>{'\u00B7 ' + raum.nummer}</span> : null}
+                    </div>
+                    <div style={{
+                        fontSize:'0.78rem',
+                        color:'#666'
+                    }}>
+                        {t('fotos.raum.waende', { n: raum.wandzahl || 4 })}
+                    </div>
+                </div>
+
+                <span style={{color:'#999', fontSize:'1.3rem', flexShrink:0}}>{'\u203A'}</span>
+            </button>
+
+            {/* Action-Buttons rechts */}
+            <div style={{
+                display:'flex',
+                flexDirection:'column',
+                borderLeft:'1px solid #EEE'
+            }}>
+                <button
+                    onClick={onBearbeiten}
+                    style={{
+                        padding:'0 14px',
+                        background:'transparent',
+                        border:'none',
+                        borderBottom:'1px solid #EEE',
+                        cursor:'pointer',
+                        fontSize:'0.9rem',
+                        color:'#1E88E5',
+                        flex:1,
+                        minHeight:32
+                    }}
+                    title={t('fotos.raum.bearbeiten')}>
+                    {'\u270F\uFE0F'}
+                </button>
+                <button
+                    onClick={onLoeschen}
+                    style={{
+                        padding:'0 14px',
+                        background:'transparent',
+                        border:'none',
+                        cursor:'pointer',
+                        fontSize:'0.9rem',
+                        color:'#E53935',
+                        flex:1,
+                        minHeight:32
+                    }}
+                    title={t('fotos.raum.loeschen')}>
+                    {'\u{1F5D1}\uFE0F'}
+                </button>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// MARaumDialog - Anlegen / Bearbeiten eines Raumes
+// ============================================================
+// Felder: Bezeichnung (mit Spracheingabe), Nummer (optional),
+// Geschoss (Dropdown), Wandzahl (Auswahl 3-8).
+
+function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
+    const lang = useSprache();
+    const istNeu = !raum;
+    const [bezeichnung, setBezeichnung] = useState(raum ? (raum.bezeichnung || '') : '');
+    const [nummer, setNummer] = useState(raum ? (raum.nummer || '') : '');
+    const [geschoss, setGeschoss] = useState(raum ? (raum.geschoss || 'EG') : 'EG');
+    const [wandzahl, setWandzahl] = useState(raum ? (raum.wandzahl || 4) : 4);
+    const [hatBoden, setHatBoden] = useState(raum && raum.hatBoden !== undefined ? raum.hatBoden : true);
+    const [hatDecke, setHatDecke] = useState(raum && raum.hatDecke !== undefined ? raum.hatDecke : false);
+    const [speichern, setSpeichern] = useState(false);
+    const [fehler, setFehler] = useState(null);
+
+    function handleSpeichern() {
+        const bez = (bezeichnung || '').trim();
+        if (!bez) {
+            setFehler(t('fotos.raum.fehler.bezeichnung'));
+            return;
+        }
+        if (!baustelleId) {
+            setFehler(t('fotos.raum.fehler.baustelle'));
+            return;
+        }
+        if (!window.TWMaStorage || !window.TWMaStorage.saveRaum) {
+            setFehler(t('fotos.raum.fehler.storage'));
+            return;
+        }
+
+        setFehler(null);
+        setSpeichern(true);
+
+        const id = (raum && raum.id) || ('raum-' + baustelleId + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,7));
+        const datensatz = {
+            id: id,
+            baustelle_id: baustelleId,
+            bezeichnung: bez,
+            nummer: (nummer || '').trim(),
+            geschoss: geschoss,
+            wandzahl: parseInt(wandzahl, 10) || 4,
+            hatBoden: !!hatBoden,
+            hatDecke: !!hatDecke,
+            angelegt_am: (raum && raum.angelegt_am) || Date.now(),
+            geaendert_am: Date.now()
+        };
+
+        window.TWMaStorage.saveRaum(datensatz).then(function(){
+            setSpeichern(false);
+            onGespeichert(istNeu ? datensatz : null);
+        }).catch(function(err){
+            setSpeichern(false);
+            setFehler(err.message || t('fotos.raum.fehler.speichern'));
+        });
+    }
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={istNeu ? t('fotos.raum.neu.titel') : t('fotos.raum.bearbeiten.titel')}
+                onZurueck={onAbbrechen}/>
+
+            <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
+                {/* Bezeichnung */}
+                <div style={{marginBottom:16}}>
+                    <label style={maLabelStyle}>
+                        {t('fotos.raum.feld.bezeichnung')} <span style={{color:'#E53935'}}>*</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={bezeichnung}
+                        onChange={function(e){ setBezeichnung(e.target.value); }}
+                        placeholder={t('fotos.raum.feld.bezeichnung.platzhalter')}
+                        style={maInputStyle}
+                        autoFocus={istNeu}/>
+                </div>
+
+                {/* Nummer (optional) */}
+                <div style={{marginBottom:16}}>
+                    <label style={maLabelStyle}>{t('fotos.raum.feld.nummer')}</label>
+                    <input
+                        type="text"
+                        inputMode="text"
+                        value={nummer}
+                        onChange={function(e){ setNummer(e.target.value); }}
+                        placeholder={t('fotos.raum.feld.nummer.platzhalter')}
+                        style={maInputStyle}/>
+                </div>
+
+                {/* Geschoss */}
+                <div style={{marginBottom:16}}>
+                    <label style={maLabelStyle}>{t('fotos.raum.feld.geschoss')}</label>
+                    <div style={{display:'flex', gap:6}}>
+                        {MA_GESCHOSSE.map(function(g){
+                            const aktiv = geschoss === g;
+                            return (
+                                <button
+                                    key={g}
+                                    onClick={function(){ setGeschoss(g); }}
+                                    style={{
+                                        flex:1,
+                                        padding:'12px',
+                                        borderRadius:10,
+                                        fontSize:'0.95rem',
+                                        fontWeight:700,
+                                        fontFamily:'var(--font-headline, Oswald)',
+                                        border: aktiv ? '2px solid #1E88E5' : '1px solid #DDD',
+                                        background: aktiv ? '#E3F2FD' : '#fff',
+                                        color: aktiv ? '#1565C0' : '#666',
+                                        cursor:'pointer',
+                                        minHeight:44
+                                    }}>
+                                    {g}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Wandzahl */}
+                <div style={{marginBottom:16}}>
+                    <label style={maLabelStyle}>{t('fotos.raum.feld.wandzahl')}</label>
+                    <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+                        {MA_WANDZAHLEN.map(function(n){
+                            const aktiv = wandzahl === n;
+                            return (
+                                <button
+                                    key={n}
+                                    onClick={function(){ setWandzahl(n); }}
+                                    style={{
+                                        flex:'1 1 60px',
+                                        padding:'12px 8px',
+                                        borderRadius:10,
+                                        fontSize:'1.05rem',
+                                        fontWeight:700,
+                                        fontFamily:'var(--font-headline, Oswald)',
+                                        border: aktiv ? '2px solid #43A047' : '1px solid #DDD',
+                                        background: aktiv ? '#E8F5E9' : '#fff',
+                                        color: aktiv ? '#2E7D32' : '#666',
+                                        cursor:'pointer',
+                                        minHeight:48
+                                    }}>
+                                    {n}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Boden / Decke */}
+                <div style={{marginBottom:20}}>
+                    <label style={maLabelStyle}>{t('fotos.raum.feld.zusaetze')}</label>
+                    <div style={{display:'flex', gap:8}}>
+                        <MAToggleKachel
+                            label={t('fotos.raum.boden')}
+                            aktiv={hatBoden}
+                            onClick={function(){ setHatBoden(!hatBoden); }}/>
+                        <MAToggleKachel
+                            label={t('fotos.raum.decke')}
+                            aktiv={hatDecke}
+                            onClick={function(){ setHatDecke(!hatDecke); }}/>
+                    </div>
+                </div>
+
+                {/* Fehler-Anzeige */}
+                {fehler ? (
+                    <div style={{
+                        padding:'10px 14px',
+                        background:'#FFEBEE',
+                        color:'#C62828',
+                        borderRadius:8,
+                        fontSize:'0.85rem',
+                        marginBottom:14
+                    }}>
+                        {fehler}
+                    </div>
+                ) : null}
+
+                {/* Speichern + Abbrechen */}
+                <div style={{display:'flex', gap:10}}>
+                    <button
+                        onClick={onAbbrechen}
+                        disabled={speichern}
+                        style={{
+                            flex:1,
+                            padding:'14px',
+                            background:'#fff',
+                            color:'#666',
+                            border:'1px solid #DDD',
+                            borderRadius:10,
+                            fontSize:'0.95rem',
+                            fontWeight:600,
+                            cursor: speichern ? 'not-allowed' : 'pointer',
+                            opacity: speichern ? 0.5 : 1,
+                            minHeight:50
+                        }}>
+                        {t('fotos.raum.abbrechen')}
+                    </button>
+                    <button
+                        onClick={handleSpeichern}
+                        disabled={speichern}
+                        style={{
+                            flex:2,
+                            padding:'14px',
+                            background: speichern
+                                ? '#90CAF9'
+                                : 'linear-gradient(135deg, #43A047, #2E7D32)',
+                            color:'#fff',
+                            border:'none',
+                            borderRadius:10,
+                            fontSize:'1rem',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            cursor: speichern ? 'not-allowed' : 'pointer',
+                            boxShadow: speichern ? 'none' : '0 4px 12px rgba(67,160,71,0.3)',
+                            minHeight:50
+                        }}>
+                        {speichern ? t('fotos.raum.speichern.laeuft') : t('fotos.raum.speichern')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Sub-Komponente: Toggle-Kachel fuer Boden/Decke
+function MAToggleKachel({ label, aktiv, onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            style={{
+                flex:1,
+                padding:'12px',
+                borderRadius:10,
+                fontSize:'0.92rem',
+                fontWeight:600,
+                fontFamily:'var(--font-headline, Oswald)',
+                border: aktiv ? '2px solid #455A64' : '1px solid #DDD',
+                background: aktiv ? '#ECEFF1' : '#fff',
+                color: aktiv ? '#263238' : '#666',
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                justifyContent:'center',
+                gap:8,
+                minHeight:48
+            }}>
+            <span style={{
+                width:18, height:18, borderRadius:5,
+                border:'2px solid '+(aktiv ? '#455A64' : '#999'),
+                background: aktiv ? '#455A64' : '#fff',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                color:'#fff', fontSize:'0.7rem', fontWeight:900
+            }}>
+                {aktiv ? '\u2713' : ''}
+            </span>
+            {label}
+        </button>
+    );
+}
+
+// ============================================================
+// MAPhaseAuswahl - Stufe 3: 3 Phase-Buttons mit Fortschritt
+// ============================================================
+// Pro Phase: "X von Y Waenden dokumentiert" (Fortschritts-Indikator).
+// Master-Dokument 8.5.
+
+function MAPhaseAuswahl({ baustelle, raum, aenderungsKey, onZurueck, onPhaseGewaehlt }) {
+    const lang = useSprache();
+    const [fortschritt, setFortschritt] = useState({ rohzustand: 0, vorarbeiten: 0, fertigstellung: 0 });
+
+    // Anzahl moeglicher Foto-Slots (Waende + ggf. Boden + ggf. Decke)
+    const slotsTotal = (raum.wandzahl || 4) + (raum.hatBoden ? 1 : 0) + (raum.hatDecke ? 1 : 0);
+
+    // Foto-Anzahl pro Phase laden. aenderungsKey loest reload aus, wenn
+    // ein Foto in der Wand-Raster-Ansicht hinzugefuegt/geloescht wurde.
+    useEffect(function(){
+        if (!window.TWMaStorage || !window.TWMaStorage.zaehleFotos) return;
+        window.TWMaStorage.zaehleFotos(raum.id).then(function(map){
+            setFortschritt(map || { rohzustand: 0, vorarbeiten: 0, fertigstellung: 0 });
+        }).catch(function(){});
+    }, [raum.id, aenderungsKey]);
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={raum.bezeichnung + (raum.nummer ? ' \u00B7 ' + raum.nummer : '')}
+                untertitel={(raum.geschoss || '') + ' \u00B7 ' + t('fotos.raum.waende', { n: raum.wandzahl || 4 })}
+                onZurueck={onZurueck}/>
+
+            <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
+                <div style={{
+                    fontSize:'0.85rem',
+                    color:'#666',
+                    marginBottom:14,
+                    textAlign:'center'
+                }}>
+                    {t('fotos.phase.intro')}
+                </div>
+
+                <div style={{display:'flex', flexDirection:'column', gap:12}}>
+                    {MA_FOTO_PHASEN.map(function(phase){
+                        const anzahl = fortschritt[phase.key] || 0;
+                        return (
+                            <MAPhaseKachel
+                                key={phase.key}
+                                phase={phase}
+                                anzahlFotos={anzahl}
+                                slotsTotal={slotsTotal}
+                                onClick={function(){ onPhaseGewaehlt(phase); }}/>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// Sub-Komponente: einzelne Phase-Kachel
+function MAPhaseKachel({ phase, anzahlFotos, slotsTotal, onClick }) {
+    const [pressed, setPressed] = useState(false);
+    const prozent = slotsTotal > 0 ? Math.round((anzahlFotos / slotsTotal) * 100) : 0;
+    const fertig = anzahlFotos >= slotsTotal && slotsTotal > 0;
+
+    return (
+        <button
+            onClick={onClick}
+            onPointerDown={function(){ setPressed(true); }}
+            onPointerUp={function(){ setPressed(false); }}
+            onPointerLeave={function(){ setPressed(false); }}
+            style={{
+                width:'100%',
+                padding:'18px 18px',
+                background:'#fff',
+                border:'1px solid #E0E0E0',
+                borderLeftWidth:6,
+                borderLeftStyle:'solid',
+                borderLeftColor: phase.color,
+                borderRadius:12,
+                cursor:'pointer',
+                boxShadow: pressed ? '0 1px 4px rgba(0,0,0,0.05)' : '0 4px 12px rgba(0,0,0,0.05)',
+                transform: pressed ? 'translateY(1px)' : 'translateY(0)',
+                transition:'all 0.12s ease-out',
+                textAlign:'left',
+                minHeight:90
+            }}>
+            <div style={{display:'flex', alignItems:'center', gap:14}}>
+                {/* Phase-Nummer als Kreis */}
+                <div style={{
+                    width:46, height:46,
+                    borderRadius:'50%',
+                    background: phase.color,
+                    color:'#fff',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    fontSize:'1.4rem', fontWeight:700,
+                    fontFamily:'var(--font-headline, Oswald)',
+                    flexShrink:0,
+                    boxShadow:'0 3px 8px '+phase.color+'55'
+                }}>
+                    {phase.nr}
+                </div>
+
+                <div style={{flex:1, minWidth:0}}>
+                    <div style={{
+                        fontSize:'1.05rem',
+                        fontWeight:700,
+                        color:'#212121',
+                        fontFamily:'var(--font-headline, Oswald)',
+                        marginBottom:2
+                    }}>
+                        {t('fotos.phase.' + phase.key + '.label')}
+                    </div>
+                    <div style={{fontSize:'0.85rem', color:'#666', marginBottom:6}}>
+                        {t('fotos.phase.' + phase.key + '.subtitle')}
+                    </div>
+                    {/* Fortschritt */}
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                        <div style={{
+                            flex:1,
+                            height:6,
+                            background:'#EEE',
+                            borderRadius:3,
+                            overflow:'hidden'
+                        }}>
+                            <div style={{
+                                height:'100%',
+                                width: prozent + '%',
+                                background: phase.color,
+                                transition:'width 0.3s ease'
+                            }}/>
+                        </div>
+                        <div style={{
+                            fontSize:'0.78rem',
+                            color: fertig ? '#2E7D32' : '#666',
+                            fontWeight: fertig ? 700 : 500,
+                            whiteSpace:'nowrap'
+                        }}>
+                            {fertig ? '\u2713 ' : ''}{anzahlFotos}/{slotsTotal}
+                        </div>
+                    </div>
+                </div>
+
+                <span style={{color:'#999', fontSize:'1.4rem', flexShrink:0}}>{'\u203A'}</span>
+            </div>
+        </button>
+    );
+}
+
+// ============================================================
+// MAWandRaster - Stufe 4: Wand-Kachel-Raster + Foto-Aufnahme (B6.2)
+// ============================================================
+// Master-Dokument 8.6 + 8.7:
+//   - Bei 4 Waenden: 2x2-Grid, bei 6 Waenden: 3x2, bei 8: 4x2
+//   - Plus Boden + Decke (optional)
+//   - Klick auf Kachel: bei leerer Kachel direkt Kamera, bei
+//     belegter Kachel Detail-Dialog (Foto anzeigen + Aktionen).
+//   - Foto wird via <input capture="environment"> aufgenommen, mit
+//     Canvas auf 1920px / q=0.85 komprimiert und in IndexedDB
+//     persistiert.
+
+function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
+    const lang = useSprache();
+    const [fotosByWand, setFotosByWand] = useState({});
+    const [laden, setLaden] = useState(true);
+
+    // Aktive Wand fuer den Aufnahme-/Vorschau-Workflow
+    const [aktiveWand, setAktiveWand] = useState(null);
+    // Vorschau-Foto (frisch aufgenommen, noch nicht gespeichert)
+    const [vorschauFoto, setVorschauFoto] = useState(null);
+    const [komprimiere, setKomprimiere] = useState(false);
+    const [fehler, setFehler] = useState(null);
+
+    const fileInputRef = React.useRef(null);
+
+    // Fotos der aktuellen Phase laden
+    function reloadFotos() {
+        if (!window.TWMaStorage || !window.TWMaStorage.listFotos) {
+            setLaden(false);
+            return;
+        }
+        setLaden(true);
+        window.TWMaStorage.listFotos(raum.id, phase.key).then(function(liste){
+            const map = {};
+            (liste || []).forEach(function(f){ map[f.wand_id] = f; });
+            setFotosByWand(map);
+            setLaden(false);
+        }).catch(function(){
+            setFotosByWand({});
+            setLaden(false);
+        });
+    }
+
+    useEffect(function(){
+        reloadFotos();
+    }, [raum.id, phase.key]);
+
+    // Wand-Liste (Master-Dokument 8.6)
+    const waende = [];
+    for (let i = 1; i <= (raum.wandzahl || 4); i++) {
+        waende.push({ id: 'wand-'+i, kind: 'wand', nr: i });
+    }
+    if (raum.hatBoden) waende.push({ id: 'boden', kind: 'boden' });
+    if (raum.hatDecke) waende.push({ id: 'decke', kind: 'decke' });
+
+    // Grid-Spalten je nach Wandzahl (Master-Dokument 8.6)
+    const wandzahl = raum.wandzahl || 4;
+    let spalten;
+    if (wandzahl <= 4) spalten = 2;
+    else if (wandzahl <= 6) spalten = 3;
+    else spalten = 4;
+
+    // ------------------------------------------------------------
+    // Workflow: Kachel-Klick
+    // ------------------------------------------------------------
+    function handleWandClick(wand) {
+        const vorhanden = fotosByWand[wand.id];
+        setAktiveWand(wand);
+        setFehler(null);
+        if (vorhanden) {
+            // Wand hat bereits ein Foto - Detail-Dialog zeigen
+            setVorschauFoto(null);
+        } else {
+            // Wand leer - Kamera direkt oeffnen
+            setVorschauFoto(null);
+            triggerKamera();
+        }
+    }
+
+    function triggerKamera() {
+        if (!fileInputRef.current) return;
+        fileInputRef.current.value = ''; // damit gleiche Datei nochmal triggern kann
+        fileInputRef.current.click();
+    }
+
+    // File ausgewaehlt -> komprimieren -> Vorschau anzeigen
+    function handleFileChange(e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!window.TWMaStorage || !window.TWMaStorage.compressFileToDataUrl) {
+            setFehler(t('fotos.aufnahme.fehler.storage'));
+            return;
+        }
+        setKomprimiere(true);
+        setFehler(null);
+        window.TWMaStorage.compressFileToDataUrl(file, 1920, 0.85)
+            .then(function(res){
+                setVorschauFoto({
+                    dataUrl: res.dataUrl,
+                    breite: res.breite,
+                    hoehe:  res.hoehe,
+                    originalGroesse: res.originalGroesse,
+                    neueGroesse:     res.neueGroesse
+                });
+                setKomprimiere(false);
+            })
+            .catch(function(err){
+                setKomprimiere(false);
+                setFehler(t('fotos.aufnahme.fehler.komprimierung') + ' ' + (err.message || ''));
+            });
+    }
+
+    // "Verwenden" - Foto in IndexedDB speichern
+    function handleVerwenden() {
+        if (!vorschauFoto || !aktiveWand) return;
+        if (!window.TWMaStorage || !window.TWMaStorage.saveFoto) {
+            setFehler(t('fotos.aufnahme.fehler.storage'));
+            return;
+        }
+
+        const baustelleId = baustelle.id || baustelle.staging_folder_id || baustelle.name;
+        const onb = (window.TWMaCore && window.TWMaCore.getDeviceId) ? window.TWMaCore.getDeviceId() : 'unbekannt';
+        const fotoId = 'foto-' + raum.id + '-' + phase.key + '-' + aktiveWand.id + '-' + Date.now();
+
+        // Thumbnail im Hintergrund erzeugen (Wand-Kachel wird damit befuellt)
+        const thumbPromise = (window.TWMaStorage.erzeugeThumbnail
+            ? window.TWMaStorage.erzeugeThumbnail(vorschauFoto.dataUrl, 220)
+            : Promise.resolve(null));
+
+        thumbPromise.then(function(thumb){
+            const datensatz = {
+                id: fotoId,
+                baustelle_id: baustelleId,
+                raum_id: raum.id,
+                phase: phase.key,
+                wand_id: aktiveWand.id,
+                wand_kind: aktiveWand.kind,
+                wand_nr: aktiveWand.nr || null,
+                foto_dataurl: vorschauFoto.dataUrl,
+                thumbnail_dataurl: thumb,
+                breite: vorschauFoto.breite,
+                hoehe:  vorschauFoto.hoehe,
+                drawings: [],
+                crop_rect: null,
+                notiz_original: null,
+                notiz_deutsch: null,
+                aufgenommen_am: new Date().toISOString(),
+                aufgenommen_von: onb,
+                sync_status: 'pending'
+            };
+            return window.TWMaStorage.saveFoto(datensatz);
+        }).then(function(){
+            setVorschauFoto(null);
+            setAktiveWand(null);
+            reloadFotos();
+            if (typeof onAenderung === 'function') onAenderung();
+        }).catch(function(err){
+            setFehler(t('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
+        });
+    }
+
+    function handleWiederholen() {
+        setVorschauFoto(null);
+        setFehler(null);
+        triggerKamera();
+    }
+
+    function handleAbbrechen() {
+        setVorschauFoto(null);
+        setAktiveWand(null);
+        setFehler(null);
+    }
+
+    function handleFotoNeu() {
+        // Fotos einer Wand werden ersetzt: vorhandene id beibehalten waere
+        // konsistenter, aber einfacher ist altes loeschen + neues machen.
+        // Wir loeschen das alte erst nach erfolgreichem Speichern (im saveFoto-
+        // path - aber da nutzen wir andere id). Einfacher: alte Foto-id beibehalten:
+        // wir wechseln in den Aufnahme-Modus und ueberschreiben beim Speichern.
+        triggerKamera();
+    }
+
+    function handleFotoLoeschen() {
+        if (!aktiveWand) return;
+        const vorhanden = fotosByWand[aktiveWand.id];
+        if (!vorhanden) return;
+        if (!confirm(t('fotos.aufnahme.loeschen.bestaetigen'))) return;
+        if (!window.TWMaStorage || !window.TWMaStorage.deleteFoto) return;
+        window.TWMaStorage.deleteFoto(vorhanden.id).then(function(){
+            setAktiveWand(null);
+            reloadFotos();
+            if (typeof onAenderung === 'function') onAenderung();
+        }).catch(function(err){
+            setFehler(t('fotos.aufnahme.fehler.loeschen') + ' ' + (err.message || ''));
+        });
+    }
+
+    // Anzahl belegter Waende fuer Header-Anzeige
+    const slotsTotal = waende.length;
+    const belegt = waende.filter(function(w){ return !!fotosByWand[w.id]; }).length;
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={t('fotos.phase.' + phase.key + '.label')}
+                untertitel={raum.bezeichnung + (raum.geschoss ? ' \u00B7 ' + raum.geschoss : '') + ' \u00B7 ' + belegt + '/' + slotsTotal}
+                farbe={phase.color}
+                onZurueck={onZurueck}/>
+
+            <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
+                {/* Phase-Banner */}
+                <div style={{
+                    padding:'10px 14px',
+                    background: phase.color + '15',
+                    border:'1px solid ' + phase.color + '55',
+                    borderRadius:8,
+                    fontSize:'0.85rem',
+                    color:'#333',
+                    marginBottom:14,
+                    display:'flex',
+                    alignItems:'center',
+                    gap:8
+                }}>
+                    <div style={{
+                        width:10, height:10, borderRadius:'50%',
+                        background: phase.color, flexShrink:0
+                    }}/>
+                    <span>{t('fotos.phase.' + phase.key + '.subtitle')}</span>
+                </div>
+
+                {laden ? (
+                    <div style={{textAlign:'center', padding:30, color:'#999', fontSize:'0.9rem'}}>
+                        {t('fotos.aufnahme.lade')}
+                    </div>
+                ) : (
+                    <React.Fragment>
+                        {/* Waende-Grid */}
+                        <div style={{
+                            display:'grid',
+                            gridTemplateColumns:'repeat(' + spalten + ', 1fr)',
+                            gap:8,
+                            marginBottom:16
+                        }}>
+                            {waende.filter(function(w){ return w.kind === 'wand'; }).map(function(w){
+                                const foto = fotosByWand[w.id];
+                                return (
+                                    <MAWandKachel
+                                        key={w.id}
+                                        wand={w}
+                                        phase={phase}
+                                        foto={foto}
+                                        onClick={function(){ handleWandClick(w); }}/>
+                                );
+                            })}
+                        </div>
+
+                        {/* Boden / Decke separat */}
+                        {(raum.hatBoden || raum.hatDecke) ? (
+                            <div style={{
+                                display:'grid',
+                                gridTemplateColumns:'repeat(2, 1fr)',
+                                gap:8
+                            }}>
+                                {raum.hatBoden ? (
+                                    <MAWandKachel
+                                        wand={{ id:'boden', kind:'boden' }}
+                                        phase={phase}
+                                        foto={fotosByWand['boden']}
+                                        onClick={function(){ handleWandClick({ id:'boden', kind:'boden' }); }}/>
+                                ) : null}
+                                {raum.hatDecke ? (
+                                    <MAWandKachel
+                                        wand={{ id:'decke', kind:'decke' }}
+                                        phase={phase}
+                                        foto={fotosByWand['decke']}
+                                        onClick={function(){ handleWandClick({ id:'decke', kind:'decke' }); }}/>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </React.Fragment>
+                )}
+            </div>
+
+            {/* Hidden file input fuer Kamera */}
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                style={{display:'none'}}/>
+
+            {/* Komprimieren-Indikator */}
+            {komprimiere ? (
+                <MAOverlay>
+                    <MAOverlayBox>
+                        <div style={{fontSize:'2.2rem', marginBottom:10}}>{'\u{23F3}'}</div>
+                        <div style={{fontSize:'0.95rem', fontWeight:600, color:'#212121'}}>
+                            {t('fotos.aufnahme.komprimiere')}
+                        </div>
+                    </MAOverlayBox>
+                </MAOverlay>
+            ) : null}
+
+            {/* Fehler-Snackbar */}
+            {fehler ? (
+                <div
+                    onClick={function(){ setFehler(null); }}
+                    style={{
+                        position:'fixed',
+                        bottom:16, left:16, right:16,
+                        background:'#C62828',
+                        color:'#fff',
+                        padding:'12px 16px',
+                        borderRadius:10,
+                        boxShadow:'0 6px 20px rgba(0,0,0,0.3)',
+                        zIndex:1100,
+                        fontSize:'0.9rem',
+                        cursor:'pointer'
+                    }}>
+                    {fehler}
+                </div>
+            ) : null}
+
+            {/* Vorschau-Dialog (frisch aufgenommen) */}
+            {vorschauFoto && aktiveWand ? (
+                <MAFotoVorschau
+                    foto={vorschauFoto}
+                    wand={aktiveWand}
+                    phase={phase}
+                    onWiederholen={handleWiederholen}
+                    onVerwenden={handleVerwenden}
+                    onAbbrechen={handleAbbrechen}/>
+            ) : null}
+
+            {/* Detail-Dialog (vorhandenes Foto) */}
+            {!vorschauFoto && aktiveWand && fotosByWand[aktiveWand.id] && !komprimiere ? (
+                <MAFotoDetail
+                    foto={fotosByWand[aktiveWand.id]}
+                    wand={aktiveWand}
+                    phase={phase}
+                    onSchliessen={handleAbbrechen}
+                    onNeuFotografieren={handleFotoNeu}
+                    onLoeschen={handleFotoLoeschen}/>
+            ) : null}
+        </div>
+    );
+}
+
+// Sub-Komponente: einzelne Wand-Kachel
+function MAWandKachel({ wand, phase, foto, onClick }) {
+    const [pressed, setPressed] = useState(false);
+    const hatFoto = !!foto;
+
+    let label;
+    let icon;
+    if (wand.kind === 'wand') { label = t('fotos.wand.label', { n: wand.nr }); icon = '\u{1F9F1}'; }
+    else if (wand.kind === 'boden') { label = t('fotos.boden'); icon = '\u{1F538}'; }
+    else if (wand.kind === 'decke') { label = t('fotos.decke'); icon = '\u{1F537}'; }
+
+    const thumbUrl = foto && (foto.thumbnail_dataurl || foto.foto_dataurl);
+
+    return (
+        <button
+            onClick={onClick}
+            onPointerDown={function(){ setPressed(true); }}
+            onPointerUp={function(){ setPressed(false); }}
+            onPointerLeave={function(){ setPressed(false); }}
+            style={{
+                aspectRatio:'1 / 1',
+                padding:0,
+                background: hatFoto ? '#000' : '#fff',
+                border:'2px solid ' + (hatFoto ? '#43A047' : '#DDD'),
+                borderRadius:12,
+                cursor:'pointer',
+                boxShadow: pressed
+                    ? '0 1px 3px rgba(0,0,0,0.06)'
+                    : '0 2px 8px rgba(0,0,0,0.05)',
+                display:'flex',
+                flexDirection:'column',
+                alignItems:'center',
+                justifyContent:'center',
+                gap:6,
+                position:'relative',
+                overflow:'hidden',
+                transform: pressed ? 'translateY(1px)' : 'translateY(0)',
+                transition:'all 0.12s ease-out'
+            }}>
+            {/* Hintergrund-Thumbnail wenn Foto vorhanden */}
+            {thumbUrl ? (
+                <img
+                    src={thumbUrl}
+                    alt={label}
+                    style={{
+                        position:'absolute', inset:0,
+                        width:'100%', height:'100%',
+                        objectFit:'cover',
+                        borderRadius:10
+                    }}/>
+            ) : null}
+
+            {/* Overlay fuer Lesbarkeit der Beschriftung */}
+            {hatFoto ? (
+                <div style={{
+                    position:'absolute', left:0, right:0, bottom:0,
+                    height:'40%',
+                    background:'linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0))',
+                    pointerEvents:'none'
+                }}/>
+            ) : null}
+
+            {!hatFoto ? (
+                <React.Fragment>
+                    <div style={{fontSize:'1.8rem', opacity:0.7}}>{icon}</div>
+                    <div style={{
+                        fontSize:'0.82rem',
+                        fontWeight:600,
+                        color:'#666',
+                        fontFamily:'var(--font-headline, Oswald)',
+                        textAlign:'center',
+                        padding:'0 4px'
+                    }}>
+                        {label}
+                    </div>
+                </React.Fragment>
+            ) : (
+                <div style={{
+                    position:'absolute', left:8, right:8, bottom:6,
+                    fontSize:'0.78rem',
+                    fontWeight:700,
+                    color:'#fff',
+                    fontFamily:'var(--font-headline, Oswald)',
+                    textShadow:'0 1px 3px rgba(0,0,0,0.6)',
+                    textAlign:'center'
+                }}>
+                    {label}
+                </div>
+            )}
+
+            {/* Status-Badge oben rechts */}
+            <div style={{
+                position:'absolute',
+                top:6, right:6,
+                width:22, height:22,
+                borderRadius:'50%',
+                background: hatFoto ? '#43A047' : '#DDD',
+                color:'#fff',
+                fontSize:'0.85rem',
+                fontWeight:700,
+                display:'flex', alignItems:'center', justifyContent:'center',
+                lineHeight:1,
+                boxShadow: hatFoto ? '0 2px 6px rgba(67,160,71,0.5)' : 'none',
+                border: hatFoto ? '2px solid #fff' : 'none'
+            }}>
+                {hatFoto ? '\u2713' : ''}
+            </div>
+        </button>
+    );
+}
+
+// ============================================================
+// MAOverlay / MAOverlayBox - Wiederverwendete Modal-Helper
+// ============================================================
+
+function MAOverlay({ children, onClick }) {
+    return (
+        <div
+            onClick={onClick}
+            style={{
+                position:'fixed', inset:0,
+                background:'rgba(0,0,0,0.65)',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                zIndex:1050,
+                padding:16
+            }}>
+            {children}
+        </div>
+    );
+}
+
+function MAOverlayBox({ children, breit }) {
+    return (
+        <div
+            onClick={function(e){ e.stopPropagation(); }}
+            style={{
+                background:'#fff',
+                borderRadius:14,
+                padding:'18px 18px',
+                maxWidth: breit ? 600 : 420,
+                width:'100%',
+                textAlign:'center',
+                boxShadow:'0 16px 40px rgba(0,0,0,0.4)',
+                maxHeight:'90vh',
+                overflowY:'auto'
+            }}>
+            {children}
+        </div>
+    );
+}
+
+// ============================================================
+// MAFotoVorschau - frisch aufgenommenes Foto bestaetigen
+// ============================================================
+// Master-Dokument 8.7: Vorschau mit "Wiederholen" (rotes X) und
+// "Verwenden" (gruener Haken).
+
+function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbrechen }) {
+    const lang = useSprache();
+
+    let wandLabel;
+    if (wand.kind === 'wand') wandLabel = t('fotos.wand.label', { n: wand.nr });
+    else if (wand.kind === 'boden') wandLabel = t('fotos.boden');
+    else if (wand.kind === 'decke') wandLabel = t('fotos.decke');
+
+    return (
+        <MAOverlay onClick={onAbbrechen}>
+            <MAOverlayBox breit={true}>
+                {/* Header */}
+                <div style={{
+                    display:'flex', alignItems:'center', gap:10, marginBottom:12,
+                    paddingBottom:10, borderBottom:'1px solid #EEE'
+                }}>
+                    <div style={{
+                        width:8, height:30, borderRadius:4,
+                        background: phase.color
+                    }}/>
+                    <div style={{flex:1, textAlign:'left'}}>
+                        <div style={{fontSize:'0.95rem', fontWeight:700, color:'#212121', fontFamily:'var(--font-headline, Oswald)'}}>
+                            {wandLabel}
+                        </div>
+                        <div style={{fontSize:'0.78rem', color:'#666'}}>
+                            {t('fotos.phase.' + phase.key + '.label')}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onAbbrechen}
+                        style={{
+                            background:'transparent', border:'none', cursor:'pointer',
+                            fontSize:'1.4rem', color:'#999',
+                            padding:'4px 8px'
+                        }}
+                        title={t('fotos.aufnahme.abbrechen')}>
+                        {'\u2715'}
+                    </button>
+                </div>
+
+                {/* Foto-Vorschau */}
+                <div style={{
+                    background:'#000',
+                    borderRadius:10,
+                    overflow:'hidden',
+                    marginBottom:12,
+                    aspectRatio:'4 / 3',
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                }}>
+                    <img
+                        src={foto.dataUrl}
+                        alt="Vorschau"
+                        style={{
+                            maxWidth:'100%', maxHeight:'60vh',
+                            objectFit:'contain'
+                        }}/>
+                </div>
+
+                {/* Foto-Infos klein */}
+                <div style={{
+                    fontSize:'0.72rem', color:'#999',
+                    marginBottom:14,
+                    fontFamily:'monospace'
+                }}>
+                    {foto.breite + ' \u00D7 ' + foto.hoehe + ' px'}
+                    {foto.neueGroesse ? ' \u00B7 ' + Math.round(foto.neueGroesse / 1024) + ' KB' : ''}
+                </div>
+
+                {/* Buttons: Wiederholen / Verwenden */}
+                <div style={{display:'flex', gap:10}}>
+                    <button
+                        onClick={onWiederholen}
+                        style={{
+                            flex:1,
+                            padding:'14px',
+                            background:'#fff',
+                            color:'#C62828',
+                            border:'2px solid #C62828',
+                            borderRadius:10,
+                            fontSize:'0.95rem',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            cursor:'pointer',
+                            minHeight:50,
+                            display:'flex',
+                            alignItems:'center',
+                            justifyContent:'center',
+                            gap:8
+                        }}>
+                        <span style={{fontSize:'1.1rem'}}>{'\u21BB'}</span>
+                        {t('fotos.aufnahme.wiederholen')}
+                    </button>
+                    <button
+                        onClick={onVerwenden}
+                        style={{
+                            flex:2,
+                            padding:'14px',
+                            background:'linear-gradient(135deg, #43A047, #2E7D32)',
+                            color:'#fff',
+                            border:'none',
+                            borderRadius:10,
+                            fontSize:'1rem',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            cursor:'pointer',
+                            minHeight:50,
+                            display:'flex',
+                            alignItems:'center',
+                            justifyContent:'center',
+                            gap:8,
+                            boxShadow:'0 4px 12px rgba(67,160,71,0.4)'
+                        }}>
+                        <span style={{fontSize:'1.1rem'}}>{'\u2713'}</span>
+                        {t('fotos.aufnahme.verwenden')}
+                    </button>
+                </div>
+            </MAOverlayBox>
+        </MAOverlay>
+    );
+}
+
+// ============================================================
+// MAFotoDetail - vorhandenes Foto anzeigen + Aktionen
+// ============================================================
+
+function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onLoeschen }) {
+    const lang = useSprache();
+
+    let wandLabel;
+    if (wand.kind === 'wand') wandLabel = t('fotos.wand.label', { n: wand.nr });
+    else if (wand.kind === 'boden') wandLabel = t('fotos.boden');
+    else if (wand.kind === 'decke') wandLabel = t('fotos.decke');
+
+    // Aufnahme-Zeit kurz formatieren
+    let zeit = '';
+    try {
+        const d = new Date(foto.aufgenommen_am);
+        zeit = d.toLocaleString('de-DE', {
+            day:'2-digit', month:'2-digit', year:'numeric',
+            hour:'2-digit', minute:'2-digit'
+        });
+    } catch(e) {}
+
+    return (
+        <MAOverlay onClick={onSchliessen}>
+            <MAOverlayBox breit={true}>
+                {/* Header */}
+                <div style={{
+                    display:'flex', alignItems:'center', gap:10, marginBottom:12,
+                    paddingBottom:10, borderBottom:'1px solid #EEE'
+                }}>
+                    <div style={{
+                        width:8, height:30, borderRadius:4,
+                        background: phase.color
+                    }}/>
+                    <div style={{flex:1, textAlign:'left'}}>
+                        <div style={{fontSize:'0.95rem', fontWeight:700, color:'#212121', fontFamily:'var(--font-headline, Oswald)'}}>
+                            {wandLabel}
+                        </div>
+                        <div style={{fontSize:'0.78rem', color:'#666'}}>
+                            {t('fotos.phase.' + phase.key + '.label')}
+                            {zeit ? ' \u00B7 ' + zeit : ''}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onSchliessen}
+                        style={{
+                            background:'transparent', border:'none', cursor:'pointer',
+                            fontSize:'1.4rem', color:'#999',
+                            padding:'4px 8px'
+                        }}>
+                        {'\u2715'}
+                    </button>
+                </div>
+
+                {/* Foto-Anzeige */}
+                <div style={{
+                    background:'#000',
+                    borderRadius:10,
+                    overflow:'hidden',
+                    marginBottom:12,
+                    display:'flex', alignItems:'center', justifyContent:'center'
+                }}>
+                    <img
+                        src={foto.foto_dataurl}
+                        alt={wandLabel}
+                        style={{
+                            maxWidth:'100%', maxHeight:'60vh',
+                            objectFit:'contain'
+                        }}/>
+                </div>
+
+                {/* Sync-Status klein */}
+                {foto.sync_status ? (
+                    <div style={{
+                        fontSize:'0.72rem', color:'#999',
+                        marginBottom:14,
+                        display:'flex', alignItems:'center', justifyContent:'center', gap:6
+                    }}>
+                        <span style={{
+                            width:8, height:8, borderRadius:'50%',
+                            background: foto.sync_status === 'uploaded' ? '#43A047'
+                                      : foto.sync_status === 'fehler'   ? '#C62828'
+                                      : '#FFA726'
+                        }}/>
+                        <span>{t('fotos.aufnahme.status.' + foto.sync_status)}</span>
+                    </div>
+                ) : null}
+
+                {/* Hinweis: Editor (Markieren / Zeichnen) kommt in B6.3 */}
+                <div style={{
+                    fontSize:'0.78rem',
+                    color:'#888',
+                    fontStyle:'italic',
+                    marginBottom:14,
+                    padding:'8px 12px',
+                    background:'#FFF8E1',
+                    borderRadius:8
+                }}>
+                    {t('fotos.aufnahme.editor.bald')}
+                </div>
+
+                {/* Aktions-Buttons */}
+                <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+                    <button
+                        onClick={onLoeschen}
+                        style={{
+                            flex:'1 1 100px',
+                            padding:'12px',
+                            background:'#fff',
+                            color:'#C62828',
+                            border:'1px solid #C62828',
+                            borderRadius:10,
+                            fontSize:'0.85rem',
+                            fontWeight:600,
+                            cursor:'pointer',
+                            minHeight:48
+                        }}>
+                        {'\u{1F5D1}\uFE0F'} {t('fotos.aufnahme.loeschen')}
+                    </button>
+                    <button
+                        onClick={onNeuFotografieren}
+                        style={{
+                            flex:'1 1 100px',
+                            padding:'12px',
+                            background:'#1E88E5',
+                            color:'#fff',
+                            border:'none',
+                            borderRadius:10,
+                            fontSize:'0.85rem',
+                            fontWeight:600,
+                            cursor:'pointer',
+                            minHeight:48
+                        }}>
+                        {'\u{1F4F7}'} {t('fotos.aufnahme.neu')}
+                    </button>
+                    <button
+                        onClick={onSchliessen}
+                        style={{
+                            flex:'2 1 120px',
+                            padding:'12px',
+                            background:'linear-gradient(135deg, #43A047, #2E7D32)',
+                            color:'#fff',
+                            border:'none',
+                            borderRadius:10,
+                            fontSize:'0.95rem',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            cursor:'pointer',
+                            minHeight:48
+                        }}>
+                        {t('fotos.aufnahme.ok')}
+                    </button>
+                </div>
+            </MAOverlayBox>
+        </MAOverlay>
+    );
+}
+
+// ============================================================
+// Hilfs-Komponente: SubHeader (analog zu MASubHeader in
+// tw-ma-baustellen.jsx, aber lokal hier um Doppelimporte zu
+// vermeiden)
+// ============================================================
+// Wenn MASubHeader bereits global ist, nutzen wir den; sonst Fallback.
+
+// (MASubHeader kommt aus tw-ma-baustellen.jsx und ist global.)
+
+// ============================================================
+// Hilfs-Styles (lokal, eindeutig benannt um Konflikte mit
+// tw-ma-baustellen.jsx zu vermeiden)
+// ============================================================
+
+const maLabelStyle = {
+    display:'block',
+    fontSize:'0.85rem',
+    fontWeight:600,
+    color:'#455A64',
+    marginBottom:6,
+    fontFamily:'var(--font-headline, Oswald)',
+    letterSpacing:'0.5px'
+};
+
+const maInputStyle = {
+    width:'100%',
+    padding:'12px 14px',
+    fontSize:'1rem',
+    border:'1px solid #DDD',
+    borderRadius:8,
+    background:'#fff',
+    boxSizing:'border-box',
+    fontFamily:'inherit',
+    outline:'none'
+};
+
+// ═══════════════════════════════════════════════════════════════════════
+// ENDE MODUL FOTOS
+// ═══════════════════════════════════════════════════════════════════════
 
     /* ═══════════════════════════════════════════════════════════
        TOP-LEVEL WRAPPER — verwaltet Sprache, rendert AuthContainer
