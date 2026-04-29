@@ -2161,7 +2161,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas+e6.1+e6.2';
+    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas+e6.1+e6.2+tFix';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -6598,11 +6598,11 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
             }}
             onRaumLoeschen={function(raum){
                 if (!window.TWMaStorage || !window.TWMaStorage.deleteRaum) return;
-                if (!confirm(t('fotos.raum.loeschen.bestaetigen', { name: raum.bezeichnung }))) return;
+                if (!confirm(tConfig('fotos.raum.loeschen.bestaetigen', { name: raum.bezeichnung }))) return;
                 window.TWMaStorage.deleteRaum(raum.id).then(function(){
                     reloadRaeume();
                 }).catch(function(err){
-                    alert(t('fotos.raum.loeschen.fehler') + '\n' + err.message);
+                    alert(tConfig('fotos.raum.loeschen.fehler') + '\n' + err.message);
                 });
             }}/>
     );
@@ -6627,7 +6627,7 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
     return (
         <div className="ma-bau-container" style={maContainerStyle}>
             <MASubHeader
-                titel={t('fotos.raumliste.titel')}
+                titel={tConfig('fotos.raumliste.titel')}
                 untertitel={baustelle.name || baustelle.id}
                 onZurueck={onZurueck}/>
 
@@ -6642,7 +6642,7 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
                     color:'#5D4037',
                     marginBottom:14
                 }}>
-                    {t('fotos.raumliste.hinweis')}
+                    {tConfig('fotos.raumliste.hinweis')}
                 </div>
 
                 {/* "Neuer Raum"-Button */}
@@ -6668,13 +6668,13 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
                         minHeight:54
                     }}>
                     <span style={{fontSize:'1.4rem', lineHeight:1}}>+</span>
-                    <span>{t('fotos.raum.neu')}</span>
+                    <span>{tConfig('fotos.raum.neu')}</span>
                 </button>
 
                 {/* Raum-Liste oder Empty-State */}
                 {laden ? (
                     <div style={{textAlign:'center', padding:40, color:'#999'}}>
-                        {t('fotos.raumliste.lade')}
+                        {tConfig('fotos.raumliste.lade')}
                     </div>
                 ) : sortierteRaeume.length === 0 ? (
                     <div style={{
@@ -6687,10 +6687,10 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
                     }}>
                         <div style={{fontSize:'2.5rem', marginBottom:8, opacity:0.5}}>{'\u{1F4D0}'}</div>
                         <div style={{fontSize:'0.95rem', fontWeight:600, color:'#666', marginBottom:4}}>
-                            {t('fotos.raumliste.leer.titel')}
+                            {tConfig('fotos.raumliste.leer.titel')}
                         </div>
                         <div style={{fontSize:'0.85rem'}}>
-                            {t('fotos.raumliste.leer.text')}
+                            {tConfig('fotos.raumliste.leer.text')}
                         </div>
                     </div>
                 ) : (
@@ -6775,7 +6775,7 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                         fontSize:'0.78rem',
                         color:'#666'
                     }}>
-                        {t('fotos.raum.waende', { n: raum.wandzahl || 4 })}
+                        {tConfig('fotos.raum.waende', { n: raum.wandzahl || 4 })}
                     </div>
                 </div>
 
@@ -6801,7 +6801,7 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                         flex:1,
                         minHeight:32
                     }}
-                    title={t('fotos.raum.bearbeiten')}>
+                    title={tConfig('fotos.raum.bearbeiten')}>
                     {'\u270F\uFE0F'}
                 </button>
                 <button
@@ -6816,7 +6816,7 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                         flex:1,
                         minHeight:32
                     }}
-                    title={t('fotos.raum.loeschen')}>
+                    title={tConfig('fotos.raum.loeschen')}>
                     {'\u{1F5D1}\uFE0F'}
                 </button>
             </div>
@@ -6845,15 +6845,15 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
     function handleSpeichern() {
         const bez = (bezeichnung || '').trim();
         if (!bez) {
-            setFehler(t('fotos.raum.fehler.bezeichnung'));
+            setFehler(tConfig('fotos.raum.fehler.bezeichnung'));
             return;
         }
         if (!baustelleId) {
-            setFehler(t('fotos.raum.fehler.baustelle'));
+            setFehler(tConfig('fotos.raum.fehler.baustelle'));
             return;
         }
         if (!window.TWMaStorage || !window.TWMaStorage.saveRaum) {
-            setFehler(t('fotos.raum.fehler.storage'));
+            setFehler(tConfig('fotos.raum.fehler.storage'));
             return;
         }
 
@@ -6879,46 +6879,46 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
             onGespeichert(istNeu ? datensatz : null);
         }).catch(function(err){
             setSpeichern(false);
-            setFehler(err.message || t('fotos.raum.fehler.speichern'));
+            setFehler(err.message || tConfig('fotos.raum.fehler.speichern'));
         });
     }
 
     return (
         <div className="ma-bau-container" style={maContainerStyle}>
             <MASubHeader
-                titel={istNeu ? t('fotos.raum.neu.titel') : t('fotos.raum.bearbeiten.titel')}
+                titel={istNeu ? tConfig('fotos.raum.neu.titel') : tConfig('fotos.raum.bearbeiten.titel')}
                 onZurueck={onAbbrechen}/>
 
             <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
                 {/* Bezeichnung */}
                 <div style={{marginBottom:16}}>
                     <label style={maLabelStyle}>
-                        {t('fotos.raum.feld.bezeichnung')} <span style={{color:'#E53935'}}>*</span>
+                        {tConfig('fotos.raum.feld.bezeichnung')} <span style={{color:'#E53935'}}>*</span>
                     </label>
                     <input
                         type="text"
                         value={bezeichnung}
                         onChange={function(e){ setBezeichnung(e.target.value); }}
-                        placeholder={t('fotos.raum.feld.bezeichnung.platzhalter')}
+                        placeholder={tConfig('fotos.raum.feld.bezeichnung.platzhalter')}
                         style={maInputStyle}
                         autoFocus={istNeu}/>
                 </div>
 
                 {/* Nummer (optional) */}
                 <div style={{marginBottom:16}}>
-                    <label style={maLabelStyle}>{t('fotos.raum.feld.nummer')}</label>
+                    <label style={maLabelStyle}>{tConfig('fotos.raum.feld.nummer')}</label>
                     <input
                         type="text"
                         inputMode="text"
                         value={nummer}
                         onChange={function(e){ setNummer(e.target.value); }}
-                        placeholder={t('fotos.raum.feld.nummer.platzhalter')}
+                        placeholder={tConfig('fotos.raum.feld.nummer.platzhalter')}
                         style={maInputStyle}/>
                 </div>
 
                 {/* Geschoss */}
                 <div style={{marginBottom:16}}>
-                    <label style={maLabelStyle}>{t('fotos.raum.feld.geschoss')}</label>
+                    <label style={maLabelStyle}>{tConfig('fotos.raum.feld.geschoss')}</label>
                     <div style={{display:'flex', gap:6}}>
                         {MA_GESCHOSSE.map(function(g){
                             const aktiv = geschoss === g;
@@ -6948,7 +6948,7 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
 
                 {/* Wandzahl */}
                 <div style={{marginBottom:16}}>
-                    <label style={maLabelStyle}>{t('fotos.raum.feld.wandzahl')}</label>
+                    <label style={maLabelStyle}>{tConfig('fotos.raum.feld.wandzahl')}</label>
                     <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
                         {MA_WANDZAHLEN.map(function(n){
                             const aktiv = wandzahl === n;
@@ -6978,14 +6978,14 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
 
                 {/* Boden / Decke */}
                 <div style={{marginBottom:20}}>
-                    <label style={maLabelStyle}>{t('fotos.raum.feld.zusaetze')}</label>
+                    <label style={maLabelStyle}>{tConfig('fotos.raum.feld.zusaetze')}</label>
                     <div style={{display:'flex', gap:8}}>
                         <MAToggleKachel
-                            label={t('fotos.raum.boden')}
+                            label={tConfig('fotos.raum.boden')}
                             aktiv={hatBoden}
                             onClick={function(){ setHatBoden(!hatBoden); }}/>
                         <MAToggleKachel
-                            label={t('fotos.raum.decke')}
+                            label={tConfig('fotos.raum.decke')}
                             aktiv={hatDecke}
                             onClick={function(){ setHatDecke(!hatDecke); }}/>
                     </div>
@@ -7023,7 +7023,7 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
                             opacity: speichern ? 0.5 : 1,
                             minHeight:50
                         }}>
-                        {t('fotos.raum.abbrechen')}
+                        {tConfig('fotos.raum.abbrechen')}
                     </button>
                     <button
                         onClick={handleSpeichern}
@@ -7044,7 +7044,7 @@ function MARaumDialog({ baustelleId, raum, onAbbrechen, onGespeichert }) {
                             boxShadow: speichern ? 'none' : '0 4px 12px rgba(67,160,71,0.3)',
                             minHeight:50
                         }}>
-                        {speichern ? t('fotos.raum.speichern.laeuft') : t('fotos.raum.speichern')}
+                        {speichern ? tConfig('fotos.raum.speichern.laeuft') : tConfig('fotos.raum.speichern')}
                     </button>
                 </div>
             </div>
@@ -7114,7 +7114,7 @@ function MAPhaseAuswahl({ baustelle, raum, aenderungsKey, onZurueck, onPhaseGewa
         <div className="ma-bau-container" style={maContainerStyle}>
             <MASubHeader
                 titel={raum.bezeichnung + (raum.nummer ? ' \u00B7 ' + raum.nummer : '')}
-                untertitel={(raum.geschoss || '') + ' \u00B7 ' + t('fotos.raum.waende', { n: raum.wandzahl || 4 })}
+                untertitel={(raum.geschoss || '') + ' \u00B7 ' + tConfig('fotos.raum.waende', { n: raum.wandzahl || 4 })}
                 onZurueck={onZurueck}/>
 
             <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
@@ -7124,7 +7124,7 @@ function MAPhaseAuswahl({ baustelle, raum, aenderungsKey, onZurueck, onPhaseGewa
                     marginBottom:14,
                     textAlign:'center'
                 }}>
-                    {t('fotos.phase.intro')}
+                    {tConfig('fotos.phase.intro')}
                 </div>
 
                 <div style={{display:'flex', flexDirection:'column', gap:12}}>
@@ -7197,10 +7197,10 @@ function MAPhaseKachel({ phase, anzahlFotos, slotsTotal, onClick }) {
                         fontFamily:'var(--font-headline, Oswald)',
                         marginBottom:2
                     }}>
-                        {t('fotos.phase.' + phase.key + '.label')}
+                        {tConfig('fotos.phase.' + phase.key + '.label')}
                     </div>
                     <div style={{fontSize:'0.85rem', color:'#666', marginBottom:6}}>
-                        {t('fotos.phase.' + phase.key + '.subtitle')}
+                        {tConfig('fotos.phase.' + phase.key + '.subtitle')}
                     </div>
                     {/* Fortschritt */}
                     <div style={{display:'flex', alignItems:'center', gap:8}}>
@@ -7326,7 +7326,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
         if (!window.TWMaStorage || !window.TWMaStorage.compressFileToDataUrl) {
-            setFehler(t('fotos.aufnahme.fehler.storage'));
+            setFehler(tConfig('fotos.aufnahme.fehler.storage'));
             return;
         }
         setKomprimiere(true);
@@ -7344,7 +7344,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
             })
             .catch(function(err){
                 setKomprimiere(false);
-                setFehler(t('fotos.aufnahme.fehler.komprimierung') + ' ' + (err.message || ''));
+                setFehler(tConfig('fotos.aufnahme.fehler.komprimierung') + ' ' + (err.message || ''));
             });
     }
 
@@ -7352,7 +7352,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
     function handleVerwenden() {
         if (!vorschauFoto || !aktiveWand) return;
         if (!window.TWMaStorage || !window.TWMaStorage.saveFoto) {
-            setFehler(t('fotos.aufnahme.fehler.storage'));
+            setFehler(tConfig('fotos.aufnahme.fehler.storage'));
             return;
         }
 
@@ -7393,7 +7393,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
             reloadFotos();
             if (typeof onAenderung === 'function') onAenderung();
         }).catch(function(err){
-            setFehler(t('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
+            setFehler(tConfig('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
         });
     }
 
@@ -7422,14 +7422,14 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
         if (!aktiveWand) return;
         const vorhanden = fotosByWand[aktiveWand.id];
         if (!vorhanden) return;
-        if (!confirm(t('fotos.aufnahme.loeschen.bestaetigen'))) return;
+        if (!confirm(tConfig('fotos.aufnahme.loeschen.bestaetigen'))) return;
         if (!window.TWMaStorage || !window.TWMaStorage.deleteFoto) return;
         window.TWMaStorage.deleteFoto(vorhanden.id).then(function(){
             setAktiveWand(null);
             reloadFotos();
             if (typeof onAenderung === 'function') onAenderung();
         }).catch(function(err){
-            setFehler(t('fotos.aufnahme.fehler.loeschen') + ' ' + (err.message || ''));
+            setFehler(tConfig('fotos.aufnahme.fehler.loeschen') + ' ' + (err.message || ''));
         });
     }
 
@@ -7440,7 +7440,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
     return (
         <div className="ma-bau-container" style={maContainerStyle}>
             <MASubHeader
-                titel={t('fotos.phase.' + phase.key + '.label')}
+                titel={tConfig('fotos.phase.' + phase.key + '.label')}
                 untertitel={raum.bezeichnung + (raum.geschoss ? ' \u00B7 ' + raum.geschoss : '') + ' \u00B7 ' + belegt + '/' + slotsTotal}
                 farbe={phase.color}
                 onZurueck={onZurueck}/>
@@ -7463,12 +7463,12 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
                         width:10, height:10, borderRadius:'50%',
                         background: phase.color, flexShrink:0
                     }}/>
-                    <span>{t('fotos.phase.' + phase.key + '.subtitle')}</span>
+                    <span>{tConfig('fotos.phase.' + phase.key + '.subtitle')}</span>
                 </div>
 
                 {laden ? (
                     <div style={{textAlign:'center', padding:30, color:'#999', fontSize:'0.9rem'}}>
-                        {t('fotos.aufnahme.lade')}
+                        {tConfig('fotos.aufnahme.lade')}
                     </div>
                 ) : (
                     <React.Fragment>
@@ -7534,7 +7534,7 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
                     <MAOverlayBox>
                         <div style={{fontSize:'2.2rem', marginBottom:10}}>{'\u{23F3}'}</div>
                         <div style={{fontSize:'0.95rem', fontWeight:600, color:'#212121'}}>
-                            {t('fotos.aufnahme.komprimiere')}
+                            {tConfig('fotos.aufnahme.komprimiere')}
                         </div>
                     </MAOverlayBox>
                 </MAOverlay>
@@ -7592,9 +7592,9 @@ function MAWandKachel({ wand, phase, foto, onClick }) {
 
     let label;
     let icon;
-    if (wand.kind === 'wand') { label = t('fotos.wand.label', { n: wand.nr }); icon = '\u{1F9F1}'; }
-    else if (wand.kind === 'boden') { label = t('fotos.boden'); icon = '\u{1F538}'; }
-    else if (wand.kind === 'decke') { label = t('fotos.decke'); icon = '\u{1F537}'; }
+    if (wand.kind === 'wand') { label = tConfig('fotos.wand.label', { n: wand.nr }); icon = '\u{1F9F1}'; }
+    else if (wand.kind === 'boden') { label = tConfig('fotos.boden'); icon = '\u{1F538}'; }
+    else if (wand.kind === 'decke') { label = tConfig('fotos.decke'); icon = '\u{1F537}'; }
 
     const thumbUrl = foto && (foto.thumbnail_dataurl || foto.foto_dataurl);
 
@@ -7746,9 +7746,9 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
     const lang = useSprache();
 
     let wandLabel;
-    if (wand.kind === 'wand') wandLabel = t('fotos.wand.label', { n: wand.nr });
-    else if (wand.kind === 'boden') wandLabel = t('fotos.boden');
-    else if (wand.kind === 'decke') wandLabel = t('fotos.decke');
+    if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
+    else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
+    else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
 
     return (
         <MAOverlay onClick={onAbbrechen}>
@@ -7767,7 +7767,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
                             {wandLabel}
                         </div>
                         <div style={{fontSize:'0.78rem', color:'#666'}}>
-                            {t('fotos.phase.' + phase.key + '.label')}
+                            {tConfig('fotos.phase.' + phase.key + '.label')}
                         </div>
                     </div>
                     <button
@@ -7777,7 +7777,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
                             fontSize:'1.4rem', color:'#999',
                             padding:'4px 8px'
                         }}
-                        title={t('fotos.aufnahme.abbrechen')}>
+                        title={tConfig('fotos.aufnahme.abbrechen')}>
                         {'\u2715'}
                     </button>
                 </div>
@@ -7832,7 +7832,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
                             gap:8
                         }}>
                         <span style={{fontSize:'1.1rem'}}>{'\u21BB'}</span>
-                        {t('fotos.aufnahme.wiederholen')}
+                        {tConfig('fotos.aufnahme.wiederholen')}
                     </button>
                     <button
                         onClick={onVerwenden}
@@ -7855,7 +7855,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
                             boxShadow:'0 4px 12px rgba(67,160,71,0.4)'
                         }}>
                         <span style={{fontSize:'1.1rem'}}>{'\u2713'}</span>
-                        {t('fotos.aufnahme.verwenden')}
+                        {tConfig('fotos.aufnahme.verwenden')}
                     </button>
                 </div>
             </MAOverlayBox>
@@ -7871,9 +7871,9 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
     const lang = useSprache();
 
     let wandLabel;
-    if (wand.kind === 'wand') wandLabel = t('fotos.wand.label', { n: wand.nr });
-    else if (wand.kind === 'boden') wandLabel = t('fotos.boden');
-    else if (wand.kind === 'decke') wandLabel = t('fotos.decke');
+    if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
+    else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
+    else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
 
     // Aufnahme-Zeit kurz formatieren
     let zeit = '';
@@ -7902,7 +7902,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                             {wandLabel}
                         </div>
                         <div style={{fontSize:'0.78rem', color:'#666'}}>
-                            {t('fotos.phase.' + phase.key + '.label')}
+                            {tConfig('fotos.phase.' + phase.key + '.label')}
                             {zeit ? ' \u00B7 ' + zeit : ''}
                         </div>
                     </div>
@@ -7947,7 +7947,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                                       : foto.sync_status === 'fehler'   ? '#C62828'
                                       : '#FFA726'
                         }}/>
-                        <span>{t('fotos.aufnahme.status.' + foto.sync_status)}</span>
+                        <span>{tConfig('fotos.aufnahme.status.' + foto.sync_status)}</span>
                     </div>
                 ) : null}
 
@@ -7961,7 +7961,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                     background:'#FFF8E1',
                     borderRadius:8
                 }}>
-                    {t('fotos.aufnahme.editor.bald')}
+                    {tConfig('fotos.aufnahme.editor.bald')}
                 </div>
 
                 {/* Aktions-Buttons */}
@@ -7980,7 +7980,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                             cursor:'pointer',
                             minHeight:48
                         }}>
-                        {'\u{1F5D1}\uFE0F'} {t('fotos.aufnahme.loeschen')}
+                        {'\u{1F5D1}\uFE0F'} {tConfig('fotos.aufnahme.loeschen')}
                     </button>
                     <button
                         onClick={onNeuFotografieren}
@@ -7996,7 +7996,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                             cursor:'pointer',
                             minHeight:48
                         }}>
-                        {'\u{1F4F7}'} {t('fotos.aufnahme.neu')}
+                        {'\u{1F4F7}'} {tConfig('fotos.aufnahme.neu')}
                     </button>
                     <button
                         onClick={onSchliessen}
@@ -8013,7 +8013,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                             cursor:'pointer',
                             minHeight:48
                         }}>
-                        {t('fotos.aufnahme.ok')}
+                        {tConfig('fotos.aufnahme.ok')}
                     </button>
                 </div>
             </MAOverlayBox>
