@@ -19,13 +19,13 @@ importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-comp
 // Diese Werte sind Public — sie stehen auch in index.html.
 // ──────────────────────────────────────────────────────────
 firebase.initializeApp({
-    apiKey:            'AIzaSyAZeQTY5d0WyvUjZW3OUnvlo9-i4A_LPR0',
+    apiKey:            'AIzaSyBUHOr2dM2H-sUnhNODoVSerM224vPsC_E',
     authDomain:        'einkaufsliste-98199.firebaseapp.com',
-    databaseURL:       'https://einkaufsliste-98199-default-rtdb.firebaseio.com',
+    databaseURL:       'https://einkaufsliste-98199-default-rtdb.europe-west1.firebasedatabase.app',
     projectId:         'einkaufsliste-98199',
     storageBucket:     'einkaufsliste-98199.firebasestorage.app',
-    messagingSenderId: '1007048023194',
-    appId:             '1:1007048023194:web:dddc3b8bba5b23ded99d37'
+    messagingSenderId: '411877213047',
+    appId:             '1:411877213047:web:f04e3b9b98a8d97120d772'
 });
 
 const messaging = firebase.messaging();
