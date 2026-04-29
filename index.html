@@ -2161,7 +2161,7 @@
     /* ═══════════════════════════════════════════════════════════
        KONFIGURATION
        ═══════════════════════════════════════════════════════════ */
-    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas+e6.1+e6.2+tFix+tabFix';
+    const APP_VERSION = '1.0.0-etappe5-b6-hotfix1+thomas+e6.1+e6.2+e6.3+e6.4+tFix+tabFix';
 
     const SPRACHEN = [
         { code: 'de', flag: '🇩🇪', name: 'Deutsch' },
@@ -6428,13 +6428,12 @@ function MAPushPermissionBanner({ lang, status, onAktivieren, onSpaeter }) {
 
 
 // ╔══════════════════════════════════════════════════════════════════════╗
-// ║ MODUL FOTOS - Etappe 6 / Bausteine 6.1 + 6.2                          ║
-// ║ Uebernommen aus baustellen-app-etappe-6-b2/jsx/tw-ma-fotos.jsx        ║
+// ║ MODUL FOTOS - Etappe 6 / Bausteine 6.1 + 6.2 + 6.3 + 6.4              ║
+// ║ Uebernommen aus baustellen-app-etappe-6-b4/jsx/tw-ma-fotos.jsx        ║
 // ║ am 29.04.2026 (Generation-A-Sockel: dunkel, monolithisch, +Thomas)    ║
-// ║ Komponenten: MAFotosView, MARaumListe, MARaumRow, MARaumDialog,       ║
-// ║   MAToggleKachel, MAPhaseAuswahl, MAPhaseKachel, MAWandRaster,        ║
-// ║   MAWandKachel, MAOverlay, MAOverlayBox, MAFotoVorschau, MAFotoDetail ║
-// ║ Editor + Sprach-Notiz folgen in Phase 3.3 / 3.4.                      ║
+// ║ ALLE 17 Komponenten: Raum-Verwaltung, Phasen, Wand-Raster,            ║
+// ║   Foto-Aufnahme + Editor (Crop+Markieren+Zeichnen) + Sprach-Notiz.    ║
+// ║ tFix: alle t('punkt.notation') -> tConfig('punkt.notation') angepasst.║
 // ╚══════════════════════════════════════════════════════════════════════╝
 // ============================================================
 // TW Baustellen-App - Modul Fotos (Etappe 6)
@@ -6467,6 +6466,58 @@ const MA_WANDZAHLEN = [3, 4, 5, 6, 7, 8];
 
 // Geschoss-Optionen (Master-Dokument 8.4)
 const MA_GESCHOSSE = ['KG', 'EG', 'OG', 'DG'];
+
+// 6 Markierungsfarben (1:1 wie Master-App tw-aufmass.jsx Z. 5379)
+const MA_MARKIERUNGS_FARBEN = [
+    { id: 'rot',    hex: '#e63535', nameKey: 'fotos.editor.farbe.rot' },
+    { id: 'blau',   hex: '#1e88e5', nameKey: 'fotos.editor.farbe.blau' },
+    { id: 'gruen',  hex: '#2ecc71', nameKey: 'fotos.editor.farbe.gruen' },
+    { id: 'gelb',   hex: '#f1c40f', nameKey: 'fotos.editor.farbe.gelb' },
+    { id: 'lila',   hex: '#9b59b6', nameKey: 'fotos.editor.farbe.lila' },
+    { id: 'orange', hex: '#e67e22', nameKey: 'fotos.editor.farbe.orange' }
+];
+
+// Default-Farbzuordnung pro Phase (1:1 wie Master-App, vereinfachte
+// Beschreibungen). Dient als Gedanken-Stuetze, damit der MA einheitlich
+// markiert. Thomas in der Master-App hat dann die gleiche Konvention.
+const MA_FARBZUORDNUNG = {
+    rohzustand: [
+        { farbe: 'rot',    beschreibungKey: 'fotos.editor.zuord.boden' },
+        { farbe: 'blau',   beschreibungKey: 'fotos.editor.zuord.wand' },
+        { farbe: 'gruen',  beschreibungKey: 'fotos.editor.zuord.sockel' },
+        { farbe: 'gelb',   beschreibungKey: 'fotos.editor.zuord.laibung' }
+    ],
+    vorarbeiten: [
+        { farbe: 'blau',   beschreibungKey: 'fotos.editor.zuord.abdichtung' },
+        { farbe: 'gruen',  beschreibungKey: 'fotos.editor.zuord.dichtungsband' },
+        { farbe: 'gelb',   beschreibungKey: 'fotos.editor.zuord.ecken' },
+        { farbe: 'lila',   beschreibungKey: 'fotos.editor.zuord.manschetten' }
+    ],
+    fertigstellung: [
+        { farbe: 'rot',    beschreibungKey: 'fotos.editor.zuord.gefliest' },
+        { farbe: 'blau',   beschreibungKey: 'fotos.editor.zuord.installation' },
+        { farbe: 'gruen',  beschreibungKey: 'fotos.editor.zuord.dehnung' },
+        { farbe: 'gelb',   beschreibungKey: 'fotos.editor.zuord.schienen' },
+        { farbe: 'lila',   beschreibungKey: 'fotos.editor.zuord.ablagen' },
+        { farbe: 'orange', beschreibungKey: 'fotos.editor.zuord.laibung' }
+    ]
+};
+
+// Strichbreiten (markieren = dick, zeichnen = duenn)
+const MA_MARKIER_BREITE   = 12;
+const MA_ZEICHEN_BREITE   = 4;
+
+// Web-Speech-API Sprach-Codes pro App-Sprache
+// (Web Speech braucht Region-Codes, App-Sprache nur ISO-Code)
+const MA_SPEECH_LANG_MAP = {
+    'de': 'de-DE',
+    'cs': 'cs-CZ',
+    'sk': 'sk-SK',
+    'pl': 'pl-PL',
+    'en': 'en-US',
+    'ro': 'ro-RO',
+    'uk': 'uk-UA'
+};
 
 // ============================================================
 // MAFotosView - Hauptkomponente, ersetzt den MAStubView fuer Fotos
@@ -7258,6 +7309,10 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
     const [vorschauFoto, setVorschauFoto] = useState(null);
     const [komprimiere, setKomprimiere] = useState(false);
     const [fehler, setFehler] = useState(null);
+    // Editor-State (B6.3): geoeffnet wenn != null, enthaelt das zu bearbeitende Foto
+    const [editorFoto, setEditorFoto] = useState(null);
+    // Sprach-Notiz-State (B6.4): geoeffnet wenn != null
+    const [notizFoto, setNotizFoto] = useState(null);
 
     const fileInputRef = React.useRef(null);
 
@@ -7572,14 +7627,55 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
             ) : null}
 
             {/* Detail-Dialog (vorhandenes Foto) */}
-            {!vorschauFoto && aktiveWand && fotosByWand[aktiveWand.id] && !komprimiere ? (
+            {!vorschauFoto && aktiveWand && fotosByWand[aktiveWand.id] && !komprimiere && !editorFoto && !notizFoto ? (
                 <MAFotoDetail
                     foto={fotosByWand[aktiveWand.id]}
                     wand={aktiveWand}
                     phase={phase}
                     onSchliessen={handleAbbrechen}
                     onNeuFotografieren={handleFotoNeu}
-                    onLoeschen={handleFotoLoeschen}/>
+                    onLoeschen={handleFotoLoeschen}
+                    onBearbeiten={function(){
+                        setEditorFoto(fotosByWand[aktiveWand.id]);
+                    }}
+                    onSprachNotiz={function(){
+                        setNotizFoto(fotosByWand[aktiveWand.id]);
+                    }}/>
+            ) : null}
+
+            {/* Editor (B6.3) */}
+            {editorFoto ? (
+                <MAFotoEditor
+                    foto={editorFoto}
+                    raum={raum}
+                    wand={aktiveWand}
+                    phase={phase}
+                    onAbbrechen={function(){
+                        setEditorFoto(null);
+                    }}
+                    onGespeichert={function(){
+                        setEditorFoto(null);
+                        setAktiveWand(null);
+                        reloadFotos();
+                        if (typeof onAenderung === 'function') onAenderung();
+                    }}/>
+            ) : null}
+
+            {/* Sprach-Notiz-Dialog (B6.4) */}
+            {notizFoto ? (
+                <MASprachNotizDialog
+                    foto={notizFoto}
+                    wand={aktiveWand}
+                    phase={phase}
+                    onAbbrechen={function(){
+                        setNotizFoto(null);
+                    }}
+                    onGespeichert={function(){
+                        setNotizFoto(null);
+                        // aktiveWand offen lassen, damit Detail-Dialog refreshed
+                        reloadFotos();
+                        if (typeof onAenderung === 'function') onAenderung();
+                    }}/>
             ) : null}
         </div>
     );
@@ -7867,7 +7963,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
 // MAFotoDetail - vorhandenes Foto anzeigen + Aktionen
 // ============================================================
 
-function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onLoeschen }) {
+function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onLoeschen, onBearbeiten, onSprachNotiz }) {
     const lang = useSprache();
 
     let wandLabel;
@@ -7885,6 +7981,11 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
         });
     } catch(e) {}
 
+    // Anzeige-Bild: bearbeitete Version bevorzugt
+    const anzeigeUrl = foto.bearbeitet_dataurl || foto.foto_dataurl;
+    const istBearbeitet = !!foto.bearbeitet_dataurl;
+    const hatNotiz = !!(foto.notiz_original && foto.notiz_original.text);
+
     return (
         <MAOverlay onClick={onSchliessen}>
             <MAOverlayBox breit={true}>
@@ -7900,6 +8001,18 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                     <div style={{flex:1, textAlign:'left'}}>
                         <div style={{fontSize:'0.95rem', fontWeight:700, color:'#212121', fontFamily:'var(--font-headline, Oswald)'}}>
                             {wandLabel}
+                            {istBearbeitet ? (
+                                <span style={{
+                                    marginLeft:8,
+                                    fontSize:'0.7rem',
+                                    background:'#1E88E5',
+                                    color:'#fff',
+                                    padding:'2px 6px',
+                                    borderRadius:4,
+                                    fontWeight:500,
+                                    verticalAlign:'middle'
+                                }}>{tConfig('fotos.editor.bearbeitet')}</span>
+                            ) : null}
                         </div>
                         <div style={{fontSize:'0.78rem', color:'#666'}}>
                             {tConfig('fotos.phase.' + phase.key + '.label')}
@@ -7926,13 +8039,77 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                     display:'flex', alignItems:'center', justifyContent:'center'
                 }}>
                     <img
-                        src={foto.foto_dataurl}
+                        src={anzeigeUrl}
                         alt={wandLabel}
                         style={{
-                            maxWidth:'100%', maxHeight:'60vh',
+                            maxWidth:'100%', maxHeight:'50vh',
                             objectFit:'contain'
                         }}/>
                 </div>
+
+                {/* Notiz-Anzeige (falls vorhanden) */}
+                {hatNotiz ? (
+                    <div style={{
+                        background:'#F5F7FA',
+                        border:'1px solid #E0E0E0',
+                        borderRadius:10,
+                        padding:'12px 14px',
+                        marginBottom:12,
+                        textAlign:'left'
+                    }}>
+                        <div style={{
+                            display:'flex',
+                            alignItems:'center',
+                            gap:6,
+                            fontSize:'0.78rem',
+                            color:'#666',
+                            marginBottom:6,
+                            fontWeight:600
+                        }}>
+                            <span>{'\u{1F3A4}'}</span>
+                            <span>{tConfig('fotos.notiz.titel')}</span>
+                            {foto.notiz_original.sprache ? (
+                                <span style={{
+                                    marginLeft:'auto',
+                                    fontSize:'0.7rem',
+                                    color:'#999'
+                                }}>
+                                    {foto.notiz_original.sprache.toUpperCase()}
+                                </span>
+                            ) : null}
+                        </div>
+                        <div style={{
+                            fontSize:'0.92rem',
+                            color:'#212121',
+                            lineHeight:1.4,
+                            marginBottom: foto.notiz_deutsch && foto.notiz_original.sprache !== 'de' ? 8 : 0
+                        }}>
+                            {foto.notiz_original.text}
+                        </div>
+                        {foto.notiz_deutsch && foto.notiz_original.sprache !== 'de' ? (
+                            <div style={{
+                                fontSize:'0.85rem',
+                                color:'#666',
+                                fontStyle:'italic',
+                                paddingTop:8,
+                                borderTop:'1px dashed #DDD',
+                                lineHeight:1.4
+                            }}>
+                                <span style={{
+                                    display:'inline-block',
+                                    fontSize:'0.7rem',
+                                    color:'#1E88E5',
+                                    fontWeight:600,
+                                    marginRight:6,
+                                    fontStyle:'normal'
+                                }}>
+                                    {'\u{1F1E9}\u{1F1EA}'} DE:
+                                </span>
+                                {foto.notiz_deutsch}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 {/* Sync-Status klein */}
                 {foto.sync_status ? (
@@ -7951,31 +8128,18 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                     </div>
                 ) : null}
 
-                {/* Hinweis: Editor (Markieren / Zeichnen) kommt in B6.3 */}
-                <div style={{
-                    fontSize:'0.78rem',
-                    color:'#888',
-                    fontStyle:'italic',
-                    marginBottom:14,
-                    padding:'8px 12px',
-                    background:'#FFF8E1',
-                    borderRadius:8
-                }}>
-                    {tConfig('fotos.aufnahme.editor.bald')}
-                </div>
-
                 {/* Aktions-Buttons */}
                 <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
                     <button
                         onClick={onLoeschen}
                         style={{
-                            flex:'1 1 100px',
-                            padding:'12px',
+                            flex:'1 1 80px',
+                            padding:'12px 8px',
                             background:'#fff',
                             color:'#C62828',
                             border:'1px solid #C62828',
                             borderRadius:10,
-                            fontSize:'0.85rem',
+                            fontSize:'0.78rem',
                             fontWeight:600,
                             cursor:'pointer',
                             minHeight:48
@@ -7985,13 +8149,13 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                     <button
                         onClick={onNeuFotografieren}
                         style={{
-                            flex:'1 1 100px',
-                            padding:'12px',
-                            background:'#1E88E5',
-                            color:'#fff',
-                            border:'none',
+                            flex:'1 1 80px',
+                            padding:'12px 8px',
+                            background:'#fff',
+                            color:'#455A64',
+                            border:'1px solid #DDD',
                             borderRadius:10,
-                            fontSize:'0.85rem',
+                            fontSize:'0.78rem',
                             fontWeight:600,
                             cursor:'pointer',
                             minHeight:48
@@ -7999,21 +8163,41 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
                         {'\u{1F4F7}'} {tConfig('fotos.aufnahme.neu')}
                     </button>
                     <button
-                        onClick={onSchliessen}
+                        onClick={onSprachNotiz}
                         style={{
-                            flex:'2 1 120px',
-                            padding:'12px',
-                            background:'linear-gradient(135deg, #43A047, #2E7D32)',
+                            flex:'1 1 100px',
+                            padding:'12px 8px',
+                            background: hatNotiz
+                                ? 'linear-gradient(135deg, #FB8C00, #EF6C00)'
+                                : '#fff',
+                            color: hatNotiz ? '#fff' : '#FB8C00',
+                            border: hatNotiz ? 'none' : '1px solid #FB8C00',
+                            borderRadius:10,
+                            fontSize:'0.78rem',
+                            fontWeight:700,
+                            cursor:'pointer',
+                            minHeight:48,
+                            boxShadow: hatNotiz ? '0 4px 12px rgba(251,140,0,0.3)' : 'none'
+                        }}>
+                        {'\u{1F3A4}'} {hatNotiz ? tConfig('fotos.notiz.bearbeiten') : tConfig('fotos.notiz.neu')}
+                    </button>
+                    <button
+                        onClick={onBearbeiten}
+                        style={{
+                            flex:'2 1 130px',
+                            padding:'12px 8px',
+                            background:'linear-gradient(135deg, #1E88E5, #1565C0)',
                             color:'#fff',
                             border:'none',
                             borderRadius:10,
-                            fontSize:'0.95rem',
+                            fontSize:'0.85rem',
                             fontWeight:700,
                             fontFamily:'var(--font-headline, Oswald)',
                             cursor:'pointer',
-                            minHeight:48
+                            minHeight:48,
+                            boxShadow:'0 4px 12px rgba(30,136,229,0.3)'
                         }}>
-                        {tConfig('fotos.aufnahme.ok')}
+                        {'\u270F\uFE0F'} {tConfig('fotos.editor.oeffnen')}
                     </button>
                 </div>
             </MAOverlayBox>
@@ -8029,6 +8213,1374 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
 // Wenn MASubHeader bereits global ist, nutzen wir den; sonst Fallback.
 
 // (MASubHeader kommt aus tw-ma-baustellen.jsx und ist global.)
+
+// ============================================================
+// MASprachNotizDialog - Sprach-Notiz aufnehmen + uebersetzen (B6.4)
+// ============================================================
+// Workflow:
+//   - Mikrofon-Button startet Web Speech API in MA-Sprache
+//   - Live-Transkription wird angezeigt waehrend des Sprechens
+//   - Nach Stop: Text editierbar (fuer Korrekturen oder manuelle Eingabe)
+//   - Beim Speichern: Originaltext + Sprache wird gespeichert,
+//     zusaetzlich wird ins Deutsche uebersetzt (Stub aktuell - 1:1
+//     wie Master-App-Pattern, echtes Gemini in Etappe 7)
+//   - Bestehende Notiz wird beim Oeffnen vorbefuellt + editierbar
+//
+// Wichtig: Web Speech API ist nicht in allen Browsern verfuegbar
+// (Firefox aktuell nicht). Wenn nicht verfuegbar, kann der MA
+// trotzdem manuell tippen.
+
+function MASprachNotizDialog({ foto, wand, phase, onAbbrechen, onGespeichert }) {
+    const lang = useSprache();
+
+    // Aktuell verwendete Sprache (default: App-Sprache des MA)
+    // Falls schon eine Notiz existiert, deren Sprache uebernehmen.
+    const initialeSprache = (foto.notiz_original && foto.notiz_original.sprache) || lang || 'de';
+
+    const [notizSprache, setNotizSprache] = useState(initialeSprache);
+    const [notizText, setNotizText] = useState(
+        (foto.notiz_original && foto.notiz_original.text) || ''
+    );
+    const [interimText, setInterimText] = useState('');  // live-transcribed (noch nicht final)
+    const [aufnahmeAktiv, setAufnahmeAktiv] = useState(false);
+    const [browserUnterstuetzt, setBrowserUnterstuetzt] = useState(true);
+    const [speichernLaeuft, setSpeichernLaeuft] = useState(false);
+    const [fehler, setFehler] = useState(null);
+
+    const recognitionRef = React.useRef(null);
+    const textareaRef    = React.useRef(null);
+
+    // Browser-Support-Check
+    useEffect(function(){
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) setBrowserUnterstuetzt(false);
+    }, []);
+
+    // Cleanup: Recognition stoppen wenn Dialog geschlossen wird
+    useEffect(function(){
+        return function(){
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch(e) {}
+                recognitionRef.current = null;
+            }
+        };
+    }, []);
+
+    // ── Aufnahme starten ──
+    function startAufnahme() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            setFehler(tConfig('fotos.notiz.fehler.kein.support'));
+            return;
+        }
+
+        const recognition = new SR();
+        const speechLang = MA_SPEECH_LANG_MAP[notizSprache] || 'de-DE';
+        recognition.lang           = speechLang;
+        recognition.continuous     = true;
+        recognition.interimResults = true;
+
+        let finalBuffer = notizText; // bestehender Text bleibt erhalten
+
+        recognition.onresult = function(event) {
+            let interim = '';
+            let neueFinaleZusatz = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const r = event.results[i];
+                const text = r[0].transcript;
+                if (r.isFinal) {
+                    neueFinaleZusatz += text;
+                } else {
+                    interim += text;
+                }
+            }
+            if (neueFinaleZusatz) {
+                // An vorhandenen Text anhaengen mit Leerzeichen
+                finalBuffer = (finalBuffer ? finalBuffer.trim() + ' ' : '') + neueFinaleZusatz.trim();
+                setNotizText(finalBuffer);
+            }
+            setInterimText(interim);
+        };
+
+        recognition.onerror = function(event) {
+            console.warn('[Sprach-Notiz] Recognition-Fehler:', event.error);
+            // 'no-speech' und 'aborted' nicht als Fehler dem MA zeigen
+            if (event.error && event.error !== 'no-speech' && event.error !== 'aborted') {
+                setFehler(tConfig('fotos.notiz.fehler.aufnahme') + ' (' + event.error + ')');
+            }
+            setAufnahmeAktiv(false);
+        };
+
+        recognition.onend = function() {
+            setAufnahmeAktiv(false);
+            setInterimText('');
+        };
+
+        try {
+            recognition.start();
+            recognitionRef.current = recognition;
+            setAufnahmeAktiv(true);
+            setFehler(null);
+        } catch (err) {
+            setFehler(tConfig('fotos.notiz.fehler.aufnahme') + ' (' + err.message + ')');
+            setAufnahmeAktiv(false);
+        }
+    }
+
+    // ── Aufnahme stoppen ──
+    function stopAufnahme() {
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch(e) {}
+            recognitionRef.current = null;
+        }
+        setAufnahmeAktiv(false);
+        setInterimText('');
+    }
+
+    // ── Notiz loeschen ──
+    function handleNotizLoeschen() {
+        if (!confirm(tConfig('fotos.notiz.loeschen.bestaetigen'))) return;
+        setNotizText('');
+        setInterimText('');
+        if (aufnahmeAktiv) stopAufnahme();
+    }
+
+    // ── Speichern ──
+    function handleSpeichern() {
+        if (!window.TWMaStorage || !window.TWMaStorage.saveFoto) {
+            setFehler(tConfig('fotos.aufnahme.fehler.storage'));
+            return;
+        }
+        if (aufnahmeAktiv) stopAufnahme();
+
+        const text = (notizText || '').trim();
+
+        // Wenn Text leer ist, Notiz vom Foto entfernen
+        if (!text) {
+            setSpeichernLaeuft(true);
+            setFehler(null);
+            const updated = Object.assign({}, foto, {
+                notiz_original: null,
+                notiz_deutsch:  null,
+                sync_status:    'pending'
+            });
+            window.TWMaStorage.saveFoto(updated).then(function(){
+                setSpeichernLaeuft(false);
+                onGespeichert();
+            }).catch(function(err){
+                setSpeichernLaeuft(false);
+                setFehler(tConfig('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
+            });
+            return;
+        }
+
+        setSpeichernLaeuft(true);
+        setFehler(null);
+
+        // Uebersetzen: wenn MA-Sprache schon Deutsch ist, einfach
+        // Originaltext als Deutsch durchreichen. Sonst Translation-
+        // Service fragen (Stub gibt aktuell Original zurueck, Etappe 7
+        // wird Gemini einbauen).
+        let uebersetzungPromise;
+        if (notizSprache === 'de') {
+            uebersetzungPromise = Promise.resolve(text);
+        } else if (window.TWMaTranslation && window.TWMaTranslation.uebersetzeText) {
+            uebersetzungPromise = window.TWMaTranslation.uebersetzeText(text, notizSprache, 'de')
+                .catch(function(err){
+                    console.warn('[Sprach-Notiz] Uebersetzung fehlgeschlagen:', err);
+                    return text; // Fallback: Original
+                });
+        } else {
+            uebersetzungPromise = Promise.resolve(text);
+        }
+
+        uebersetzungPromise.then(function(deutsch){
+            const updated = Object.assign({}, foto, {
+                notiz_original: {
+                    sprache: notizSprache,
+                    text:    text
+                },
+                notiz_deutsch: deutsch || text,
+                sync_status:   'pending'
+            });
+            return window.TWMaStorage.saveFoto(updated);
+        }).then(function(){
+            setSpeichernLaeuft(false);
+            onGespeichert();
+        }).catch(function(err){
+            setSpeichernLaeuft(false);
+            setFehler(tConfig('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
+        });
+    }
+
+    // ── Wand-Label ──
+    let wandLabel = '';
+    if (wand) {
+        if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
+        else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
+        else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+    }
+
+    // Sprach-Liste (zur Auswahl der Aufnahme-Sprache)
+    const sprachen = (window.TWMaConfig && window.TWMaConfig.SUPPORTED_LANGUAGES) || [
+        { code: 'de', flag: '\u{1F1E9}\u{1F1EA}', nativeName: 'Deutsch' }
+    ];
+
+    return (
+        <MAOverlay onClick={onAbbrechen}>
+            <MAOverlayBox breit={true}>
+                {/* Header */}
+                <div style={{
+                    display:'flex', alignItems:'center', gap:10,
+                    paddingBottom:10, borderBottom:'1px solid #EEE',
+                    marginBottom:14
+                }}>
+                    <div style={{
+                        width:8, height:30, borderRadius:4, background: phase.color
+                    }}/>
+                    <div style={{flex:1, textAlign:'left'}}>
+                        <div style={{
+                            fontSize:'0.95rem', fontWeight:700, color:'#212121',
+                            fontFamily:'var(--font-headline, Oswald)'
+                        }}>
+                            {'\u{1F3A4}'} {tConfig('fotos.notiz.titel')}
+                        </div>
+                        <div style={{fontSize:'0.78rem', color:'#666'}}>
+                            {wandLabel} {'\u00B7'} {tConfig('fotos.phase.' + phase.key + '.label')}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onAbbrechen}
+                        disabled={speichernLaeuft}
+                        style={{
+                            background:'transparent', border:'none',
+                            cursor: speichernLaeuft ? 'not-allowed' : 'pointer',
+                            fontSize:'1.4rem', color:'#999',
+                            padding:'4px 8px',
+                            opacity: speichernLaeuft ? 0.5 : 1
+                        }}>
+                        {'\u2715'}
+                    </button>
+                </div>
+
+                {/* Sprach-Auswahl */}
+                <div style={{marginBottom:14, textAlign:'left'}}>
+                    <label style={{
+                        display:'block',
+                        fontSize:'0.78rem',
+                        color:'#666',
+                        marginBottom:6,
+                        fontWeight:600
+                    }}>
+                        {tConfig('fotos.notiz.sprache')}
+                    </label>
+                    <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                        {sprachen.map(function(s){
+                            const aktiv = s.code === notizSprache;
+                            return (
+                                <button
+                                    key={s.code}
+                                    onClick={function(){
+                                        if (aufnahmeAktiv) stopAufnahme();
+                                        setNotizSprache(s.code);
+                                    }}
+                                    disabled={aufnahmeAktiv}
+                                    style={{
+                                        padding:'8px 12px',
+                                        background: aktiv ? '#E3F2FD' : '#fff',
+                                        color: aktiv ? '#1565C0' : '#666',
+                                        border: aktiv ? '2px solid #1E88E5' : '1px solid #DDD',
+                                        borderRadius:8,
+                                        fontSize:'0.85rem',
+                                        fontWeight: aktiv ? 700 : 500,
+                                        cursor: aufnahmeAktiv ? 'not-allowed' : 'pointer',
+                                        opacity: aufnahmeAktiv ? 0.5 : 1,
+                                        display:'flex',
+                                        alignItems:'center',
+                                        gap:6,
+                                        minHeight:38
+                                    }}>
+                                    <span style={{fontSize:'1.1rem'}}>{s.flag}</span>
+                                    <span>{s.nativeName}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Mikrofon-Button + Status */}
+                {browserUnterstuetzt ? (
+                    <div style={{
+                        display:'flex',
+                        alignItems:'center',
+                        gap:14,
+                        marginBottom:14,
+                        padding:'14px 16px',
+                        background: aufnahmeAktiv ? '#FFEBEE' : '#F5F7FA',
+                        border: aufnahmeAktiv ? '1px solid #EF9A9A' : '1px solid #E0E0E0',
+                        borderRadius:10,
+                        transition:'all 0.2s ease-out'
+                    }}>
+                        <button
+                            onClick={aufnahmeAktiv ? stopAufnahme : startAufnahme}
+                            disabled={speichernLaeuft}
+                            style={{
+                                width:54, height:54,
+                                borderRadius:'50%',
+                                background: aufnahmeAktiv
+                                    ? 'linear-gradient(135deg, #E53935, #C62828)'
+                                    : 'linear-gradient(135deg, #43A047, #2E7D32)',
+                                color:'#fff',
+                                border:'none',
+                                fontSize:'1.6rem',
+                                cursor: speichernLaeuft ? 'not-allowed' : 'pointer',
+                                boxShadow: aufnahmeAktiv
+                                    ? '0 0 0 8px rgba(229,57,53,0.2), 0 4px 14px rgba(229,57,53,0.4)'
+                                    : '0 4px 14px rgba(67,160,71,0.4)',
+                                animation: aufnahmeAktiv ? 'maPulse 1.4s ease-in-out infinite' : 'none',
+                                flexShrink:0
+                            }}
+                            title={aufnahmeAktiv ? tConfig('fotos.notiz.stop') : tConfig('fotos.notiz.start')}>
+                            {aufnahmeAktiv ? '\u23F9' : '\u{1F3A4}'}
+                        </button>
+                        <div style={{flex:1, textAlign:'left', minWidth:0}}>
+                            <div style={{
+                                fontSize:'0.92rem',
+                                fontWeight:600,
+                                color: aufnahmeAktiv ? '#C62828' : '#212121',
+                                marginBottom:2
+                            }}>
+                                {aufnahmeAktiv ? tConfig('fotos.notiz.aktiv') : tConfig('fotos.notiz.inaktiv')}
+                            </div>
+                            <div style={{fontSize:'0.78rem', color:'#666'}}>
+                                {aufnahmeAktiv
+                                    ? tConfig('fotos.notiz.aktiv.hinweis')
+                                    : tConfig('fotos.notiz.inaktiv.hinweis')}
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div style={{
+                        padding:'12px 14px',
+                        background:'#FFF8E1',
+                        border:'1px solid #FFE082',
+                        borderRadius:10,
+                        marginBottom:14,
+                        fontSize:'0.85rem',
+                        color:'#5D4037',
+                        textAlign:'left'
+                    }}>
+                        {'\u26A0\uFE0F '}{tConfig('fotos.notiz.kein.support')}
+                    </div>
+                )}
+
+                {/* Text-Editor */}
+                <div style={{marginBottom:14, textAlign:'left'}}>
+                    <label style={{
+                        display:'block',
+                        fontSize:'0.78rem',
+                        color:'#666',
+                        marginBottom:6,
+                        fontWeight:600
+                    }}>
+                        {tConfig('fotos.notiz.text')}
+                    </label>
+                    <textarea
+                        ref={textareaRef}
+                        value={notizText + (interimText ? (notizText ? ' ' : '') + interimText : '')}
+                        onChange={function(e){
+                            // Wenn aktiv aufnehmend, sind Manual-Edits ignoriert,
+                            // weil interimText drin ist
+                            if (aufnahmeAktiv) return;
+                            setNotizText(e.target.value);
+                        }}
+                        readOnly={aufnahmeAktiv}
+                        placeholder={tConfig('fotos.notiz.platzhalter')}
+                        style={{
+                            width:'100%',
+                            minHeight:100,
+                            padding:'10px 12px',
+                            fontSize:'0.95rem',
+                            border:'1px solid #DDD',
+                            borderRadius:10,
+                            background: aufnahmeAktiv ? '#FAFAFA' : '#fff',
+                            boxSizing:'border-box',
+                            fontFamily:'inherit',
+                            outline:'none',
+                            resize:'vertical',
+                            lineHeight:1.5
+                        }}/>
+                    {interimText ? (
+                        <div style={{
+                            fontSize:'0.72rem',
+                            color:'#1E88E5',
+                            marginTop:4,
+                            fontStyle:'italic'
+                        }}>
+                            {'\u{1F4DD} '}{tConfig('fotos.notiz.live')}
+                        </div>
+                    ) : null}
+                </div>
+
+                {/* Uebersetzungs-Hinweis, wenn nicht-Deutsch */}
+                {notizSprache !== 'de' && notizText.trim() ? (
+                    <div style={{
+                        padding:'8px 12px',
+                        background:'#E3F2FD',
+                        border:'1px solid #BBDEFB',
+                        borderRadius:8,
+                        fontSize:'0.78rem',
+                        color:'#1565C0',
+                        marginBottom:14,
+                        textAlign:'left'
+                    }}>
+                        {'\u{1F1E9}\u{1F1EA} '}{tConfig('fotos.notiz.uebersetzung.hinweis')}
+                    </div>
+                ) : null}
+
+                {/* Fehler */}
+                {fehler ? (
+                    <div
+                        onClick={function(){ setFehler(null); }}
+                        style={{
+                            padding:'10px 14px',
+                            background:'#FFEBEE',
+                            color:'#C62828',
+                            borderRadius:8,
+                            fontSize:'0.85rem',
+                            marginBottom:14,
+                            textAlign:'left',
+                            cursor:'pointer'
+                        }}>
+                        {fehler}
+                    </div>
+                ) : null}
+
+                {/* Aktions-Buttons */}
+                <div style={{display:'flex', gap:8}}>
+                    <button
+                        onClick={handleNotizLoeschen}
+                        disabled={!notizText || aufnahmeAktiv || speichernLaeuft}
+                        style={{
+                            padding:'12px 14px',
+                            background:'#fff',
+                            color: !notizText ? '#999' : '#C62828',
+                            border:'1px solid ' + (!notizText ? '#DDD' : '#C62828'),
+                            borderRadius:10,
+                            fontSize:'0.85rem',
+                            fontWeight:600,
+                            cursor: (!notizText || aufnahmeAktiv || speichernLaeuft) ? 'not-allowed' : 'pointer',
+                            minHeight:48,
+                            opacity: (!notizText || aufnahmeAktiv || speichernLaeuft) ? 0.5 : 1
+                        }}>
+                        {'\u{1F5D1}\uFE0F'}
+                    </button>
+                    <button
+                        onClick={onAbbrechen}
+                        disabled={speichernLaeuft}
+                        style={{
+                            flex:1,
+                            padding:'12px',
+                            background:'#fff',
+                            color:'#666',
+                            border:'1px solid #DDD',
+                            borderRadius:10,
+                            fontSize:'0.92rem',
+                            fontWeight:600,
+                            cursor: speichernLaeuft ? 'not-allowed' : 'pointer',
+                            minHeight:48,
+                            opacity: speichernLaeuft ? 0.5 : 1
+                        }}>
+                        {tConfig('fotos.raum.abbrechen')}
+                    </button>
+                    <button
+                        onClick={handleSpeichern}
+                        disabled={speichernLaeuft || aufnahmeAktiv}
+                        style={{
+                            flex:2,
+                            padding:'12px',
+                            background: (speichernLaeuft || aufnahmeAktiv)
+                                ? '#90CAF9'
+                                : 'linear-gradient(135deg, #43A047, #2E7D32)',
+                            color:'#fff',
+                            border:'none',
+                            borderRadius:10,
+                            fontSize:'0.95rem',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            cursor: (speichernLaeuft || aufnahmeAktiv) ? 'not-allowed' : 'pointer',
+                            minHeight:48,
+                            boxShadow: (speichernLaeuft || aufnahmeAktiv) ? 'none' : '0 4px 12px rgba(67,160,71,0.3)'
+                        }}>
+                        {speichernLaeuft
+                            ? tConfig('fotos.editor.speichern.laeuft')
+                            : ('\u2713 ' + tConfig('fotos.notiz.speichern'))}
+                    </button>
+                </div>
+
+                {/* Pulse-Animation fuer Mikrofon */}
+                <style>{
+                    '@keyframes maPulse { ' +
+                        '0%, 100% { box-shadow: 0 0 0 8px rgba(229,57,53,0.2), 0 4px 14px rgba(229,57,53,0.4); }' +
+                        '50%      { box-shadow: 0 0 0 14px rgba(229,57,53,0.05), 0 4px 14px rgba(229,57,53,0.4); }' +
+                    '}'
+                }</style>
+            </MAOverlayBox>
+        </MAOverlay>
+    );
+}
+
+// ============================================================
+// MAFotoEditor - Fullscreen-Foto-Editor (Etappe 6 / B6.3)
+// ============================================================
+// Master-App-Aequivalent: tw-aufmass.jsx fullscreenEdit (Z. 5416ff).
+// Drei Modi: 'crop' (Zuschneiden) | 'mark' (Markieren, dicker Strich)
+//            | 'draw' (Zeichnen, duenner Strich)
+// 6 Markierungsfarben. Pro Phase eine Default-Farbzuordnung als Legende.
+//
+// Datenfluss:
+//  - Editor laedt das Original-Foto (foto.foto_dataurl)
+//  - Bestehende Bearbeitung (foto.crop_rect, foto.drawings) wird
+//    initial gezeigt
+//  - User mache Aenderungen, beim "Speichern" wird auf Canvas
+//    gerendert (Crop + Drawings eingebrannt) -> bearbeitet_dataurl
+//  - Original bleibt unveraendert in foto_dataurl, sodass der Editor
+//    jederzeit wieder geoeffnet werden kann
+//
+// Performance:
+//  - drawBufferRef + cropBufferRef halten Live-Werte
+//  - rAF-Commit committet nur 1x pro Frame in den State (60 fps statt
+//    hunderter setStates pro Sekunde bei jedem Touchmove)
+
+function MAFotoEditor({ foto, raum, wand, phase, onAbbrechen, onGespeichert }) {
+    const lang = useSprache();
+
+    // ── State ──
+    const [editMode, setEditMode] = useState('mark'); // 'crop' | 'mark' | 'draw'
+    const [drawColor, setDrawColor] = useState(MA_MARKIERUNGS_FARBEN[0].hex);
+    const [drawings, setDrawings] = useState((foto.drawings || []).slice());
+    const [cropRect, setCropRect] = useState(foto.crop_rect ? Object.assign({}, foto.crop_rect) : null);
+    const [currentDraw, setCurrentDraw] = useState(null);
+    const [cropDragging, setCropDragging] = useState(false);
+    const [legendeOffen, setLegendeOffen] = useState(false);
+    const [speichernLaeuft, setSpeichernLaeuft] = useState(false);
+    const [fehler, setFehler] = useState(null);
+    const [imgGeladen, setImgGeladen] = useState(false);
+
+    // Bild-Container-Groesse (rendered px)
+    const [boxSize, setBoxSize] = useState({ w: 0, h: 0, offsetX: 0, offsetY: 0 });
+
+    // ── Refs (rAF / Buffers) ──
+    const containerRef = React.useRef(null);
+    const imgElementRef = React.useRef(null);
+    const drawBufferRef = React.useRef(null);
+    const cropBufferRef = React.useRef(null);
+    const rafPendingRef = React.useRef(false);
+
+    // Strichbreite haengt vom Modus ab
+    const drawWidth = editMode === 'mark' ? MA_MARKIER_BREITE : MA_ZEICHEN_BREITE;
+
+    // ── Body-Lock waehrend Editor offen ──
+    useEffect(function(){
+        const prevOverflow = document.body.style.overflow;
+        const prevTouchAction = document.body.style.touchAction;
+        document.body.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
+        return function(){
+            document.body.style.overflow = prevOverflow;
+            document.body.style.touchAction = prevTouchAction;
+        };
+    }, []);
+
+    // ── Bild-Box-Groesse messen + neu messen bei Resize ──
+    useEffect(function(){
+        function messen() {
+            const c = containerRef.current;
+            const img = imgElementRef.current;
+            if (!c || !img || !img.naturalWidth) return;
+
+            const cw = c.clientWidth;
+            const ch = c.clientHeight;
+            const ratio = img.naturalWidth / img.naturalHeight;
+
+            // Bild eingepasst (object-fit: contain)
+            let w, h;
+            if (cw / ch > ratio) {
+                // Container breiter als Bild-Verhaeltnis -> Hoehe limitiert
+                h = ch;
+                w = h * ratio;
+            } else {
+                w = cw;
+                h = w / ratio;
+            }
+            const offsetX = (cw - w) / 2;
+            const offsetY = (ch - h) / 2;
+            setBoxSize({ w: w, h: h, offsetX: offsetX, offsetY: offsetY });
+        }
+        messen();
+        window.addEventListener('resize', messen);
+        window.addEventListener('orientationchange', messen);
+        return function(){
+            window.removeEventListener('resize', messen);
+            window.removeEventListener('orientationchange', messen);
+        };
+    }, [imgGeladen]);
+
+    // ── Pointer-Helper: ClientX/Y -> relative 0-1 Koordinaten ──
+    function clientToRel(clientX, clientY) {
+        const c = containerRef.current;
+        if (!c || !boxSize.w || !boxSize.h) return null;
+        const rect = c.getBoundingClientRect();
+        const px = clientX - rect.left - boxSize.offsetX;
+        const py = clientY - rect.top  - boxSize.offsetY;
+        if (px < 0 || px > boxSize.w || py < 0 || py > boxSize.h) {
+            // Ausserhalb des Bilds: clampen
+            return {
+                x: Math.max(0, Math.min(1, px / boxSize.w)),
+                y: Math.max(0, Math.min(1, py / boxSize.h))
+            };
+        }
+        return { x: px / boxSize.w, y: py / boxSize.h };
+    }
+
+    // ── rAF-Commit ──
+    function flushBuffers() {
+        rafPendingRef.current = false;
+        if (drawBufferRef.current) {
+            setCurrentDraw({
+                points: drawBufferRef.current.points.slice(),
+                color:  drawBufferRef.current.color,
+                width:  drawBufferRef.current.width
+            });
+        }
+        if (cropBufferRef.current) {
+            setCropRect({
+                x: cropBufferRef.current.x,
+                y: cropBufferRef.current.y,
+                w: cropBufferRef.current.w,
+                h: cropBufferRef.current.h
+            });
+            setCropDragging(true);
+        }
+    }
+    function scheduleFlush() {
+        if (rafPendingRef.current) return;
+        rafPendingRef.current = true;
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(flushBuffers);
+        } else {
+            setTimeout(flushBuffers, 16);
+        }
+    }
+
+    // ── Pointer-Events (Touch + Mouse vereinheitlicht) ──
+    function handlePointerDown(e) {
+        if (!boxSize.w) return;
+        e.preventDefault();
+        const t = e.touches && e.touches[0] ? e.touches[0] : e;
+        const rel = clientToRel(t.clientX, t.clientY);
+        if (!rel) return;
+
+        if (editMode === 'mark' || editMode === 'draw') {
+            drawBufferRef.current = {
+                points: [{ x: rel.x, y: rel.y }],
+                color:  drawColor,
+                width:  drawWidth
+            };
+            setCurrentDraw({ points:[{x:rel.x,y:rel.y}], color:drawColor, width:drawWidth });
+        } else if (editMode === 'crop') {
+            cropBufferRef.current = { x: rel.x, y: rel.y, w: 0, h: 0 };
+            setCropRect({ x: rel.x, y: rel.y, w: 0, h: 0 });
+            setCropDragging(true);
+        }
+    }
+
+    function handlePointerMove(e) {
+        if (!boxSize.w) return;
+        if (!drawBufferRef.current && !cropBufferRef.current) return;
+        e.preventDefault();
+        const t = e.touches && e.touches[0] ? e.touches[0] : e;
+        const rel = clientToRel(t.clientX, t.clientY);
+        if (!rel) return;
+
+        if (drawBufferRef.current) {
+            drawBufferRef.current.points.push({ x: rel.x, y: rel.y });
+            scheduleFlush();
+        } else if (cropBufferRef.current) {
+            cropBufferRef.current.w = rel.x - cropBufferRef.current.x;
+            cropBufferRef.current.h = rel.y - cropBufferRef.current.y;
+            scheduleFlush();
+        }
+    }
+
+    function handlePointerUp(e) {
+        if (drawBufferRef.current) {
+            const finished = drawBufferRef.current;
+            drawBufferRef.current = null;
+            if (finished.points.length > 1) {
+                setDrawings(function(prev){
+                    return prev.concat([{
+                        points: finished.points,
+                        color:  finished.color,
+                        width:  finished.width
+                    }]);
+                });
+            }
+            setCurrentDraw(null);
+        }
+        if (cropBufferRef.current) {
+            cropBufferRef.current = null;
+            setCropDragging(false);
+        }
+    }
+
+    // ── Rueckgaengig: letzten Strich entfernen ──
+    function handleZurueck() {
+        setDrawings(function(prev){
+            if (prev.length === 0) return prev;
+            return prev.slice(0, prev.length - 1);
+        });
+    }
+
+    function handleAlleLoeschen() {
+        if (drawings.length === 0 && !cropRect) return;
+        if (!confirm(tConfig('fotos.editor.alle.bestaetigen'))) return;
+        setDrawings([]);
+        setCropRect(null);
+        setCropDragging(false);
+    }
+
+    function handleCropResetten() {
+        setCropRect(null);
+        setCropDragging(false);
+    }
+
+    // ── Speichern: Crop + Drawings auf Canvas einbrennen ──
+    function handleSpeichern() {
+        if (!window.TWMaStorage || !window.TWMaStorage.saveFoto) {
+            setFehler(tConfig('fotos.aufnahme.fehler.storage'));
+            return;
+        }
+
+        // Crop normalisieren (negative w/h korrigieren, in 0-1 clampen)
+        let normCrop = null;
+        if (cropRect && Math.abs(cropRect.w) > 0.01 && Math.abs(cropRect.h) > 0.01) {
+            normCrop = {
+                x: cropRect.w < 0 ? cropRect.x + cropRect.w : cropRect.x,
+                y: cropRect.h < 0 ? cropRect.y + cropRect.h : cropRect.y,
+                w: Math.abs(cropRect.w),
+                h: Math.abs(cropRect.h)
+            };
+            normCrop.x = Math.max(0, Math.min(1, normCrop.x));
+            normCrop.y = Math.max(0, Math.min(1, normCrop.y));
+            normCrop.w = Math.min(normCrop.w, 1 - normCrop.x);
+            normCrop.h = Math.min(normCrop.h, 1 - normCrop.y);
+        }
+
+        setSpeichernLaeuft(true);
+        setFehler(null);
+
+        const img = new Image();
+        img.onerror = function(){
+            setSpeichernLaeuft(false);
+            setFehler(tConfig('fotos.editor.fehler.bild'));
+        };
+        img.onload = function(){
+            try {
+                const canvas = document.createElement('canvas');
+                let sx = 0, sy = 0, sw = img.width, sh = img.height;
+                if (normCrop) {
+                    sx = normCrop.x * img.width;
+                    sy = normCrop.y * img.height;
+                    sw = normCrop.w * img.width;
+                    sh = normCrop.h * img.height;
+                }
+                canvas.width  = Math.max(1, Math.round(sw));
+                canvas.height = Math.max(1, Math.round(sh));
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+                // Drawings rendern (Strichbreite skaliert mit Bild-Breite)
+                if (drawings && drawings.length > 0) {
+                    const skala = canvas.width / 1000;
+                    drawings.forEach(function(d){
+                        if (!d.points || d.points.length < 2) return;
+                        ctx.strokeStyle = d.color || '#e63535';
+                        ctx.lineWidth   = (d.width || 4) * skala;
+                        ctx.lineCap     = 'round';
+                        ctx.lineJoin    = 'round';
+                        ctx.beginPath();
+                        for (let pi = 0; pi < d.points.length; pi++) {
+                            const p = d.points[pi];
+                            // Punkt-Koordinaten transformieren (Crop beruecksichtigen)
+                            let px, py;
+                            if (normCrop) {
+                                px = (p.x - normCrop.x) / normCrop.w * canvas.width;
+                                py = (p.y - normCrop.y) / normCrop.h * canvas.height;
+                            } else {
+                                px = p.x * canvas.width;
+                                py = p.y * canvas.height;
+                            }
+                            if (pi === 0) ctx.moveTo(px, py);
+                            else          ctx.lineTo(px, py);
+                        }
+                        ctx.stroke();
+                    });
+                }
+
+                const editedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                canvas.width = 0; canvas.height = 0;
+
+                // Thumbnail neu generieren auf Basis des bearbeiteten Bilds
+                const thumbPromise = (window.TWMaStorage.erzeugeThumbnail
+                    ? window.TWMaStorage.erzeugeThumbnail(editedDataUrl, 220)
+                    : Promise.resolve(null));
+
+                thumbPromise.then(function(thumb){
+                    const updated = Object.assign({}, foto, {
+                        bearbeitet_dataurl: editedDataUrl,
+                        thumbnail_dataurl: thumb || foto.thumbnail_dataurl,
+                        drawings: drawings,
+                        crop_rect: normCrop,
+                        sync_status: 'pending', // muss neu gesynct werden
+                        bearbeitet_am: new Date().toISOString()
+                    });
+                    return window.TWMaStorage.saveFoto(updated);
+                }).then(function(){
+                    setSpeichernLaeuft(false);
+                    onGespeichert();
+                }).catch(function(err){
+                    setSpeichernLaeuft(false);
+                    setFehler(tConfig('fotos.aufnahme.fehler.speichern') + ' ' + (err.message || ''));
+                });
+            } catch (err) {
+                setSpeichernLaeuft(false);
+                setFehler(err.message || tConfig('fotos.editor.fehler.bild'));
+            }
+        };
+        img.src = foto.foto_dataurl;
+    }
+
+    // ── Render-Helper: Crop-Rechteck normalisieren (Anzeige) ──
+    function getDisplayCrop() {
+        if (!cropRect) return null;
+        const x = cropRect.w < 0 ? cropRect.x + cropRect.w : cropRect.x;
+        const y = cropRect.h < 0 ? cropRect.y + cropRect.h : cropRect.y;
+        const w = Math.abs(cropRect.w);
+        const h = Math.abs(cropRect.h);
+        return { x: x, y: y, w: w, h: h };
+    }
+    const displayCrop = getDisplayCrop();
+
+    // ── Wand-Label fuer Header ──
+    let wandLabel = '';
+    if (wand) {
+        if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
+        else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
+        else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+    }
+
+    // ── Render ──
+    return (
+        <div style={{
+            position:'fixed', inset:0,
+            background:'#1a1a1a',
+            zIndex:1100,
+            display:'flex',
+            flexDirection:'column',
+            color:'#fff'
+        }}>
+            {/* HEADER */}
+            <div style={{
+                padding:'10px 12px',
+                background:'#2a2a2a',
+                borderBottom:'1px solid #444',
+                display:'flex',
+                alignItems:'center',
+                gap:10,
+                flexShrink:0
+            }}>
+                <button
+                    onClick={onAbbrechen}
+                    disabled={speichernLaeuft}
+                    style={{
+                        background:'transparent',
+                        border:'1px solid #555',
+                        borderRadius:8,
+                        color:'#fff',
+                        padding:'8px 12px',
+                        fontSize:'0.9rem',
+                        cursor: speichernLaeuft ? 'not-allowed' : 'pointer',
+                        opacity: speichernLaeuft ? 0.5 : 1,
+                        minHeight:40
+                    }}>
+                    {'\u2715'}
+                </button>
+                <div style={{flex:1, minWidth:0}}>
+                    <div style={{
+                        fontFamily:'var(--font-headline, Oswald)',
+                        fontSize:'0.95rem',
+                        fontWeight:600,
+                        color: phase.color,
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'
+                    }}>
+                        {wandLabel} {'\u00B7'} {tConfig('fotos.phase.' + phase.key + '.label')}
+                    </div>
+                    <div style={{fontSize:'0.72rem', color:'#aaa', marginTop:2}}>
+                        {drawings.length > 0 ? tConfig('fotos.editor.striche', { n: drawings.length }) : tConfig('fotos.editor.keine.aenderungen')}
+                        {displayCrop ? ' \u00B7 ' + tConfig('fotos.editor.zugeschnitten') : ''}
+                    </div>
+                </div>
+                <button
+                    onClick={function(){ setLegendeOffen(true); }}
+                    style={{
+                        background:'transparent',
+                        border:'1px solid #555',
+                        borderRadius:8,
+                        color:'#fff',
+                        padding:'8px 12px',
+                        fontSize:'1.1rem',
+                        cursor:'pointer',
+                        minHeight:40
+                    }}
+                    title={tConfig('fotos.editor.legende')}>
+                    {'\u2139\uFE0F'}
+                </button>
+            </div>
+
+            {/* BILD-CONTAINER */}
+            <div
+                ref={containerRef}
+                onMouseDown={handlePointerDown}
+                onMouseMove={drawBufferRef.current || cropBufferRef.current ? handlePointerMove : null}
+                onMouseUp={handlePointerUp}
+                onMouseLeave={handlePointerUp}
+                onTouchStart={handlePointerDown}
+                onTouchMove={handlePointerMove}
+                onTouchEnd={handlePointerUp}
+                onTouchCancel={handlePointerUp}
+                style={{
+                    flex:1,
+                    position:'relative',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    overflow:'hidden',
+                    touchAction:'none',
+                    userSelect:'none',
+                    cursor: editMode === 'crop' ? 'crosshair' : 'default'
+                }}>
+
+                {/* Originalfoto */}
+                <img
+                    ref={imgElementRef}
+                    src={foto.foto_dataurl}
+                    alt="Foto"
+                    onLoad={function(){ setImgGeladen(true); }}
+                    style={{
+                        maxWidth:'100%',
+                        maxHeight:'100%',
+                        objectFit:'contain',
+                        pointerEvents:'none',
+                        userSelect:'none'
+                    }}
+                    draggable={false}/>
+
+                {/* SVG-Overlay: Drawings + Crop + currentDraw */}
+                {imgGeladen && boxSize.w > 0 ? (
+                    <svg
+                        width={boxSize.w}
+                        height={boxSize.h}
+                        viewBox={'0 0 ' + boxSize.w + ' ' + boxSize.h}
+                        style={{
+                            position:'absolute',
+                            left: boxSize.offsetX,
+                            top:  boxSize.offsetY,
+                            pointerEvents:'none'
+                        }}>
+                        {/* Bestehende Drawings */}
+                        {drawings.map(function(d, i){
+                            if (!d.points || d.points.length < 2) return null;
+                            const path = d.points.map(function(p, pi){
+                                return (pi === 0 ? 'M' : 'L') + (p.x * boxSize.w) + ',' + (p.y * boxSize.h);
+                            }).join(' ');
+                            return (
+                                <path
+                                    key={'d-'+i}
+                                    d={path}
+                                    fill="none"
+                                    stroke={d.color}
+                                    strokeWidth={d.width}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    opacity={0.85}/>
+                            );
+                        })}
+
+                        {/* Aktiver Draw (waehrend des Zeichnens) */}
+                        {currentDraw && currentDraw.points && currentDraw.points.length >= 2 ? (
+                            <path
+                                d={currentDraw.points.map(function(p, pi){
+                                    return (pi === 0 ? 'M' : 'L') + (p.x * boxSize.w) + ',' + (p.y * boxSize.h);
+                                }).join(' ')}
+                                fill="none"
+                                stroke={currentDraw.color}
+                                strokeWidth={currentDraw.width}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                opacity={0.85}/>
+                        ) : null}
+
+                        {/* Crop-Rechteck */}
+                        {displayCrop && displayCrop.w > 0.01 && displayCrop.h > 0.01 ? (
+                            <React.Fragment>
+                                {/* Verdunkelung ausserhalb */}
+                                <path
+                                    d={
+                                        'M0,0 L' + boxSize.w + ',0 L' + boxSize.w + ',' + boxSize.h + ' L0,' + boxSize.h + ' Z ' +
+                                        'M' + (displayCrop.x * boxSize.w) + ',' + (displayCrop.y * boxSize.h) + ' ' +
+                                        'L' + (displayCrop.x * boxSize.w) + ',' + ((displayCrop.y + displayCrop.h) * boxSize.h) + ' ' +
+                                        'L' + ((displayCrop.x + displayCrop.w) * boxSize.w) + ',' + ((displayCrop.y + displayCrop.h) * boxSize.h) + ' ' +
+                                        'L' + ((displayCrop.x + displayCrop.w) * boxSize.w) + ',' + (displayCrop.y * boxSize.h) + ' Z'
+                                    }
+                                    fill="rgba(0,0,0,0.55)"
+                                    fillRule="evenodd"/>
+                                {/* Crop-Rahmen */}
+                                <rect
+                                    x={displayCrop.x * boxSize.w}
+                                    y={displayCrop.y * boxSize.h}
+                                    width={displayCrop.w * boxSize.w}
+                                    height={displayCrop.h * boxSize.h}
+                                    fill="none"
+                                    stroke="#fff"
+                                    strokeWidth={2}
+                                    strokeDasharray="6,4"/>
+                            </React.Fragment>
+                        ) : null}
+                    </svg>
+                ) : null}
+            </div>
+
+            {/* TOOLBAR-MODE-AUSWAHL */}
+            <div style={{
+                background:'#2a2a2a',
+                borderTop:'1px solid #444',
+                padding:'8px 10px',
+                display:'flex',
+                gap:6,
+                flexShrink:0
+            }}>
+                <MAEditorTab
+                    label={tConfig('fotos.editor.mode.crop')}
+                    icon={'\u2702'}
+                    aktiv={editMode === 'crop'}
+                    onClick={function(){ setEditMode('crop'); }}/>
+                <MAEditorTab
+                    label={tConfig('fotos.editor.mode.mark')}
+                    icon={'\u{1F58D}'}
+                    aktiv={editMode === 'mark'}
+                    onClick={function(){ setEditMode('mark'); }}/>
+                <MAEditorTab
+                    label={tConfig('fotos.editor.mode.draw')}
+                    icon={'\u270F'}
+                    aktiv={editMode === 'draw'}
+                    onClick={function(){ setEditMode('draw'); }}/>
+            </div>
+
+            {/* WERKZEUG-LEISTE (mode-spezifisch) */}
+            <div style={{
+                background:'#1f1f1f',
+                borderTop:'1px solid #333',
+                padding:'10px 12px',
+                flexShrink:0
+            }}>
+                {(editMode === 'mark' || editMode === 'draw') ? (
+                    <div style={{display:'flex', gap:6, justifyContent:'center', flexWrap:'wrap'}}>
+                        {MA_MARKIERUNGS_FARBEN.map(function(f){
+                            const aktiv = drawColor === f.hex;
+                            return (
+                                <button
+                                    key={f.id}
+                                    onClick={function(){ setDrawColor(f.hex); }}
+                                    style={{
+                                        width:42, height:42,
+                                        borderRadius:'50%',
+                                        background: f.hex,
+                                        border: aktiv ? '3px solid #fff' : '2px solid #555',
+                                        cursor:'pointer',
+                                        boxShadow: aktiv ? '0 0 0 2px ' + f.hex : 'none',
+                                        transform: aktiv ? 'scale(1.1)' : 'scale(1)',
+                                        transition:'all 0.15s ease-out',
+                                        padding:0
+                                    }}
+                                    title={t(f.nameKey)}/>
+                            );
+                        })}
+                    </div>
+                ) : null}
+
+                {editMode === 'crop' ? (
+                    <div style={{display:'flex', gap:8, justifyContent:'center', flexWrap:'wrap'}}>
+                        <button
+                            onClick={handleCropResetten}
+                            style={{
+                                padding:'10px 16px',
+                                background:'transparent',
+                                border:'1px solid #555',
+                                borderRadius:8,
+                                color:'#fff',
+                                fontSize:'0.85rem',
+                                cursor:'pointer'
+                            }}>
+                            {tConfig('fotos.editor.crop.reset')}
+                        </button>
+                        <div style={{
+                            padding:'10px 16px',
+                            color:'#aaa',
+                            fontSize:'0.8rem',
+                            fontStyle:'italic'
+                        }}>
+                            {displayCrop && displayCrop.w > 0.01
+                                ? tConfig('fotos.editor.crop.aktiv')
+                                : tConfig('fotos.editor.crop.hinweis')}
+                        </div>
+                    </div>
+                ) : null}
+            </div>
+
+            {/* FUSS-LEISTE */}
+            <div style={{
+                background:'#2a2a2a',
+                borderTop:'1px solid #444',
+                padding:'10px 12px',
+                display:'flex',
+                gap:8,
+                flexShrink:0
+            }}>
+                <button
+                    onClick={handleZurueck}
+                    disabled={drawings.length === 0 || speichernLaeuft}
+                    style={{
+                        padding:'12px 12px',
+                        background:'transparent',
+                        border:'1px solid #555',
+                        borderRadius:8,
+                        color: drawings.length === 0 ? '#666' : '#fff',
+                        fontSize:'0.85rem',
+                        cursor: (drawings.length === 0 || speichernLaeuft) ? 'not-allowed' : 'pointer',
+                        minHeight:46
+                    }}>
+                    {'\u21B6'} {tConfig('fotos.editor.rueckgaengig')}
+                </button>
+                <button
+                    onClick={handleAlleLoeschen}
+                    disabled={(drawings.length === 0 && !cropRect) || speichernLaeuft}
+                    style={{
+                        padding:'12px 12px',
+                        background:'transparent',
+                        border:'1px solid #C62828',
+                        borderRadius:8,
+                        color: (drawings.length === 0 && !cropRect) ? '#666' : '#E57373',
+                        fontSize:'0.85rem',
+                        cursor: ((drawings.length === 0 && !cropRect) || speichernLaeuft) ? 'not-allowed' : 'pointer',
+                        minHeight:46
+                    }}>
+                    {'\u{1F5D1}\uFE0F'}
+                </button>
+                <button
+                    onClick={handleSpeichern}
+                    disabled={speichernLaeuft}
+                    style={{
+                        flex:1,
+                        padding:'12px',
+                        background: speichernLaeuft
+                            ? '#555'
+                            : 'linear-gradient(135deg, #43A047, #2E7D32)',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:8,
+                        fontSize:'1rem',
+                        fontWeight:700,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        cursor: speichernLaeuft ? 'not-allowed' : 'pointer',
+                        minHeight:46,
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:6
+                    }}>
+                    {speichernLaeuft ? tConfig('fotos.editor.speichern.laeuft') : ('\u2713 ' + tConfig('fotos.editor.speichern'))}
+                </button>
+            </div>
+
+            {/* Fehler-Anzeige */}
+            {fehler ? (
+                <div
+                    onClick={function(){ setFehler(null); }}
+                    style={{
+                        position:'absolute',
+                        bottom:80, left:16, right:16,
+                        background:'#C62828',
+                        color:'#fff',
+                        padding:'12px 16px',
+                        borderRadius:10,
+                        boxShadow:'0 6px 20px rgba(0,0,0,0.4)',
+                        fontSize:'0.9rem',
+                        cursor:'pointer'
+                    }}>
+                    {fehler}
+                </div>
+            ) : null}
+
+            {/* Farbzuordnung-Legende */}
+            {legendeOffen ? (
+                <MAFarbzuordnungLegende
+                    phase={phase}
+                    onSchliessen={function(){ setLegendeOffen(false); }}/>
+            ) : null}
+        </div>
+    );
+}
+
+// Sub-Komponente: Mode-Tab
+function MAEditorTab({ label, icon, aktiv, onClick }) {
+    return (
+        <button
+            onClick={onClick}
+            style={{
+                flex:1,
+                padding:'10px 4px',
+                background: aktiv ? '#1E88E5' : 'transparent',
+                color: aktiv ? '#fff' : '#bbb',
+                border: aktiv ? 'none' : '1px solid #555',
+                borderRadius:8,
+                fontSize:'0.85rem',
+                fontWeight: aktiv ? 700 : 500,
+                fontFamily:'var(--font-headline, Oswald)',
+                cursor:'pointer',
+                display:'flex',
+                flexDirection:'column',
+                alignItems:'center',
+                gap:2,
+                minHeight:48,
+                transition:'all 0.15s ease-out'
+            }}>
+            <span style={{fontSize:'1.1rem', lineHeight:1}}>{icon}</span>
+            <span style={{fontSize:'0.72rem'}}>{label}</span>
+        </button>
+    );
+}
+
+// ============================================================
+// MAFarbzuordnungLegende - zeigt Default-Farb-Mapping pro Phase
+// ============================================================
+// Reine Anzeige, kein Editing (vereinfacht ggue Master-App).
+
+function MAFarbzuordnungLegende({ phase, onSchliessen }) {
+    const lang = useSprache();
+    const zuordnungen = MA_FARBZUORDNUNG[phase.key] || [];
+
+    return (
+        <MAOverlay onClick={onSchliessen}>
+            <MAOverlayBox>
+                <div style={{
+                    display:'flex', alignItems:'center', gap:10,
+                    paddingBottom:10, borderBottom:'1px solid #EEE',
+                    marginBottom:14
+                }}>
+                    <div style={{
+                        width:8, height:30, borderRadius:4, background: phase.color
+                    }}/>
+                    <div style={{flex:1, textAlign:'left'}}>
+                        <div style={{fontSize:'0.95rem', fontWeight:700, color:'#212121', fontFamily:'var(--font-headline, Oswald)'}}>
+                            {tConfig('fotos.editor.legende')}
+                        </div>
+                        <div style={{fontSize:'0.78rem', color:'#666'}}>
+                            {tConfig('fotos.phase.' + phase.key + '.label')}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onSchliessen}
+                        style={{
+                            background:'transparent', border:'none',
+                            cursor:'pointer', fontSize:'1.4rem', color:'#999',
+                            padding:'4px 8px'
+                        }}>
+                        {'\u2715'}
+                    </button>
+                </div>
+
+                <div style={{
+                    fontSize:'0.82rem',
+                    color:'#666',
+                    marginBottom:14,
+                    textAlign:'left',
+                    lineHeight:1.5
+                }}>
+                    {tConfig('fotos.editor.legende.intro')}
+                </div>
+
+                <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                    {zuordnungen.map(function(z, i){
+                        const farbDef = MA_MARKIERUNGS_FARBEN.find(function(f){ return f.id === z.farbe; });
+                        if (!farbDef) return null;
+                        return (
+                            <div
+                                key={i}
+                                style={{
+                                    display:'flex',
+                                    alignItems:'center',
+                                    gap:12,
+                                    padding:'8px 10px',
+                                    background:'#F5F7FA',
+                                    borderRadius:8,
+                                    textAlign:'left'
+                                }}>
+                                <div style={{
+                                    width:28, height:28, borderRadius:'50%',
+                                    background: farbDef.hex,
+                                    flexShrink:0,
+                                    border:'2px solid #fff',
+                                    boxShadow:'0 1px 3px rgba(0,0,0,0.15)'
+                                }}/>
+                                <div style={{flex:1}}>
+                                    <div style={{
+                                        fontSize:'0.85rem',
+                                        fontWeight:600,
+                                        color:'#212121'
+                                    }}>
+                                        {t(farbDef.nameKey)}
+                                    </div>
+                                    <div style={{fontSize:'0.78rem', color:'#666'}}>
+                                        {t(z.beschreibungKey)}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <button
+                    onClick={onSchliessen}
+                    style={{
+                        marginTop:16,
+                        width:'100%',
+                        padding:'12px',
+                        background:'#1E88E5',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:10,
+                        fontSize:'0.95rem',
+                        fontWeight:600,
+                        cursor:'pointer',
+                        minHeight:46
+                    }}>
+                    {tConfig('fotos.aufnahme.ok')}
+                </button>
+            </MAOverlayBox>
+        </MAOverlay>
+    );
+}
 
 // ============================================================
 // Hilfs-Styles (lokal, eindeutig benannt um Konflikte mit
@@ -8057,6 +9609,9 @@ const maInputStyle = {
     outline:'none'
 };
 
+// ═══════════════════════════════════════════════════════════════════════
+// ENDE MODUL FOTOS
+// ═══════════════════════════════════════════════════════════════════════
 
 // ============================================================
 // MAFotosTab - Hauptmenue-Tab "Fotos" (Variante 3)
@@ -8131,10 +9686,6 @@ function MAFotosTab() {
         </React.Fragment>
     );
 }
-
-// ═══════════════════════════════════════════════════════════════════════
-// ENDE MODUL FOTOS
-// ═══════════════════════════════════════════════════════════════════════
 
     /* ═══════════════════════════════════════════════════════════
        TOP-LEVEL WRAPPER — verwaltet Sprache, rendert AuthContainer
