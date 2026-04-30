@@ -57,14 +57,6 @@
         appId: '1:411877213047:web:f04e3b9b98a8d97120d772'
     };
 
-    // VAPID-Key fuer Web-Push (FCM) — aus Firebase Console > Cloud Messaging > Web-Push-Zertifikate
-    // Wird von initFcm() benoetigt, damit Push-Nachrichten im Hintergrund ankommen.
-    const FCM_VAPID_KEY = 'BG4IsYD6li2CGXGyBrhBZ2vhV7grlbMouOuDwjNRmgnTFgZBupE1CBGsCX4C5BnT2pN_f2rOLNolr_2TAyYK-UY';
-
-    function getFcmVapidKey() {
-        return FCM_VAPID_KEY || '';
-    }
-
     // Gemini-Wrapper (wird in Etappe 7 befuellt, verschluesselt)
     const TRANSLATION_CONFIG = {
         provider: 'gemini',
@@ -1351,6 +1343,167 @@
     });
 
     // ============================================================
+    // FOTOS_LABELS: Foto-Modul Etappe 6 (B6.1 - B6.5)
+    // Vollstaendige UI-Texte fuer Raum-Verwaltung, Phasen-Auswahl,
+    // Wand-Raster, Foto-Aufnahme, Editor, Sprach-Notiz und neu
+    // (B6.5) "Allgemeine Fotos" - 20 Slots pro Baustelle ohne
+    // Raum-Zuordnung.
+    //
+    // DE ist vollstaendig. Die anderen Sprachen (CS, SK, PL, EN, RO, UK)
+    // sind aktuell als leere Stubs angelegt; die t()-Funktion faellt
+    // automatisch auf DE zurueck. Diese Sprachen koennen spaeter
+    // nachgepflegt werden, ohne dass die App bricht.
+    // ============================================================
+
+    const FOTOS_LABELS = {
+        de: {
+            // -------- Raumliste (Stufe 2) --------
+            'fotos.raumliste.titel':            'Raumliste',
+            'fotos.raumliste.hinweis':          'Waehle einen Raum aus oder lege einen neuen an, um Wand-Fotos in 3 Phasen aufzunehmen.',
+            'fotos.raumliste.lade':             'Lade Raeume ...',
+            'fotos.raumliste.leer.titel':       'Noch keine Raeume angelegt',
+            'fotos.raumliste.leer.text':        'Tippe oben auf "Neuer Raum", um deinen ersten Raum anzulegen. Allgemeine Fotos kannst du auch ohne Raum aufnehmen (Kachel oben).',
+
+            // -------- Allgemeine Fotos (B6.5) - NEU --------
+            'fotos.allgemein.kachel.titel':     'Allgemeine Fotos',
+            'fotos.allgemein.kachel.text':      'Bis zu 20 Fotos ohne Raum-Zuordnung (Schaeden, Material, Werkzeug)',
+            'fotos.allgemein.titel':            'Allgemeine Fotos',
+            'fotos.allgemein.untertitel':       'Bis zu 20 Fotos pro Baustelle',
+            'fotos.allgemein.intro':            'Hier kannst du Fotos aufnehmen, die keinem Raum zugeordnet sind: Schaeden, Materiallieferungen, Werkzeug-Standorte, Probleme.',
+            'fotos.allgemein.label':            'Allgemein {n}',
+            'fotos.allgemein.fortschritt':      '{aktuell} von {gesamt} belegt',
+
+            // -------- Raum-Dialog (Anlegen / Bearbeiten) --------
+            'fotos.raum.neu':                   'Neuer Raum',
+            'fotos.raum.neu.titel':             'Neuen Raum anlegen',
+            'fotos.raum.bearbeiten':            'Bearbeiten',
+            'fotos.raum.bearbeiten.titel':      'Raum bearbeiten',
+            'fotos.raum.abbrechen':             'Abbrechen',
+            'fotos.raum.speichern':             'Speichern',
+            'fotos.raum.speichern.laeuft':      'Wird gespeichert ...',
+            'fotos.raum.loeschen':              'Loeschen',
+            'fotos.raum.loeschen.bestaetigen':  'Raum "{name}" wirklich loeschen? Alle zugehoerigen Fotos gehen verloren.',
+            'fotos.raum.loeschen.fehler':       'Raum konnte nicht geloescht werden.',
+            'fotos.raum.waende':                '{n} Waende',
+            'fotos.raum.boden':                 'Mit Boden',
+            'fotos.raum.decke':                 'Mit Decke',
+
+            'fotos.raum.feld.bezeichnung':              'Raum-Bezeichnung',
+            'fotos.raum.feld.bezeichnung.platzhalter':  'z.B. Bad Erdgeschoss',
+            'fotos.raum.feld.nummer':                   'Raum-Nummer (optional)',
+            'fotos.raum.feld.nummer.platzhalter':       'z.B. 0.12',
+            'fotos.raum.feld.geschoss':                 'Geschoss',
+            'fotos.raum.feld.wandzahl':                 'Anzahl Waende',
+            'fotos.raum.feld.zusaetze':                 'Zusaetze (optional)',
+
+            'fotos.raum.fehler.bezeichnung':    'Bitte gib eine Raum-Bezeichnung ein.',
+            'fotos.raum.fehler.baustelle':      'Keine Baustelle gewaehlt.',
+            'fotos.raum.fehler.speichern':      'Raum konnte nicht gespeichert werden:',
+            'fotos.raum.fehler.storage':        'Speicher nicht verfuegbar.',
+
+            // -------- Buero-Raeume (B6.5c) - read-only Marker --------
+            'fotos.raum.buero.badge':           'Buero',
+            'fotos.raum.buero.readonly':        'Dieser Raum kommt aus dem Buero und kann nur dort geaendert werden.',
+
+            // -------- Phase-Auswahl (Stufe 3) --------
+            'fotos.phase.intro':                'Waehle die Bauphase, in der die Fotos aufgenommen werden.',
+            'fotos.phase.rohzustand.label':     'Rohzustand',
+            'fotos.phase.rohzustand.subtitle':  'Vor Arbeitsbeginn',
+            'fotos.phase.vorarbeiten.label':    'Nach Vorarbeiten',
+            'fotos.phase.vorarbeiten.subtitle': 'Abdichtung / Grundierung',
+            'fotos.phase.fertigstellung.label': 'Fertigstellung',
+            'fotos.phase.fertigstellung.subtitle': 'Nach Fliesenarbeiten',
+
+            // -------- Wand-Raster (Stufe 4) --------
+            'fotos.wand.label':                 'Wand {n}',
+            'fotos.boden':                      'Boden',
+            'fotos.decke':                      'Decke',
+
+            // -------- Foto-Aufnahme (B6.2) --------
+            'fotos.aufnahme.abbrechen':         'Abbrechen',
+            'fotos.aufnahme.ok':                'OK',
+            'fotos.aufnahme.neu':               'Neu aufnehmen',
+            'fotos.aufnahme.lade':              'Lade Fotos ...',
+            'fotos.aufnahme.komprimiere':       'Foto wird komprimiert ...',
+            'fotos.aufnahme.verwenden':         'Verwenden',
+            'fotos.aufnahme.wiederholen':       'Wiederholen',
+            'fotos.aufnahme.loeschen':          'Foto loeschen',
+            'fotos.aufnahme.loeschen.bestaetigen': 'Foto wirklich loeschen?',
+            'fotos.aufnahme.status.pending':    'Lokal gespeichert',
+            'fotos.aufnahme.status.uploaded':   'Synchronisiert',
+            'fotos.aufnahme.status.fehler':     'Sync-Fehler',
+            'fotos.aufnahme.fehler.komprimierung': 'Foto konnte nicht komprimiert werden:',
+            'fotos.aufnahme.fehler.speichern':  'Foto konnte nicht gespeichert werden:',
+            'fotos.aufnahme.fehler.loeschen':   'Foto konnte nicht geloescht werden:',
+            'fotos.aufnahme.fehler.storage':    'Speicher nicht verfuegbar.',
+
+            // -------- Foto-Editor (B6.3) - Crop / Draw / Mark --------
+            'fotos.editor.oeffnen':             'Bearbeiten',
+            'fotos.editor.bearbeitet':          'Bearbeitet',
+            'fotos.editor.speichern':           'Uebernehmen',
+            'fotos.editor.speichern.laeuft':    'Wird gespeichert ...',
+            'fotos.editor.rueckgaengig':        'Rueckgaengig',
+            'fotos.editor.alle.bestaetigen':    'Wirklich alle Markierungen entfernen?',
+            'fotos.editor.keine.aenderungen':   'Keine Aenderungen',
+            'fotos.editor.mode.crop':           'Zuschneiden',
+            'fotos.editor.mode.draw':           'Zeichnen',
+            'fotos.editor.mode.mark':           'Markieren',
+            'fotos.editor.crop.aktiv':          'Zuschnitt aktiv',
+            'fotos.editor.crop.hinweis':        'Ziehe die Ecken, um den Bildausschnitt festzulegen.',
+            'fotos.editor.crop.reset':          'Zuruecksetzen',
+            'fotos.editor.zugeschnitten':       'Zugeschnitten',
+            'fotos.editor.striche':             '{n} Striche',
+            'fotos.editor.legende':             'Legende',
+            'fotos.editor.legende.intro':       'Markierungs-Bedeutung in dieser Phase:',
+            'fotos.editor.fehler.bild':         'Bild konnte nicht geladen werden.',
+            'fotos.editor.farbe.rot':           'Rot',
+            'fotos.editor.farbe.blau':          'Blau',
+            'fotos.editor.farbe.gruen':         'Gruen',
+            'fotos.editor.farbe.gelb':          'Gelb',
+            'fotos.editor.farbe.lila':          'Lila',
+            'fotos.editor.farbe.orange':        'Orange',
+
+            // -------- Sprach-Notiz (B6.4) --------
+            'fotos.notiz.titel':                'Sprach-Notiz',
+            'fotos.notiz.text':                 'Tippe auf das Mikrofon, um eine Sprach-Notiz aufzunehmen.',
+            'fotos.notiz.start':                'Aufnahme starten',
+            'fotos.notiz.stop':                 'Aufnahme stoppen',
+            'fotos.notiz.live':                 'Hoert zu ...',
+            'fotos.notiz.platzhalter':          'Hier erscheint deine Aufnahme ...',
+            'fotos.notiz.speichern':            'Uebernehmen',
+            'fotos.notiz.bearbeiten':           'Bearbeiten',
+            'fotos.notiz.neu':                  'Neu aufnehmen',
+            'fotos.notiz.aktiv':                'Notiz vorhanden',
+            'fotos.notiz.aktiv.hinweis':        'Tippe zum Bearbeiten oder Loeschen.',
+            'fotos.notiz.inaktiv':              'Keine Notiz',
+            'fotos.notiz.inaktiv.hinweis':      'Tippe, um eine Sprach-Notiz hinzuzufuegen.',
+            'fotos.notiz.sprache':              'Sprache',
+            'fotos.notiz.uebersetzung.hinweis': 'Wird automatisch ins Deutsche uebersetzt:',
+            'fotos.notiz.kein.support':         'Sprachaufnahme nicht unterstuetzt',
+            'fotos.notiz.fehler.aufnahme':      'Aufnahme konnte nicht gestartet werden:',
+            'fotos.notiz.fehler.kein.support':  'Dein Browser unterstuetzt keine Spracherkennung. Bitte verwende Chrome oder Edge.',
+            'fotos.notiz.loeschen.bestaetigen': 'Sprach-Notiz wirklich loeschen?'
+        },
+
+        // -------- Andere Sprachen: aktuell leer, t()-Funktion faellt auf DE zurueck --------
+        // Diese Sprachen werden in einer spaeteren Lieferung nachgepflegt.
+        cs: {},
+        sk: {},
+        pl: {},
+        en: {},
+        ro: {},
+        uk: {}
+    };
+
+    // Merge FOTOS-Labels in UI_LABELS pro Sprache
+    Object.keys(FOTOS_LABELS).forEach(function (lang) {
+        if (!UI_LABELS[lang]) UI_LABELS[lang] = {};
+        Object.keys(FOTOS_LABELS[lang]).forEach(function (k) {
+            UI_LABELS[lang][k] = FOTOS_LABELS[lang][k];
+        });
+    });
+
+    // ============================================================
     // Helper: t(key, replacements) — Uebersetzungs-Funktion
     // replacements: Objekt wie {n: 5}, ersetzt {n} im Label
     // ============================================================
@@ -1444,7 +1597,6 @@
         SUPPORTED_LANGUAGES: SUPPORTED_LANGUAGES,
         FIRMEN_DATEN: FIRMEN_DATEN,
         FIREBASE_CONFIG: FIREBASE_CONFIG,
-        getFcmVapidKey: getFcmVapidKey,
         TRANSLATION_CONFIG: TRANSLATION_CONFIG,
         DRIVE_CONFIG: DRIVE_CONFIG,
         UI_LABELS: UI_LABELS,

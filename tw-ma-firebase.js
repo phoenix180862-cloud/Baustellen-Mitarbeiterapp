@@ -474,6 +474,38 @@
         });
     }
 
+    /**
+     * Live-Subscription auf die Raumliste einer Baustelle (Etappe 6.5c).
+     * Pfad: /aktive_baustellen/{baustelleId}/raeume/
+     * Callback erhaelt: { raumId1: {bezeichnung, geschoss, wandzahl, ...}, ... }
+     * Gibt Unsubscribe-Funktion zurueck.
+     *
+     * Vor dem Subscribe wird geprueft, ob die Baustelle ueberhaupt fuer das
+     * eigene Geraet freigegeben ist - sonst kein Listener (Datenschutz).
+     */
+    function subscribeRaeumeFromFirebase(baustelleId, callback) {
+        let unsub = function(){};
+        ensureInit().then(function(){
+            if (!db || !baustelleId) { callback({}); return; }
+            const uid = getMeineUid();
+            if (!uid) { callback({}); return; }
+            // Vorab-Check: Baustelle muss fuer dieses Geraet freigegeben sein
+            return db.ref('aktive_baustellen/' + baustelleId + '/freigegebene_geraete/' + uid).once('value').then(function(snap){
+                if (snap.val() !== true) { callback({}); return; }
+                const ref = db.ref('aktive_baustellen/' + baustelleId + '/raeume');
+                const handler = function(snap2){
+                    callback(snap2.val() || {});
+                };
+                ref.on('value', handler);
+                unsub = function(){ ref.off('value', handler); };
+            });
+        }).catch(function(err){
+            console.warn('[TWMaFirebase] subscribeRaeumeFromFirebase-Fehler:', err);
+            callback({});
+        });
+        return function(){ unsub(); };
+    }
+
     // ============================================================
     // ETAPPE 5 — NACHRICHTEN-MODUL (Kalender + Chat)
     // ============================================================
@@ -762,6 +794,107 @@
         });
     }
 
+    /**
+     * Initialisiert FCM und fordert (falls noch nicht entschieden) die Push-Erlaubnis an.
+     * Registriert den Background-Service-Worker und holt sich den FCM-Token.
+     * vapidKey: Web-Push-Public-Key aus Firebase Console > Cloud Messaging.
+     * Ohne vapidKey wird FCM NICHT initialisiert (Warnung in Konsole).
+     * Returns Promise mit { status: 'granted'|'denied'|'default'|'unsupported', token?: string }.
+     */
+    function initFcm(vapidKey) {
+        return new Promise(function(resolve){
+            // Vorbedingungen pruefen
+            if (typeof firebase === 'undefined' || !firebase.messaging) {
+                resolve({ status: 'unsupported', reason: 'firebase-messaging-nicht-geladen' });
+                return;
+            }
+            if (!('Notification' in window)) {
+                resolve({ status: 'unsupported', reason: 'notification-api-fehlt' });
+                return;
+            }
+            if (!('serviceWorker' in navigator)) {
+                resolve({ status: 'unsupported', reason: 'service-worker-fehlt' });
+                return;
+            }
+            if (!vapidKey) {
+                console.warn('[TWMaFirebase] FCM nicht initialisiert: vapidKey fehlt');
+                resolve({ status: 'unsupported', reason: 'vapid-key-fehlt' });
+                return;
+            }
+
+            // Aktueller Permission-Status
+            const aktPerm = Notification.permission;
+            if (aktPerm === 'denied') {
+                resolve({ status: 'denied' });
+                return;
+            }
+
+            function nachErlaubnisRegistrieren() {
+                // Background-Service-Worker fuer FCM registrieren (separate Datei!)
+                navigator.serviceWorker.register('firebase-messaging-sw.js', { scope: '/firebase-cloud-messaging-push-scope' })
+                    .then(function(reg){
+                        try {
+                            const messaging = firebase.messaging();
+                            return messaging.getToken({
+                                vapidKey: vapidKey,
+                                serviceWorkerRegistration: reg
+                            }).then(function(token){
+                                if (!token) {
+                                    resolve({ status: 'denied', reason: 'kein-token' });
+                                    return;
+                                }
+                                // Token in Firebase speichern
+                                return speichereFcmToken(token).then(function(){
+                                    console.log('[TWMaFirebase] FCM-Token registriert (' + token.slice(0, 10) + '...)');
+                                    resolve({ status: 'granted', token: token });
+                                });
+                            });
+                        } catch(e) {
+                            console.error('[TWMaFirebase] messaging() fehlgeschlagen:', e);
+                            resolve({ status: 'unsupported', reason: 'messaging-init-fail' });
+                        }
+                    })
+                    .catch(function(err){
+                        console.error('[TWMaFirebase] SW-Register fehlgeschlagen:', err);
+                        resolve({ status: 'unsupported', reason: 'sw-register-fail' });
+                    });
+            }
+
+            if (aktPerm === 'granted') {
+                nachErlaubnisRegistrieren();
+                return;
+            }
+
+            // 'default' - User muss zustimmen
+            Notification.requestPermission().then(function(perm){
+                if (perm === 'granted') {
+                    nachErlaubnisRegistrieren();
+                } else {
+                    resolve({ status: perm }); // 'denied' oder 'default'
+                }
+            });
+        });
+    }
+
+    /**
+     * Registriert onMessage-Handler fuer Foreground-Nachrichten.
+     * Wird aufgerufen, wenn die App offen ist und eine Push-Nachricht ankommt.
+     * Returns unsubscribe-Funktion (oder no-op wenn FCM nicht verfuegbar).
+     */
+    function subscribeFcmForeground(callback) {
+        if (typeof firebase === 'undefined' || !firebase.messaging) {
+            return function(){};
+        }
+        try {
+            const messaging = firebase.messaging();
+            return messaging.onMessage(function(payload){
+                try { callback(payload); } catch(e) { console.error('[FCM] Handler-Fehler:', e); }
+            });
+        } catch(e) {
+            return function(){};
+        }
+    }
+
     // ============================================================
     // Export
     // ============================================================
@@ -794,6 +927,7 @@
         ladeAktiveBaustellen:       ladeAktiveBaustellen,
         subscribeAktiveBaustellen:  subscribeAktiveBaustellen,
         ladeBaustelle:              ladeBaustelle,
+        subscribeRaeumeFromFirebase: subscribeRaeumeFromFirebase,
 
         // Etappe 5 — Mitarbeiter-Identity
         getMeineMaId:               getMeineMaId,
@@ -816,7 +950,9 @@
         zaehleUngeleseneBueroNachrichten: zaehleUngeleseneBueroNachrichten,
 
         // Etappe 5 — FCM
-        speichereFcmToken:          speichereFcmToken
+        speichereFcmToken:          speichereFcmToken,
+        initFcm:                    initFcm,
+        subscribeFcmForeground:     subscribeFcmForeground
     };
 
     console.log('[TWMaFirebase] Etappe-5-Vollausbau (Kalender + Chat + FCM) geladen.');

@@ -6543,8 +6543,13 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
     // Counter, der bei jeder Foto-Aenderung hochgezaehlt wird; triggert
     // ein Reload der Phasen-Fortschritte in MAPhaseAuswahl.
     const [aenderungsKey, setAenderungsKey] = useState(0);
+    // Anzahl Allgemeine-Fotos (B6.5) - fuer Anzeige auf der Kachel
+    const [allgemeineCount, setAllgemeineCount] = useState(0);
 
     const baustelleId = baustelle && (baustelle.id || baustelle.staging_folder_id || baustelle.name);
+
+    // Pseudo-Raum-ID fuer Allgemeine Fotos: stabil pro Baustelle
+    const allgemeinerRaumId = 'allgemein-' + baustelleId;
 
     // Raeume aus IndexedDB laden, wenn Komponente gemountet wird oder
     // Baustelle wechselt.
@@ -6562,6 +6567,81 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
             setRaeume([]);
             setLaden(false);
         });
+    }, [baustelleId]);
+
+    // Allgemein-Fotos-Counter laden (B6.5)
+    function reloadAllgemeineCount() {
+        if (!window.TWMaStorage || !window.TWMaStorage.listFotos) return;
+        window.TWMaStorage.listFotos(allgemeinerRaumId, 'allgemein').then(function(liste){
+            setAllgemeineCount((liste || []).length);
+        }).catch(function(){ setAllgemeineCount(0); });
+    }
+    useEffect(function(){
+        reloadAllgemeineCount();
+    }, [baustelleId, aenderungsKey]);
+
+    // Firebase-Raeume-Subscription (B6.5c) - merged Buero-Raeume in lokale IndexedDB
+    // Master-App pusht nach /aktive_baustellen/{slug}/raeume/ - wir lesen das live
+    // und mergen mit Marker aus_firebase=true (read-only fuer den MA).
+    useEffect(function(){
+        if (!baustelleId) return;
+        if (!window.TWMaFirebase || !window.TWMaFirebase.subscribeRaeumeFromFirebase) return;
+        if (!window.TWMaStorage || !window.TWMaStorage.saveRaum || !window.TWMaStorage.listRaeume) return;
+
+        const unsub = window.TWMaFirebase.subscribeRaeumeFromFirebase(baustelleId, function(firebaseRaeumeMap){
+            const fbRaeume = firebaseRaeumeMap || {};
+            const fbIds = Object.keys(fbRaeume);
+
+            // Aktuelle lokale Raeume holen
+            window.TWMaStorage.listRaeume(baustelleId).then(function(lokal){
+                const lokal_safe = lokal || [];
+                const promises = [];
+
+                // 1. Geloeschte Firebase-Raeume aus lokaler DB entfernen
+                //    (alle lokalen mit aus_firebase=true, deren ID nicht mehr in fbRaeume ist)
+                lokal_safe.forEach(function(r){
+                    if (r && r.aus_firebase === true && r.firebase_id && fbIds.indexOf(r.firebase_id) === -1) {
+                        if (window.TWMaStorage.deleteRaum) {
+                            promises.push(window.TWMaStorage.deleteRaum(r.id).catch(function(){}));
+                        }
+                    }
+                });
+
+                // 2. Firebase-Raeume nach lokal speichern (Upsert)
+                //    Lokale ID = "fb-" + firebase_id, damit kein Konflikt mit MA-Raeumen
+                fbIds.forEach(function(fbId){
+                    const fb = fbRaeume[fbId] || {};
+                    const lokalId = 'fb-' + baustelleId + '-' + fbId;
+                    const datensatz = {
+                        id: lokalId,
+                        baustelle_id: baustelleId,
+                        firebase_id: fbId,
+                        aus_firebase: true,
+                        bezeichnung: fb.bezeichnung || '(ohne Bezeichnung)',
+                        nummer: fb.nummer || '',
+                        geschoss: fb.geschoss || 'EG',
+                        wandzahl: typeof fb.wandzahl === 'number' ? fb.wandzahl : 4,
+                        hatBoden: fb.hatBoden !== false,
+                        hatDecke: fb.hatDecke === true,
+                        erstellt_am: fb.erstellt_am || Date.now(),
+                        erstellt_von: fb.erstellt_von || 'master-app',
+                        firebase_aenderung_am: fb.geaendert_am || Date.now()
+                    };
+                    promises.push(window.TWMaStorage.saveRaum(datensatz).catch(function(err){
+                        console.warn('[MAFotosView] saveRaum (Firebase) fehlgeschlagen:', err && err.message);
+                    }));
+                });
+
+                Promise.all(promises).then(function(){
+                    // Nach Sync: lokale Liste neu laden, damit UI aktualisiert wird
+                    if (promises.length > 0) reloadRaeume();
+                });
+            }).catch(function(err){
+                console.warn('[MAFotosView] listRaeume in Firebase-Sync fehlgeschlagen:', err && err.message);
+            });
+        });
+
+        return function(){ if (typeof unsub === 'function') unsub(); };
     }, [baustelleId]);
 
     // Hilfs-Reload nach Anlegen / Aendern / Loeschen
@@ -6615,6 +6695,37 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
         );
     }
 
+    // Allgemeine Fotos (B6.5) - Pseudo-Raum + Pseudo-Phase fuer
+    // Wiederverwendung von MAWandRaster mit 20 Slots
+    if (stufe === 'allgemein') {
+        const allgemeinerRaum = {
+            id: allgemeinerRaumId,
+            bezeichnung: tConfig('fotos.allgemein.titel'),
+            kind: 'allgemein',     // Marker fuer MAWandRaster
+            geschoss: '',
+            wandzahl: 20,          // 20 Slots
+            hatBoden: false,
+            hatDecke: false
+        };
+        const allgemeinPhase = {
+            key: 'allgemein',
+            nr: 0,
+            color: '#8E24AA'
+        };
+        return (
+            <MAWandRaster
+                baustelle={baustelle}
+                raum={allgemeinerRaum}
+                phase={allgemeinPhase}
+                onZurueck={function(){
+                    setStufe('raumliste');
+                }}
+                onAenderung={function(){
+                    setAenderungsKey(function(prev){ return prev + 1; });
+                }}/>
+        );
+    }
+
     if (stufe === 'waende' && aktiverRaum && aktivePhase) {
         return (
             <MAWandRaster
@@ -6637,6 +6748,8 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
             baustelle={baustelle}
             raeume={raeume}
             laden={laden}
+            allgemeineCount={allgemeineCount}
+            onAllgemeineFotos={function(){ setStufe('allgemein'); }}
             onZurueck={onZurueck}
             onNeuerRaum={function(){ setStufe('neuerRaum'); }}
             onRaumWaehlen={function(raum){
@@ -6644,11 +6757,21 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
                 setStufe('phasen');
             }}
             onRaumBearbeiten={function(raum){
+                // Firebase-Raeume sind read-only - sie kommen aus dem Buero
+                if (raum && raum.aus_firebase === true) {
+                    alert(tConfig('fotos.raum.buero.readonly'));
+                    return;
+                }
                 setEditRaum(raum);
                 setStufe('raumEdit');
             }}
             onRaumLoeschen={function(raum){
                 if (!window.TWMaStorage || !window.TWMaStorage.deleteRaum) return;
+                // Firebase-Raeume kann der MA nicht loeschen
+                if (raum && raum.aus_firebase === true) {
+                    alert(tConfig('fotos.raum.buero.readonly'));
+                    return;
+                }
                 if (!confirm(tConfig('fotos.raum.loeschen.bestaetigen', { name: raum.bezeichnung }))) return;
                 window.TWMaStorage.deleteRaum(raum.id).then(function(){
                     reloadRaeume();
@@ -6663,7 +6786,7 @@ function MAFotosView({ baustelle, kachel, onZurueck }) {
 // MARaumListe - Stufe 2: Liste der Raeume + Neuer-Raum-Button
 // ============================================================
 
-function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumWaehlen, onRaumBearbeiten, onRaumLoeschen }) {
+function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumWaehlen, onRaumBearbeiten, onRaumLoeschen, onAllgemeineFotos, allgemeineCount }) {
     const lang = useSprache();
 
     // Sortier-Reihenfolge: KG < EG < OG < DG, dann alphabetisch nach bezeichnung
@@ -6683,6 +6806,72 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
                 onZurueck={onZurueck}/>
 
             <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
+                {/* Allgemeine-Fotos-Kachel (B6.5) - OHNE Raum-Pflicht */}
+                <button
+                    onClick={onAllgemeineFotos}
+                    style={{
+                        width:'100%',
+                        padding:'16px 14px',
+                        marginBottom:12,
+                        background:'linear-gradient(135deg, #8E24AA, #4A148C)',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:12,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        cursor:'pointer',
+                        boxShadow:'0 4px 14px rgba(142,36,170,0.35)',
+                        display:'flex',
+                        alignItems:'center',
+                        gap:14,
+                        textAlign:'left',
+                        minHeight:72
+                    }}>
+                    <div style={{
+                        fontSize:'2rem',
+                        lineHeight:1,
+                        flexShrink:0,
+                        width:48,
+                        height:48,
+                        borderRadius:'50%',
+                        background:'rgba(255,255,255,0.18)',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center'
+                    }}>
+                        {'\u{1F4F7}'}
+                    </div>
+                    <div style={{flex:1, minWidth:0}}>
+                        <div style={{
+                            fontSize:'1.05rem',
+                            fontWeight:700,
+                            marginBottom:2,
+                            letterSpacing:'0.3px'
+                        }}>
+                            {tConfig('fotos.allgemein.kachel.titel')}
+                        </div>
+                        <div style={{
+                            fontSize:'0.78rem',
+                            opacity:0.9,
+                            fontWeight:400,
+                            fontFamily:'inherit',
+                            lineHeight:1.3
+                        }}>
+                            {tConfig('fotos.allgemein.kachel.text')}
+                        </div>
+                    </div>
+                    <div style={{
+                        fontSize:'0.75rem',
+                        fontWeight:700,
+                        background:'rgba(255,255,255,0.22)',
+                        padding:'4px 10px',
+                        borderRadius:14,
+                        flexShrink:0,
+                        letterSpacing:'0.3px'
+                    }}>
+                        {(allgemeineCount || 0) + ' / 20'}
+                    </div>
+                </button>
+
                 {/* Hinweis-Box */}
                 <div style={{
                     padding:'10px 14px',
@@ -6766,16 +6955,39 @@ function MARaumListe({ baustelle, raeume, laden, onZurueck, onNeuerRaum, onRaumW
 // Sub-Komponente: einzelne Raum-Zeile mit Bearbeiten/Loeschen-Buttons
 function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
     const [pressed, setPressed] = useState(false);
+    const istBuero = raum && raum.aus_firebase === true;
     return (
         <div style={{
             display:'flex',
             alignItems:'stretch',
             background:'#fff',
             borderRadius:10,
-            border:'1px solid #E0E0E0',
+            border: istBuero ? '1px solid #1E88E5' : '1px solid #E0E0E0',
             boxShadow: pressed ? '0 1px 4px rgba(0,0,0,0.06)' : '0 2px 8px rgba(0,0,0,0.04)',
-            overflow:'hidden'
+            overflow:'hidden',
+            position:'relative'
         }}>
+            {/* Buero-Badge oben rechts (nur bei Firebase-Raeumen) */}
+            {istBuero ? (
+                <div style={{
+                    position:'absolute',
+                    top:6,
+                    right:6,
+                    background:'linear-gradient(135deg, #1E88E5, #1565C0)',
+                    color:'#fff',
+                    fontSize:'0.65rem',
+                    fontWeight:700,
+                    padding:'2px 8px',
+                    borderRadius:10,
+                    letterSpacing:'0.4px',
+                    fontFamily:'var(--font-headline, Oswald)',
+                    zIndex:1,
+                    boxShadow:'0 2px 6px rgba(30,136,229,0.35)'
+                }}>
+                    {'\u{1F3E2} ' + tConfig('fotos.raum.buero.badge')}
+                </div>
+            ) : null}
+
             <button
                 onClick={onClick}
                 onPointerDown={function(){ setPressed(true); }}
@@ -6798,7 +7010,9 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                     minWidth:42,
                     height:42,
                     borderRadius:'50%',
-                    background:'linear-gradient(135deg, #455A64, #263238)',
+                    background: istBuero
+                        ? 'linear-gradient(135deg, #1E88E5, #1565C0)'
+                        : 'linear-gradient(135deg, #455A64, #263238)',
                     color:'#fff',
                     display:'flex',
                     alignItems:'center',
@@ -6817,7 +7031,8 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                         fontSize:'1rem',
                         fontWeight:600,
                         color:'#212121',
-                        marginBottom:2
+                        marginBottom:2,
+                        paddingRight: istBuero ? 60 : 0   // Platz fuer Badge
                     }}>
                         {raum.bezeichnung}
                         {raum.nummer ? <span style={{color:'#999', fontWeight:400, marginLeft:6}}>{'\u00B7 ' + raum.nummer}</span> : null}
@@ -6833,44 +7048,46 @@ function MARaumRow({ raum, onClick, onBearbeiten, onLoeschen }) {
                 <span style={{color:'#999', fontSize:'1.3rem', flexShrink:0}}>{'\u203A'}</span>
             </button>
 
-            {/* Action-Buttons rechts */}
-            <div style={{
-                display:'flex',
-                flexDirection:'column',
-                borderLeft:'1px solid #EEE'
-            }}>
-                <button
-                    onClick={onBearbeiten}
-                    style={{
-                        padding:'0 14px',
-                        background:'transparent',
-                        border:'none',
-                        borderBottom:'1px solid #EEE',
-                        cursor:'pointer',
-                        fontSize:'0.9rem',
-                        color:'#1E88E5',
-                        flex:1,
-                        minHeight:32
-                    }}
-                    title={tConfig('fotos.raum.bearbeiten')}>
-                    {'\u270F\uFE0F'}
-                </button>
-                <button
-                    onClick={onLoeschen}
-                    style={{
-                        padding:'0 14px',
-                        background:'transparent',
-                        border:'none',
-                        cursor:'pointer',
-                        fontSize:'0.9rem',
-                        color:'#E53935',
-                        flex:1,
-                        minHeight:32
-                    }}
-                    title={tConfig('fotos.raum.loeschen')}>
-                    {'\u{1F5D1}\uFE0F'}
-                </button>
-            </div>
+            {/* Action-Buttons rechts - nur bei MA-eigenen Raeumen */}
+            {!istBuero ? (
+                <div style={{
+                    display:'flex',
+                    flexDirection:'column',
+                    borderLeft:'1px solid #EEE'
+                }}>
+                    <button
+                        onClick={onBearbeiten}
+                        style={{
+                            padding:'0 14px',
+                            background:'transparent',
+                            border:'none',
+                            borderBottom:'1px solid #EEE',
+                            cursor:'pointer',
+                            fontSize:'0.9rem',
+                            color:'#1E88E5',
+                            flex:1,
+                            minHeight:32
+                        }}
+                        title={tConfig('fotos.raum.bearbeiten')}>
+                        {'\u270F\uFE0F'}
+                    </button>
+                    <button
+                        onClick={onLoeschen}
+                        style={{
+                            padding:'0 14px',
+                            background:'transparent',
+                            border:'none',
+                            cursor:'pointer',
+                            fontSize:'0.9rem',
+                            color:'#E53935',
+                            flex:1,
+                            minHeight:32
+                        }}
+                        title={tConfig('fotos.raum.loeschen')}>
+                        {'\u{1F5D1}\uFE0F'}
+                    </button>
+                </div>
+            ) : null}
         </div>
     );
 }
@@ -7338,18 +7555,27 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
         reloadFotos();
     }, [raum.id, phase.key]);
 
-    // Wand-Liste (Master-Dokument 8.6)
+    // Wand-Liste (Master-Dokument 8.6) - oder 20 Allgemein-Slots (B6.5)
+    const istAllgemein = raum.kind === 'allgemein';
     const waende = [];
-    for (let i = 1; i <= (raum.wandzahl || 4); i++) {
-        waende.push({ id: 'wand-'+i, kind: 'wand', nr: i });
+    if (istAllgemein) {
+        // 20 Allgemein-Slots, kein Boden/Decke
+        for (let i = 1; i <= 20; i++) {
+            waende.push({ id: 'slot-'+i, kind: 'allgemein', nr: i });
+        }
+    } else {
+        for (let i = 1; i <= (raum.wandzahl || 4); i++) {
+            waende.push({ id: 'wand-'+i, kind: 'wand', nr: i });
+        }
+        if (raum.hatBoden) waende.push({ id: 'boden', kind: 'boden' });
+        if (raum.hatDecke) waende.push({ id: 'decke', kind: 'decke' });
     }
-    if (raum.hatBoden) waende.push({ id: 'boden', kind: 'boden' });
-    if (raum.hatDecke) waende.push({ id: 'decke', kind: 'decke' });
 
-    // Grid-Spalten je nach Wandzahl (Master-Dokument 8.6)
+    // Grid-Spalten je nach Wandzahl (Master-Dokument 8.6) - oder 4 Spalten fuer Allgemein
     const wandzahl = raum.wandzahl || 4;
     let spalten;
-    if (wandzahl <= 4) spalten = 2;
+    if (istAllgemein) spalten = 4;             // 20 Slots in 4x5-Raster
+    else if (wandzahl <= 4) spalten = 2;
     else if (wandzahl <= 6) spalten = 3;
     else spalten = 4;
 
@@ -7492,20 +7718,32 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
     const slotsTotal = waende.length;
     const belegt = waende.filter(function(w){ return !!fotosByWand[w.id]; }).length;
 
+    // Header-Texte je nach Modus (B6.5: Allgemein vs. Standard-Phasen)
+    const headerTitel = istAllgemein
+        ? tConfig('fotos.allgemein.titel')
+        : tConfig('fotos.phase.' + phase.key + '.label');
+    const headerUntertitel = istAllgemein
+        ? ((baustelle && baustelle.name ? baustelle.name : (baustelle && baustelle.id ? baustelle.id : '')) + ' \u00B7 ' + belegt + '/' + slotsTotal)
+        : (raum.bezeichnung + (raum.geschoss ? ' \u00B7 ' + raum.geschoss : '') + ' \u00B7 ' + belegt + '/' + slotsTotal);
+    const headerFarbe = istAllgemein ? '#8E24AA' : phase.color;
+    const bannerText = istAllgemein
+        ? tConfig('fotos.allgemein.intro')
+        : tConfig('fotos.phase.' + phase.key + '.subtitle');
+
     return (
         <div className="ma-bau-container" style={maContainerStyle}>
             <MASubHeader
-                titel={tConfig('fotos.phase.' + phase.key + '.label')}
-                untertitel={raum.bezeichnung + (raum.geschoss ? ' \u00B7 ' + raum.geschoss : '') + ' \u00B7 ' + belegt + '/' + slotsTotal}
-                farbe={phase.color}
+                titel={headerTitel}
+                untertitel={headerUntertitel}
+                farbe={headerFarbe}
                 onZurueck={onZurueck}/>
 
             <div style={{padding:'16px', maxWidth:620, margin:'0 auto', width:'100%'}}>
-                {/* Phase-Banner */}
+                {/* Phase-Banner (oder Allgemein-Intro) */}
                 <div style={{
                     padding:'10px 14px',
-                    background: phase.color + '15',
-                    border:'1px solid ' + phase.color + '55',
+                    background: headerFarbe + '15',
+                    border:'1px solid ' + headerFarbe + '55',
                     borderRadius:8,
                     fontSize:'0.85rem',
                     color:'#333',
@@ -7516,9 +7754,9 @@ function MAWandRaster({ baustelle, raum, phase, onZurueck, onAenderung }) {
                 }}>
                     <div style={{
                         width:10, height:10, borderRadius:'50%',
-                        background: phase.color, flexShrink:0
+                        background: headerFarbe, flexShrink:0
                     }}/>
-                    <span>{tConfig('fotos.phase.' + phase.key + '.subtitle')}</span>
+                    <span>{bannerText}</span>
                 </div>
 
                 {laden ? (
@@ -7691,6 +7929,7 @@ function MAWandKachel({ wand, phase, foto, onClick }) {
     if (wand.kind === 'wand') { label = tConfig('fotos.wand.label', { n: wand.nr }); icon = '\u{1F9F1}'; }
     else if (wand.kind === 'boden') { label = tConfig('fotos.boden'); icon = '\u{1F538}'; }
     else if (wand.kind === 'decke') { label = tConfig('fotos.decke'); icon = '\u{1F537}'; }
+    else if (wand.kind === 'allgemein') { label = tConfig('fotos.allgemein.label', { n: wand.nr }); icon = '\u{1F4F7}'; }
 
     const thumbUrl = foto && (foto.thumbnail_dataurl || foto.foto_dataurl);
 
@@ -7845,6 +8084,7 @@ function MAFotoVorschau({ foto, wand, phase, onWiederholen, onVerwenden, onAbbre
     if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
     else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
     else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+    else if (wand.kind === 'allgemein') wandLabel = tConfig('fotos.allgemein.label', { n: wand.nr });
 
     return (
         <MAOverlay onClick={onAbbrechen}>
@@ -7970,6 +8210,7 @@ function MAFotoDetail({ foto, wand, phase, onSchliessen, onNeuFotografieren, onL
     if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
     else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
     else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+    else if (wand.kind === 'allgemein') wandLabel = tConfig('fotos.allgemein.label', { n: wand.nr });
 
     // Aufnahme-Zeit kurz formatieren
     let zeit = '';
@@ -8419,6 +8660,7 @@ function MASprachNotizDialog({ foto, wand, phase, onAbbrechen, onGespeichert }) 
         if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
         else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
         else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+        else if (wand.kind === 'allgemein') wandLabel = tConfig('fotos.allgemein.label', { n: wand.nr });
     }
 
     // Sprach-Liste (zur Auswahl der Aufnahme-Sprache)
@@ -9078,6 +9320,7 @@ function MAFotoEditor({ foto, raum, wand, phase, onAbbrechen, onGespeichert }) {
         if (wand.kind === 'wand') wandLabel = tConfig('fotos.wand.label', { n: wand.nr });
         else if (wand.kind === 'boden') wandLabel = tConfig('fotos.boden');
         else if (wand.kind === 'decke') wandLabel = tConfig('fotos.decke');
+        else if (wand.kind === 'allgemein') wandLabel = tConfig('fotos.allgemein.label', { n: wand.nr });
     }
 
     // ── Render ──
