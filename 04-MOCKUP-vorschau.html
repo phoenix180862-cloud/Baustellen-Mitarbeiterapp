@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Foto-Modul Optik-Vorschau · Master-konform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --accent-blue: #1E88E5;
+    --accent-blue-dark: #1565C0;
+    --accent-red: #E53935;
+    --accent-green: #43A047;
+    --accent-orange: #FB8C00;
+    --text-primary: #2D3436;
+    --text-secondary: #555;
+    --text-muted: #888;
+    --bg-primary: #FFFFFF;
+    --bg-secondary: #F4F6F8;
+    --bg-tertiary: #E8ECEF;
+    --bg-card: #FFFFFF;
+    --bg-dark: #1A1F24;
+    --border-light: #E0E4E7;
+    --border-medium: #C8CED3;
+    --border-color: rgba(0,0,0,0.08);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
+    --font-headline: 'Oswald', 'Arial Narrow', sans-serif;
+    --font-body: 'Source Sans 3', 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Sub-Header */
+.subheader {
+    background: var(--accent-red);
+    color: #fff;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.subheader .back {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+}
+.subheader .titel { 
+    flex: 1;
+    font-family: var(--font-headline);
+    font-weight: 600;
+    font-size: 18px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.subheader .untertitel {
+    font-size: 11px;
+    opacity: 0.85;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 2px;
+}
+
+/* Container */
+.container {
+    padding: 12px;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.intro {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    margin-bottom: 14px;
+}
+
+/* Akkordeon */
+.akkordeon-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.akkordeon {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+}
+
+.akkordeon-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    min-height: 56px;
+    user-select: none;
+}
+
+.phase-pille {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-headline);
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+.phase-pille.roh { background: rgba(251,140,0,0.15); color: #FB8C00; }
+.phase-pille.vor { background: rgba(30,136,229,0.15); color: #1E88E5; }
+.phase-pille.fer { background: rgba(67,160,71,0.15); color: #43A047; }
+
+.phase-text { flex: 1; min-width: 0; }
+.phase-titel {
+    font-family: var(--font-headline);
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+.phase-subtitel {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.status-pille {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 700;
+    flex-shrink: 0;
+    font-family: var(--font-headline);
+    letter-spacing: 0.5px;
+}
+.status-pille.leer  { background: rgba(0,0,0,0.06); color: var(--text-muted); }
+.status-pille.teil  { background: rgba(251,140,0,0.12); color: #FB8C00; }
+.status-pille.teil.vor { background: rgba(30,136,229,0.12); color: #1E88E5; }
+.status-pille.fertig { background: rgba(67,160,71,0.15); color: var(--accent-green); }
+
+.pfeil {
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+}
+.akkordeon.offen .pfeil { transform: rotate(180deg); }
+
+/* Wand-Grid */
+.wand-grid-wrapper {
+    padding: 10px 12px 14px 12px;
+    background: rgba(0,0,0,0.02);
+    border-top: 1px solid var(--border-color);
+    display: none;
+}
+.akkordeon.offen .wand-grid-wrapper { display: block; }
+
+.wand-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+    gap: 8px;
+}
+
+/* Wand-Kachel */
+.wand-kachel {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    background: var(--bg-dark);
+    border: 2px dashed var(--border-medium);
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.wand-kachel:active { transform: translateY(1px); }
+.wand-kachel.belegt {
+    border: 2px solid var(--border-medium);
+    background: #0d1117;
+}
+
+.wand-badge {
+    position: absolute;
+    top: 5px; left: 5px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: rgba(251,140,0,0.92);
+    color: #fff;
+    font-family: var(--font-headline);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.wand-badge.boden { background: rgba(96,125,139,0.92); }
+.wand-badge.decke { background: rgba(120,144,156,0.92); }
+
+.kachel-leer-content {
+    text-align: center;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.kachel-leer-content .icon {
+    font-size: 24px;
+    margin-bottom: 4px;
+}
+.kachel-leer-content .label {
+    font-size: 10px;
+    font-family: var(--font-headline);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kachel-thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Demo-Banner */
+.demo-banner {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+    color: #fff;
+    padding: 14px 16px;
+    text-align: center;
+    font-family: var(--font-headline);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    box-shadow: 0 4px 12px rgba(30,136,229,0.3);
+}
+.demo-banner small {
+    display: block;
+    font-size: 10px;
+    opacity: 0.85;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-top: 4px;
+    font-family: var(--font-body);
+}
+
+.legende {
+    background: var(--bg-card);
+    margin: 16px 12px;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-sm);
+    font-size: 13px;
+}
+.legende h3 {
+    margin: 0 0 10px 0;
+    font-family: var(--font-headline);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent-blue);
+}
+.legende ul { margin: 0; padding-left: 18px; }
+.legende li { margin: 4px 0; line-height: 1.4; }
+.legende code {
+    background: var(--bg-tertiary);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-family: 'Fira Code', Consolas, monospace;
+    font-size: 11px;
+}
+
+/* Beispiel-Foto-Hintergrund (CSS-only Pseudo-Foto) */
+.fake-foto-1 {
+    background: linear-gradient(135deg, #8B6F47 0%, #6B5337 50%, #4A3A26 100%);
+}
+.fake-foto-2 {
+    background: linear-gradient(180deg, #C0C8CC 0%, #8B9499 70%, #6A7378 100%);
+}
+.crop-badge {
+    position: absolute;
+    bottom: 5px; right: 5px;
+    font-size: 9px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(30,136,229,0.92);
+    color: #fff;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    font-family: var(--font-headline);
+    z-index: 2;
+}
+.notiz-badge {
+    position: absolute;
+    bottom: 5px; right: 5px;
+    font-size: 10px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(67,160,71,0.92);
+    color: #fff;
+    font-weight: 700;
+    z-index: 2;
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+    📸 Foto-Modul · Master-Optik · Vorschau
+    <small>Tippe einen Phasen-Header zum Auf-/Zuklappen</small>
+</div>
+
+<div class="subheader">
+    <div class="back">‹</div>
+    <div>
+        <div class="titel">Bad EG · 1</div>
+        <div class="untertitel">EG · 4 Wände</div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="intro">Wähle eine Phase, um Fotos zu dokumentieren</div>
+
+    <div class="akkordeon-list">
+        <!-- Phase 1: Rohzustand -->
+        <div class="akkordeon offen" id="ph1">
+            <div class="akkordeon-header" onclick="toggle('ph1')">
+                <span class="phase-pille roh">1</span>
+                <div class="phase-text">
+                    <div class="phase-titel">Rohzustand</div>
+                    <div class="phase-subtitel">Vor Arbeitsbeginn</div>
+                </div>
+                <span class="status-pille teil">2/4</span>
+                <span class="pfeil">▼</span>
+            </div>
+            <div class="wand-grid-wrapper">
+                <div class="wand-grid">
+                    <div class="wand-kachel belegt fake-foto-1">
+                        <span class="wand-badge">1</span>
+                        <span class="crop-badge">CROP</span>
+                    </div>
+                    <div class="wand-kachel belegt fake-foto-2">
+                        <span class="wand-badge">2</span>
+                        <span class="notiz-badge">🎤</span>
+                    </div>
+                    <div class="wand-kachel">
+                        <span class="wand-badge">3</span>
+                        <div class="kachel-leer-content">
+                            <div class="icon">📷</div>
+                            <div class="label">Foto</div>
+                        </div>
+                    </div>
+                    <div class="wand-kachel">
+                        <span class="wand-badge">4</span>
+                        <div class="kachel-leer-content">
+                            <div class="icon">📷</div>
+                            <div class="label">Foto</div>
+                        </div>
+                    </div>
+                    <div class="wand-kachel">
+                        <span class="wand-badge boden">■</span>
+                        <div class="kachel-leer-content">
+                            <div class="icon">📷</div>
+                            <div class="label">Foto</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 2: Vorarbeiten (zugeklappt) -->
+        <div class="akkordeon" id="ph2">
+            <div class="akkordeon-header" onclick="toggle('ph2')">
+                <span class="phase-pille vor">2</span>
+                <div class="phase-text">
+                    <div class="phase-titel">Nach Vorarbeiten</div>
+                    <div class="phase-subtitel">Abdichtung / Grundierung</div>
+                </div>
+                <span class="status-pille leer">0/5</span>
+                <span class="pfeil">▼</span>
+            </div>
+            <div class="wand-grid-wrapper">
+                <div class="wand-grid">
+                    <div class="wand-kachel"><span class="wand-badge">1</span><div class="kachel-leer-content"><div class="icon">📷</div><div class="label">Foto</div></div></div>
+                    <div class="wand-kachel"><span class="wand-badge">2</span><div class="kachel-leer-content"><div class="icon">📷</div><div class="label">Foto</div></div></div>
+                    <div class="wand-kachel"><span class="wand-badge">3</span><div class="kachel-leer-content"><div class="icon">📷</div><div class="label">Foto</div></div></div>
+                    <div class="wand-kachel"><span class="wand-badge">4</span><div class="kachel-leer-content"><div class="icon">📷</div><div class="label">Foto</div></div></div>
+                    <div class="wand-kachel"><span class="wand-badge boden">■</span><div class="kachel-leer-content"><div class="icon">📷</div><div class="label">Foto</div></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase 3: Fertigstellung (zugeklappt) -->
+        <div class="akkordeon" id="ph3">
+            <div class="akkordeon-header" onclick="toggle('ph3')">
+                <span class="phase-pille fer">3</span>
+                <div class="phase-text">
+                    <div class="phase-titel">Fertigstellung</div>
+                    <div class="phase-subtitel">Nach Fliesenarbeiten</div>
+                </div>
+                <span class="status-pille fertig">✓ 5/5</span>
+                <span class="pfeil">▼</span>
+            </div>
+            <div class="wand-grid-wrapper">
+                <div class="wand-grid">
+                    <div class="wand-kachel belegt fake-foto-2"><span class="wand-badge">1</span></div>
+                    <div class="wand-kachel belegt fake-foto-1"><span class="wand-badge">2</span></div>
+                    <div class="wand-kachel belegt fake-foto-2"><span class="wand-badge">3</span></div>
+                    <div class="wand-kachel belegt fake-foto-1"><span class="wand-badge">4</span></div>
+                    <div class="wand-kachel belegt fake-foto-2"><span class="wand-badge boden">■</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="legende">
+    <h3>Was ist neu vs. alt?</h3>
+    <ul>
+        <li><strong>Akkordeon-Layout</strong> statt 3 stacked-Buttons → Wand-Grid eingebettet</li>
+        <li><strong>Phasen-Pille</strong> in Akzentfarbe (orange / blau / grün)</li>
+        <li><strong>Untertitel</strong> ergänzt unter jedem Phasen-Titel</li>
+        <li><strong>Kacheln 3:4 Hochformat</strong> + Auto-Fill-Grid (passt sich an die Display-Breite an)</li>
+        <li><strong>Wand-Badge</strong> als kleines orange Rund-Badge oben links</li>
+        <li><strong>Oswald-Typo + UPPERCASE</strong> für Titel und Status-Pillen</li>
+        <li><strong>Dunkler Kachel-Hintergrund</strong> <code>var(--bg-dark)</code> für Master-Look</li>
+        <li><strong>CROP / 🎤-Badges</strong> bei bearbeiteten / besprochenen Fotos</li>
+    </ul>
+</div>
+
+<script>
+function toggle(id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('offen');
+}
+</script>
+
+</body>
+</html>
