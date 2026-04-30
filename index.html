@@ -4080,13 +4080,7 @@ function MAKachelRouter({ baustelle, kachel, onZurueck }) {
         return <MAFotosView baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}/>;
     }
     if (kachel.id === 'stunden') {
-        return (
-            <MAStubView
-                baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}
-                emoji={'\u{23F1}\uFE0F'}
-                titel={tConfig('stub.stunden.titel')}
-                text={tConfig('stub.stunden.text')}/>
-        );
+        return <MAStundenView baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}/>;
     }
     // Default: Zeichnungen + Anweisungen -> echter Drive-Browser
     return <MABaustelleBrowser baustelle={baustelle} kachel={kachel} onZurueck={onZurueck}/>;
@@ -6410,7 +6404,7 @@ function MAPushPermissionBanner({ lang, status, onAktivieren, onSpaeter }) {
                     <MAFotosTab/>
                 )}
                 {aktiverTab === 'stunden' && (
-                    <ModulPlatzhalter lang={lang} titel={t('stunden', lang)} IconComp={Icon.Uhr}/>
+                    <MAStundenTab/>
                 )}
                 {aktiverTab === 'nachrichten' && (
                     <MANachrichtenModul/>
@@ -9855,6 +9849,1125 @@ const maInputStyle = {
 // ═══════════════════════════════════════════════════════════════════════
 // ENDE MODUL FOTOS
 // ═══════════════════════════════════════════════════════════════════════
+
+// ╔══════════════════════════════════════════════════════════════════════╗
+// ║ MODUL STUNDEN - Etappe 7 / Baustein 7.1 (Grundgeruest)               ║
+// ║ Master-Dokument Kap. 9: Stundenzettel mit Material + PDF-Export.     ║
+// ║ B7.1 enthaelt: Tab-Navigation, Formular (Datum, Baustelle, Zeiten,   ║
+// ║   Taetigkeit, Bemerkung, Wetter), WIP-Auto-Save, IndexedDB-          ║
+// ║   Persistierung, Historie-Listen.                                     ║
+// ║ Folgt in spaeteren Bausteinen: Material-Popup (B7.2), PDF (B7.3),    ║
+// ║   Drive-Upload (B7.4), Master-App-Sync (B7.5).                        ║
+// ╚══════════════════════════════════════════════════════════════════════╝
+
+// ─────────────────────────────────────────────────────────────
+// MAStundenStorage - Inline IndexedDB-Schicht fuer Stundenzettel
+// ─────────────────────────────────────────────────────────────
+// Verwendet eine separate Datenbank ('tw-ma-stunden-db') um keine
+// Konflikte mit der Haupt-DB ('tw-ma-db') zu erzeugen. Spaeter kann
+// das in tw-ma-storage.js konsolidiert werden.
+
+const MAStundenStorage = (function(){
+    const DB_NAME = 'tw-ma-stunden-db';
+    const DB_VERSION = 1;
+    const STORE = 'stundenzettel';
+    let dbPromise = null;
+
+    function openDb() {
+        if (dbPromise) return dbPromise;
+        dbPromise = new Promise(function(resolve, reject){
+            if (!('indexedDB' in window)) {
+                reject(new Error('IndexedDB nicht verfuegbar'));
+                return;
+            }
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function(e){
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE)) {
+                    const s = db.createObjectStore(STORE, { keyPath: 'id' });
+                    s.createIndex('datum', 'datum', { unique: false });
+                    s.createIndex('baustelle_id', 'baustelle_id', { unique: false });
+                    s.createIndex('status', 'status', { unique: false });
+                }
+            };
+            req.onsuccess = function(){ resolve(req.result); };
+            req.onerror   = function(){ reject(req.error); };
+        });
+        return dbPromise;
+    }
+
+    function withStore(mode, cb) {
+        return openDb().then(function(db){
+            return new Promise(function(resolve, reject){
+                const tx = db.transaction(STORE, mode);
+                tx.onerror = function(){ reject(tx.error); };
+                tx.onabort = function(){ reject(tx.error || new Error('Transaktion abgebrochen')); };
+                cb(tx.objectStore(STORE), resolve, reject);
+            });
+        });
+    }
+
+    return {
+        save: function(z) {
+            return withStore('readwrite', function(s, resolve){
+                const eintrag = Object.assign({}, z, { geaendert_am: Date.now() });
+                const r = s.put(eintrag);
+                r.onsuccess = function(){ resolve(eintrag); };
+            });
+        },
+        load: function(id) {
+            return withStore('readonly', function(s, resolve){
+                const r = s.get(id);
+                r.onsuccess = function(){ resolve(r.result || null); };
+            });
+        },
+        list: function() {
+            return withStore('readonly', function(s, resolve){
+                const r = s.getAll();
+                r.onsuccess = function(){
+                    const arr = (r.result || []).slice();
+                    arr.sort(function(a, b){
+                        return (b.datum || '').localeCompare(a.datum || '');
+                    });
+                    resolve(arr);
+                };
+            });
+        },
+        listByDatum: function(datum) {
+            return withStore('readonly', function(s, resolve){
+                const idx = s.index('datum');
+                const r = idx.getAll(datum);
+                r.onsuccess = function(){ resolve(r.result || []); };
+            });
+        },
+        delete: function(id) {
+            return withStore('readwrite', function(s, resolve){
+                const r = s.delete(id);
+                r.onsuccess = function(){ resolve(true); };
+            });
+        }
+    };
+})();
+
+// ─────────────────────────────────────────────────────────────
+// Konstanten fuer Taetigkeiten und Wetter
+// ─────────────────────────────────────────────────────────────
+
+const STUNDEN_TAETIGKEITEN = [
+    { key: 'fliesen.wand',  emoji: '\u{1F9F1}' },
+    { key: 'fliesen.boden', emoji: '\u{1F538}' },
+    { key: 'verfugen',      emoji: '\u{1F58C}\uFE0F' },
+    { key: 'silikon',       emoji: '\u{1F4A7}' },
+    { key: 'abdichtung',    emoji: '\u{1F6E1}\uFE0F' },
+    { key: 'estrich',       emoji: '\u{1F9F0}' },
+    { key: 'demontage',     emoji: '\u{1F528}' },
+    { key: 'material',      emoji: '\u{1F4E6}' },
+    { key: 'einrichtung',   emoji: '\u{1F3D7}\uFE0F' },
+    { key: 'endreinigung',  emoji: '\u{1F9F9}' },
+    { key: 'aufmass',       emoji: '\u{1F4D0}' },
+    { key: 'fahrzeit',      emoji: '\u{1F698}' },
+    { key: 'sonstiges',     emoji: '\u{2026}' }
+];
+
+const STUNDEN_WETTER = [
+    { key: 'kein',     emoji: '\u{2014}' },
+    { key: 'sonnig',   emoji: '\u{2600}\uFE0F' },
+    { key: 'bewoelkt', emoji: '\u{26C5}' },
+    { key: 'regen',    emoji: '\u{1F327}\uFE0F' },
+    { key: 'schnee',   emoji: '\u{2744}\uFE0F' }
+];
+
+const STUNDEN_PAUSEN = [0, 15, 30, 45, 60];
+
+// Heute als YYYY-MM-DD-String (lokale Zeitzone)
+function stundenHeuteIso() {
+    const d = new Date();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const t = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + t;
+}
+
+// "HH:MM" → Minuten seit Mitternacht
+function stundenZeitZuMin(hhmm) {
+    if (!hhmm || typeof hhmm !== 'string') return 0;
+    const teile = hhmm.split(':');
+    return (parseInt(teile[0], 10) || 0) * 60 + (parseInt(teile[1], 10) || 0);
+}
+
+// Netto-Stunden berechnen: (ende - anfang - pause) / 60
+function stundenBerechneNetto(anfang, ende, pauseMin) {
+    const minA = stundenZeitZuMin(anfang);
+    const minE = stundenZeitZuMin(ende);
+    const minP = parseInt(pauseMin, 10) || 0;
+    let diff = minE - minA - minP;
+    if (diff < 0) diff = 0;
+    return Math.round(diff / 60 * 100) / 100;
+}
+
+// ISO-Datum → "DD.MM.YYYY"
+function stundenDatumDe(iso) {
+    if (!iso || typeof iso !== 'string') return '';
+    const teile = iso.split('-');
+    if (teile.length !== 3) return iso;
+    return teile[2] + '.' + teile[1] + '.' + teile[0];
+}
+
+// ============================================================
+// MAStundenView - Hauptkomponente mit Tab-Navigation
+// ============================================================
+//
+// Routing-State:
+//   'liste'      - Tab-Liste (Heute / Woche / 30 Tage)
+//   'formular'   - Neuer/Bearbeiten Stundenzettel
+//
+
+function MAStundenView({ baustelle, kachel, onZurueck }) {
+    const lang = useSprache();
+    const [stufe, setStufe] = useState('liste');
+    const [aktiverTab, setAktiverTab] = useState('heute');
+    const [stundenzettel, setStundenzettel] = useState([]);
+    const [laden, setLaden] = useState(true);
+    const [bearbeitenId, setBearbeitenId] = useState(null);
+
+    // Stundenzettel-Liste laden
+    function reload() {
+        setLaden(true);
+        MAStundenStorage.list().then(function(liste){
+            // Optional: Auf Baustelle filtern, wenn aus Sub-Kachel kommend
+            let arr = liste || [];
+            if (baustelle && baustelle.id) {
+                arr = arr.filter(function(z){ return z.baustelle_id === baustelle.id; });
+            }
+            setStundenzettel(arr);
+            setLaden(false);
+        }).catch(function(err){
+            console.warn('[MAStundenView] list fehlgeschlagen:', err && err.message);
+            setStundenzettel([]);
+            setLaden(false);
+        });
+    }
+    useEffect(function(){ reload(); }, [baustelle && baustelle.id]);
+
+    // ============================================================
+    // Render-Logik nach Stufe
+    // ============================================================
+
+    if (stufe === 'formular') {
+        return (
+            <MAStundenFormular
+                baustelle={baustelle}
+                bearbeitenId={bearbeitenId}
+                onAbbrechen={function(){
+                    setBearbeitenId(null);
+                    setStufe('liste');
+                }}
+                onGespeichert={function(){
+                    setBearbeitenId(null);
+                    setStufe('liste');
+                    reload();
+                }}/>
+        );
+    }
+
+    // Default: Liste mit Tabs
+    const heute = stundenHeuteIso();
+    const heutigeZettel = stundenzettel.filter(function(z){ return z.datum === heute; });
+    const wocheStart = (function(){
+        const d = new Date();
+        d.setDate(d.getDate() - 6);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const t = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + m + '-' + t;
+    })();
+    const monatStart = (function(){
+        const d = new Date();
+        d.setDate(d.getDate() - 29);
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const t = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + m + '-' + t;
+    })();
+    const wocheZettel = stundenzettel.filter(function(z){ return z.datum >= wocheStart; });
+    const monatZettel = stundenzettel.filter(function(z){ return z.datum >= monatStart; });
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={tConfig('stunden.tab.titel')}
+                untertitel={baustelle && baustelle.name ? baustelle.name : tConfig('stunden.tab.untertitel')}
+                onZurueck={onZurueck}/>
+
+            {/* Tab-Leiste */}
+            <div style={{
+                display:'flex',
+                gap:0,
+                background:'#1a1f29',
+                borderBottom:'1px solid #2c3340',
+                padding:'0 8px'
+            }}>
+                {[
+                    { id: 'heute',  label: tConfig('stunden.tab.heute'),  count: heutigeZettel.length },
+                    { id: 'woche',  label: tConfig('stunden.tab.woche'),  count: wocheZettel.length },
+                    { id: 'monat',  label: tConfig('stunden.tab.monat'),  count: monatZettel.length }
+                ].map(function(tab){
+                    const aktiv = aktiverTab === tab.id;
+                    return (
+                        <button
+                            key={tab.id}
+                            onClick={function(){ setAktiverTab(tab.id); }}
+                            style={{
+                                flex:1,
+                                padding:'12px 8px',
+                                background:'transparent',
+                                border:'none',
+                                borderBottom: aktiv ? '3px solid #2E7D32' : '3px solid transparent',
+                                color: aktiv ? '#fff' : '#999',
+                                fontFamily:'var(--font-headline, Oswald)',
+                                fontSize:'0.85rem',
+                                fontWeight:600,
+                                cursor:'pointer',
+                                letterSpacing:'0.4px',
+                                display:'flex',
+                                alignItems:'center',
+                                justifyContent:'center',
+                                gap:6,
+                                minHeight:48
+                            }}>
+                            <span>{tab.label}</span>
+                            {tab.count > 0 ? (
+                                <span style={{
+                                    background: aktiv ? '#2E7D32' : '#3a4150',
+                                    color:'#fff',
+                                    fontSize:'0.7rem',
+                                    fontWeight:700,
+                                    padding:'2px 7px',
+                                    borderRadius:10,
+                                    minWidth:18,
+                                    textAlign:'center'
+                                }}>{tab.count}</span>
+                            ) : null}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div style={{padding:'16px', maxWidth:680, margin:'0 auto', width:'100%'}}>
+
+                {/* HEUTE-Tab */}
+                {aktiverTab === 'heute' ? (
+                    <MAStundenHeuteTab
+                        zettel={heutigeZettel}
+                        laden={laden}
+                        onNeu={function(){
+                            setBearbeitenId(null);
+                            setStufe('formular');
+                        }}
+                        onBearbeiten={function(z){
+                            setBearbeitenId(z.id);
+                            setStufe('formular');
+                        }}
+                        onLoeschen={function(z){
+                            if (!confirm(tConfig('stunden.loeschen.bestaetigen', { datum: stundenDatumDe(z.datum) }))) return;
+                            MAStundenStorage.delete(z.id).then(function(){
+                                reload();
+                            }).catch(function(err){
+                                alert(tConfig('stunden.fehler.loeschen') + '\n' + (err && err.message));
+                            });
+                        }}/>
+                ) : null}
+
+                {/* WOCHE-Tab */}
+                {aktiverTab === 'woche' ? (
+                    <MAStundenHistorieListe
+                        zettel={wocheZettel}
+                        laden={laden}
+                        onBearbeiten={function(z){
+                            setBearbeitenId(z.id);
+                            setStufe('formular');
+                        }}
+                        onLoeschen={function(z){
+                            if (!confirm(tConfig('stunden.loeschen.bestaetigen', { datum: stundenDatumDe(z.datum) }))) return;
+                            MAStundenStorage.delete(z.id).then(reload).catch(function(err){
+                                alert(tConfig('stunden.fehler.loeschen') + '\n' + (err && err.message));
+                            });
+                        }}/>
+                ) : null}
+
+                {/* 30-TAGE-Tab */}
+                {aktiverTab === 'monat' ? (
+                    <MAStundenHistorieListe
+                        zettel={monatZettel}
+                        laden={laden}
+                        onBearbeiten={function(z){
+                            setBearbeitenId(z.id);
+                            setStufe('formular');
+                        }}
+                        onLoeschen={function(z){
+                            if (!confirm(tConfig('stunden.loeschen.bestaetigen', { datum: stundenDatumDe(z.datum) }))) return;
+                            MAStundenStorage.delete(z.id).then(reload).catch(function(err){
+                                alert(tConfig('stunden.fehler.loeschen') + '\n' + (err && err.message));
+                            });
+                        }}/>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// MAStundenHeuteTab - Heute-Tab Inhalt
+// ============================================================
+
+function MAStundenHeuteTab({ zettel, laden, onNeu, onBearbeiten, onLoeschen }) {
+    if (laden) {
+        return (
+            <div style={{textAlign:'center', padding:40, color:'#999'}}>
+                {tConfig('stunden.historie.lade')}
+            </div>
+        );
+    }
+
+    const fertig = zettel.filter(function(z){ return z.status === 'fertig'; });
+    const entwurf = zettel.filter(function(z){ return z.status === 'entwurf'; });
+
+    // Wenn gar nichts fuer heute existiert
+    if (zettel.length === 0) {
+        return (
+            <React.Fragment>
+                <div style={{
+                    textAlign:'center',
+                    padding:'30px 20px',
+                    color:'#999',
+                    background:'#fff',
+                    borderRadius:12,
+                    border:'1px dashed #DDD',
+                    marginBottom:14
+                }}>
+                    <div style={{fontSize:'2.5rem', marginBottom:8, opacity:0.5}}>{'\u{1F551}'}</div>
+                    <div style={{fontSize:'0.95rem', fontWeight:600, color:'#666', marginBottom:4}}>
+                        {tConfig('stunden.heute.kein')}
+                    </div>
+                    <div style={{fontSize:'0.85rem'}}>
+                        {tConfig('stunden.heute.kein.hinweis')}
+                    </div>
+                </div>
+
+                <button
+                    onClick={onNeu}
+                    style={{
+                        width:'100%',
+                        padding:'14px',
+                        background:'linear-gradient(135deg, #2E7D32, #1B5E20)',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:12,
+                        fontSize:'1rem',
+                        fontWeight:700,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        cursor:'pointer',
+                        boxShadow:'0 4px 12px rgba(46,125,50,0.3)',
+                        display:'flex',
+                        alignItems:'center',
+                        justifyContent:'center',
+                        gap:10,
+                        minHeight:56,
+                        letterSpacing:'0.4px'
+                    }}>
+                    <span style={{fontSize:'1.4rem', lineHeight:1}}>+</span>
+                    <span>{tConfig('stunden.btn.neu')}</span>
+                </button>
+            </React.Fragment>
+        );
+    }
+
+    return (
+        <React.Fragment>
+            {/* Entwuerfe oben (auffaelliger) */}
+            {entwurf.map(function(z){
+                return (
+                    <div key={z.id} style={{
+                        padding:'14px 16px',
+                        background:'#FFF8E1',
+                        border:'2px solid #FFB300',
+                        borderRadius:12,
+                        marginBottom:10
+                    }}>
+                        <div style={{
+                            fontSize:'0.78rem',
+                            fontWeight:700,
+                            color:'#E65100',
+                            textTransform:'uppercase',
+                            letterSpacing:'0.5px',
+                            marginBottom:4,
+                            fontFamily:'var(--font-headline, Oswald)'
+                        }}>
+                            {'\u{1F4DD} ' + tConfig('stunden.btn.entwurf')}
+                        </div>
+                        <div style={{fontSize:'1rem', fontWeight:600, color:'#3E2723', marginBottom:8}}>
+                            {tConfig('stunden.heute.entwurf.titel')}
+                        </div>
+                        <div style={{display:'flex', gap:8}}>
+                            <button onClick={function(){ onBearbeiten(z); }} style={{
+                                flex:1, padding:'10px', background:'#FFB300', color:'#3E2723',
+                                border:'none', borderRadius:8, fontWeight:700, fontSize:'0.88rem',
+                                cursor:'pointer', fontFamily:'var(--font-headline, Oswald)'
+                            }}>
+                                {tConfig('stunden.heute.entwurf.weiter')}
+                            </button>
+                            <button onClick={function(){ onLoeschen(z); }} style={{
+                                padding:'10px 14px', background:'transparent', color:'#E65100',
+                                border:'1px solid #FFB300', borderRadius:8, fontWeight:600, fontSize:'0.88rem',
+                                cursor:'pointer'
+                            }}>
+                                {'\u{1F5D1}\uFE0F'}
+                            </button>
+                        </div>
+                    </div>
+                );
+            })}
+
+            {/* Fertige Stundenzettel */}
+            {fertig.length > 0 ? (
+                <React.Fragment>
+                    <div style={{
+                        fontSize:'0.85rem',
+                        color:'#999',
+                        marginBottom:8,
+                        fontWeight:600,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        letterSpacing:'0.4px'
+                    }}>
+                        {tConfig('stunden.heute.fertig.titel')}
+                    </div>
+                    {fertig.map(function(z){
+                        return (
+                            <MAStundenZettelRow
+                                key={z.id}
+                                zettel={z}
+                                onClick={function(){ onBearbeiten(z); }}
+                                onLoeschen={function(){ onLoeschen(z); }}/>
+                        );
+                    })}
+                </React.Fragment>
+            ) : null}
+
+            {/* Plus-Button immer unten, falls weiterer Stundenzettel angelegt werden soll */}
+            <button
+                onClick={onNeu}
+                style={{
+                    width:'100%',
+                    padding:'12px',
+                    marginTop:12,
+                    background:'linear-gradient(135deg, #2E7D32, #1B5E20)',
+                    color:'#fff',
+                    border:'none',
+                    borderRadius:10,
+                    fontSize:'0.95rem',
+                    fontWeight:600,
+                    fontFamily:'var(--font-headline, Oswald)',
+                    cursor:'pointer',
+                    display:'flex',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    gap:8,
+                    minHeight:48,
+                    letterSpacing:'0.3px'
+                }}>
+                <span style={{fontSize:'1.2rem', lineHeight:1}}>+</span>
+                <span>{tConfig('stunden.btn.neu')}</span>
+            </button>
+        </React.Fragment>
+    );
+}
+
+// ============================================================
+// MAStundenHistorieListe - Liste fuer Woche/Monat
+// ============================================================
+
+function MAStundenHistorieListe({ zettel, laden, onBearbeiten, onLoeschen }) {
+    if (laden) {
+        return (
+            <div style={{textAlign:'center', padding:40, color:'#999'}}>
+                {tConfig('stunden.historie.lade')}
+            </div>
+        );
+    }
+
+    if (zettel.length === 0) {
+        return (
+            <div style={{
+                textAlign:'center',
+                padding:'30px 20px',
+                color:'#999',
+                background:'#fff',
+                borderRadius:12,
+                border:'1px dashed #DDD'
+            }}>
+                <div style={{fontSize:'2.5rem', marginBottom:8, opacity:0.5}}>{'\u{1F4C5}'}</div>
+                <div style={{fontSize:'0.95rem', fontWeight:600, color:'#666', marginBottom:4}}>
+                    {tConfig('stunden.historie.leer.titel')}
+                </div>
+                <div style={{fontSize:'0.85rem'}}>
+                    {tConfig('stunden.historie.leer.text')}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{display:'flex', flexDirection:'column', gap:8}}>
+            {zettel.map(function(z){
+                return (
+                    <MAStundenZettelRow
+                        key={z.id}
+                        zettel={z}
+                        onClick={function(){ onBearbeiten(z); }}
+                        onLoeschen={function(){ onLoeschen(z); }}/>
+                );
+            })}
+        </div>
+    );
+}
+
+// ============================================================
+// MAStundenZettelRow - einzelne Zeile in Liste
+// ============================================================
+
+function MAStundenZettelRow({ zettel, onClick, onLoeschen }) {
+    const [pressed, setPressed] = useState(false);
+    const istEntwurf = zettel.status === 'entwurf';
+    return (
+        <div style={{
+            display:'flex',
+            alignItems:'stretch',
+            background:'#fff',
+            borderRadius:10,
+            border: istEntwurf ? '1px solid #FFB300' : '1px solid #E0E0E0',
+            boxShadow: pressed ? '0 1px 4px rgba(0,0,0,0.06)' : '0 2px 8px rgba(0,0,0,0.04)',
+            overflow:'hidden'
+        }}>
+            <button
+                onClick={onClick}
+                onPointerDown={function(){ setPressed(true); }}
+                onPointerUp={function(){ setPressed(false); }}
+                onPointerLeave={function(){ setPressed(false); }}
+                style={{
+                    flex:1,
+                    display:'flex',
+                    alignItems:'center',
+                    gap:12,
+                    padding:'12px 14px',
+                    background:'transparent',
+                    border:'none',
+                    textAlign:'left',
+                    cursor:'pointer',
+                    minHeight:60
+                }}>
+                {/* Datum-Badge */}
+                <div style={{
+                    minWidth:50,
+                    height:50,
+                    borderRadius:10,
+                    background: istEntwurf
+                        ? 'linear-gradient(135deg, #FFB300, #FF8F00)'
+                        : 'linear-gradient(135deg, #2E7D32, #1B5E20)',
+                    color:'#fff',
+                    display:'flex',
+                    flexDirection:'column',
+                    alignItems:'center',
+                    justifyContent:'center',
+                    fontFamily:'var(--font-headline, Oswald)',
+                    flexShrink:0,
+                    padding:'4px'
+                }}>
+                    <div style={{fontSize:'1.1rem', fontWeight:700, lineHeight:1}}>
+                        {(zettel.datum || '').split('-')[2] || '?'}
+                    </div>
+                    <div style={{fontSize:'0.6rem', opacity:0.85, marginTop:2}}>
+                        {(function(){
+                            const m = (zettel.datum || '').split('-')[1];
+                            const monate = ['JAN','FEB','MRZ','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'];
+                            return m ? (monate[parseInt(m,10)-1] || m) : '';
+                        })()}
+                    </div>
+                </div>
+
+                <div style={{flex:1, minWidth:0}}>
+                    <div style={{
+                        fontFamily:'var(--font-headline, Oswald)',
+                        fontSize:'1rem',
+                        fontWeight:600,
+                        color:'#212121',
+                        marginBottom:2,
+                        whiteSpace:'nowrap',
+                        overflow:'hidden',
+                        textOverflow:'ellipsis'
+                    }}>
+                        {zettel.baustelle_name || zettel.baustelle_id || '?'}
+                    </div>
+                    <div style={{fontSize:'0.78rem', color:'#666'}}>
+                        {(zettel.anfang || '?') + ' \u2013 ' + (zettel.ende || '?') + ' \u00B7 '
+                         + (typeof zettel.netto === 'number' ? zettel.netto.toFixed(2) : '?') + 'h'
+                         + (zettel.taetigkeiten && zettel.taetigkeiten.length > 0
+                            ? ' \u00B7 ' + zettel.taetigkeiten.length + ' \u{1F3F7}\uFE0F'
+                            : '')}
+                    </div>
+                </div>
+
+                <span style={{color:'#999', fontSize:'1.3rem', flexShrink:0}}>{'\u203A'}</span>
+            </button>
+
+            <button
+                onClick={onLoeschen}
+                style={{
+                    padding:'0 14px',
+                    background:'transparent',
+                    border:'none',
+                    borderLeft:'1px solid #EEE',
+                    cursor:'pointer',
+                    fontSize:'0.9rem',
+                    color:'#E53935'
+                }}
+                title={tConfig('stunden.btn.loeschen')}>
+                {'\u{1F5D1}\uFE0F'}
+            </button>
+        </div>
+    );
+}
+
+// ============================================================
+// MAStundenFormular - Eingabeformular
+// ============================================================
+
+function MAStundenFormular({ baustelle, bearbeitenId, onAbbrechen, onGespeichert }) {
+    const lang = useSprache();
+    const istNeu = !bearbeitenId;
+
+    // Aktive Baustellen fuer Dropdown laden
+    const [aktiveBaustellen, setAktiveBaustellen] = useState(baustelle ? [baustelle] : []);
+
+    // Formular-State
+    const [datum, setDatum] = useState(stundenHeuteIso());
+    const [baustelleId, setBaustelleId] = useState(baustelle ? (baustelle.id || baustelle.staging_folder_id || '') : '');
+    const [baustelleName, setBaustelleName] = useState(baustelle ? (baustelle.name || '') : '');
+    const [anfang, setAnfang] = useState('07:00');
+    const [ende, setEnde] = useState('16:30');
+    const [pause, setPause] = useState(30);
+    const [taetigkeiten, setTaetigkeiten] = useState([]);
+    const [bemerkung, setBemerkung] = useState('');
+    const [wetter, setWetter] = useState('kein');
+    const [materialFrage, setMaterialFrage] = useState(false);
+
+    const [speichert, setSpeichert] = useState(false);
+    const [fehler, setFehler] = useState(null);
+    const [origId, setOrigId] = useState(null);
+
+    // Initial: bestehenden Stundenzettel laden (bei Bearbeiten)
+    useEffect(function(){
+        if (!bearbeitenId) return;
+        MAStundenStorage.load(bearbeitenId).then(function(z){
+            if (!z) return;
+            setOrigId(z.id);
+            setDatum(z.datum || stundenHeuteIso());
+            setBaustelleId(z.baustelle_id || '');
+            setBaustelleName(z.baustelle_name || '');
+            setAnfang(z.anfang || '07:00');
+            setEnde(z.ende || '16:30');
+            setPause(typeof z.pause === 'number' ? z.pause : 30);
+            setTaetigkeiten(Array.isArray(z.taetigkeiten) ? z.taetigkeiten : []);
+            setBemerkung(z.bemerkung || '');
+            setWetter(z.wetter || 'kein');
+            setMaterialFrage(z.material_frage === true);
+        }).catch(function(){});
+    }, [bearbeitenId]);
+
+    // Aktive Baustellen via Firebase laden (falls keine vorausgewaehlt)
+    useEffect(function(){
+        if (baustelle) return;
+        if (!window.TWMaFirebase || !window.TWMaFirebase.subscribeAktiveBaustellen) return;
+        const unsub = window.TWMaFirebase.subscribeAktiveBaustellen(function(liste){
+            setAktiveBaustellen(liste || []);
+        });
+        return function(){ if (typeof unsub === 'function') unsub(); };
+    }, [baustelle]);
+
+    const netto = stundenBerechneNetto(anfang, ende, pause);
+    const nettoOk = netto > 0;
+    const taetOk = taetigkeiten.length > 0;
+    const baustelleOk = !!baustelleId;
+    const alleOk = nettoOk && taetOk && baustelleOk;
+
+    function handleBaustelleChange(id) {
+        const found = aktiveBaustellen.find(function(b){
+            return (b.id || b.staging_folder_id) === id;
+        });
+        setBaustelleId(id);
+        setBaustelleName(found ? (found.name || '') : '');
+    }
+
+    function handleTaetigkeitToggle(key) {
+        if (taetigkeiten.indexOf(key) >= 0) {
+            setTaetigkeiten(taetigkeiten.filter(function(k){ return k !== key; }));
+        } else {
+            setTaetigkeiten(taetigkeiten.concat([key]));
+        }
+    }
+
+    function buildDatensatz(status) {
+        return {
+            id: origId || ('stunden-' + Date.now() + '-' + Math.random().toString(36).slice(2,7)),
+            datum: datum,
+            baustelle_id: baustelleId,
+            baustelle_name: baustelleName,
+            anfang: anfang,
+            ende: ende,
+            pause: pause,
+            netto: netto,
+            taetigkeiten: taetigkeiten,
+            bemerkung: bemerkung,
+            wetter: wetter,
+            material_frage: materialFrage,
+            material_liste: [],   // wird in B7.2 befuellt
+            status: status,        // 'entwurf' | 'fertig'
+            erstellt_am: origId ? null : Date.now()
+        };
+    }
+
+    function handleSpeichern() {
+        if (!baustelleOk) { setFehler(tConfig('stunden.fehler.baustelle')); return; }
+        if (!nettoOk)     { setFehler(tConfig('stunden.fehler.netto')); return; }
+        if (!taetOk)      { setFehler(tConfig('stunden.fehler.taetigkeit')); return; }
+        if (stundenZeitZuMin(ende) <= stundenZeitZuMin(anfang)) { setFehler(tConfig('stunden.fehler.zeit')); return; }
+
+        setSpeichert(true);
+        setFehler(null);
+        const ds = buildDatensatz('fertig');
+        MAStundenStorage.save(ds).then(function(){
+            setSpeichert(false);
+            onGespeichert();
+        }).catch(function(err){
+            setSpeichert(false);
+            setFehler(tConfig('stunden.fehler.speichern') + ' ' + (err && err.message || ''));
+        });
+    }
+
+    // Layout-Helper
+    const labelStyle = {
+        display:'block',
+        fontSize:'0.78rem',
+        fontWeight:700,
+        color:'#666',
+        textTransform:'uppercase',
+        letterSpacing:'0.5px',
+        marginBottom:6,
+        fontFamily:'var(--font-headline, Oswald)'
+    };
+    const inputStyle = {
+        width:'100%',
+        padding:'10px 12px',
+        fontSize:'1rem',
+        border:'1px solid #DDD',
+        borderRadius:8,
+        background:'#fff',
+        boxSizing:'border-box',
+        fontFamily:'inherit'
+    };
+    const blockStyle = { marginBottom:14 };
+
+    return (
+        <div className="ma-bau-container" style={maContainerStyle}>
+            <MASubHeader
+                titel={istNeu ? tConfig('stunden.formular.titel') : tConfig('stunden.formular.bearbeiten')}
+                untertitel={stundenDatumDe(datum)}
+                farbe={'#2E7D32'}
+                onZurueck={onAbbrechen}/>
+
+            <div style={{padding:'16px', maxWidth:680, margin:'0 auto', width:'100%'}}>
+
+                {/* Datum */}
+                <div style={blockStyle}>
+                    <label style={labelStyle}>{tConfig('stunden.formular.datum')}</label>
+                    <input type="date" value={datum}
+                           onChange={function(e){ setDatum(e.target.value); }}
+                           style={inputStyle}/>
+                </div>
+
+                {/* Baustelle */}
+                <div style={blockStyle}>
+                    <label style={labelStyle}>{tConfig('stunden.formular.baustelle')}</label>
+                    {baustelle ? (
+                        <input type="text" value={baustelleName} disabled style={Object.assign({}, inputStyle, {background:'#F5F5F5'})}/>
+                    ) : (
+                        <select value={baustelleId} onChange={function(e){ handleBaustelleChange(e.target.value); }}
+                                style={inputStyle}>
+                            <option value="">{tConfig('stunden.formular.baustelle.platzhalter')}</option>
+                            {aktiveBaustellen.length === 0 ? (
+                                <option value="" disabled>{tConfig('stunden.formular.baustelle.keine')}</option>
+                            ) : null}
+                            {aktiveBaustellen.map(function(b){
+                                const id = b.id || b.staging_folder_id || '';
+                                return <option key={id} value={id}>{b.name || id}</option>;
+                            })}
+                        </select>
+                    )}
+                </div>
+
+                {/* Zeiten in 3 Spalten */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14}}>
+                    <div>
+                        <label style={labelStyle}>{tConfig('stunden.formular.anfang')}</label>
+                        <input type="time" step="900" value={anfang}
+                               onChange={function(e){ setAnfang(e.target.value); }}
+                               style={inputStyle}/>
+                    </div>
+                    <div>
+                        <label style={labelStyle}>{tConfig('stunden.formular.ende')}</label>
+                        <input type="time" step="900" value={ende}
+                               onChange={function(e){ setEnde(e.target.value); }}
+                               style={inputStyle}/>
+                    </div>
+                </div>
+
+                {/* Pause + Netto in einer Zeile */}
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:14}}>
+                    <div>
+                        <label style={labelStyle}>{tConfig('stunden.formular.pause')}</label>
+                        <select value={pause} onChange={function(e){ setPause(parseInt(e.target.value, 10)); }}
+                                style={inputStyle}>
+                            {STUNDEN_PAUSEN.map(function(p){
+                                return <option key={p} value={p}>{p} min</option>;
+                            })}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={labelStyle}>{tConfig('stunden.formular.netto')}</label>
+                        <div style={Object.assign({}, inputStyle, {
+                            background: nettoOk ? '#E8F5E9' : '#FFF3E0',
+                            color: nettoOk ? '#1B5E20' : '#E65100',
+                            fontWeight:700,
+                            fontFamily:'var(--font-headline, Oswald)',
+                            fontSize:'1.1rem',
+                            display:'flex',
+                            alignItems:'center',
+                            justifyContent:'space-between'
+                        })}>
+                            <span>{netto.toFixed(2)}</span>
+                            <span style={{fontSize:'0.7rem', opacity:0.7, fontWeight:400}}>
+                                {tConfig('stunden.formular.netto.einheit')}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Taetigkeit Multi-Select */}
+                <div style={blockStyle}>
+                    <label style={labelStyle}>{tConfig('stunden.formular.taetigkeit')}</label>
+                    <div style={{
+                        fontSize:'0.78rem',
+                        color:'#666',
+                        marginBottom:8,
+                        fontStyle:'italic'
+                    }}>{tConfig('stunden.formular.taetigkeit.hinweis')}</div>
+                    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:6}}>
+                        {STUNDEN_TAETIGKEITEN.map(function(t){
+                            const aktiv = taetigkeiten.indexOf(t.key) >= 0;
+                            return (
+                                <button key={t.key}
+                                    onClick={function(){ handleTaetigkeitToggle(t.key); }}
+                                    style={{
+                                        padding:'8px 10px',
+                                        background: aktiv ? '#2E7D32' : '#fff',
+                                        color: aktiv ? '#fff' : '#333',
+                                        border: aktiv ? '2px solid #1B5E20' : '1px solid #DDD',
+                                        borderRadius:8,
+                                        fontSize:'0.82rem',
+                                        fontWeight: aktiv ? 700 : 500,
+                                        cursor:'pointer',
+                                        textAlign:'left',
+                                        display:'flex',
+                                        alignItems:'center',
+                                        gap:6,
+                                        minHeight:40,
+                                        transition:'all 0.15s ease-out'
+                                    }}>
+                                    <span style={{fontSize:'1.1rem', flexShrink:0}}>{t.emoji}</span>
+                                    <span style={{flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                                        {tConfig('stunden.tk.' + t.key)}
+                                    </span>
+                                    {aktiv ? <span style={{fontSize:'0.9rem'}}>{'\u2713'}</span> : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Bemerkung */}
+                <div style={blockStyle}>
+                    <label style={labelStyle}>{tConfig('stunden.formular.bemerkung')}</label>
+                    <textarea value={bemerkung}
+                              onChange={function(e){ setBemerkung(e.target.value); }}
+                              placeholder={tConfig('stunden.formular.bemerkung.platzhalter')}
+                              rows={3}
+                              style={Object.assign({}, inputStyle, {
+                                  resize:'vertical',
+                                  minHeight:70,
+                                  fontFamily:'inherit'
+                              })}/>
+                </div>
+
+                {/* Wetter */}
+                <div style={blockStyle}>
+                    <label style={labelStyle}>{tConfig('stunden.formular.wetter')}</label>
+                    <div style={{display:'flex', gap:6, flexWrap:'wrap'}}>
+                        {STUNDEN_WETTER.map(function(w){
+                            const aktiv = wetter === w.key;
+                            return (
+                                <button key={w.key}
+                                    onClick={function(){ setWetter(w.key); }}
+                                    style={{
+                                        flex:'1 1 auto',
+                                        padding:'8px 12px',
+                                        background: aktiv ? '#2E7D32' : '#fff',
+                                        color: aktiv ? '#fff' : '#333',
+                                        border: aktiv ? '2px solid #1B5E20' : '1px solid #DDD',
+                                        borderRadius:8,
+                                        fontSize:'0.85rem',
+                                        fontWeight: aktiv ? 700 : 500,
+                                        cursor:'pointer',
+                                        display:'flex',
+                                        alignItems:'center',
+                                        justifyContent:'center',
+                                        gap:6,
+                                        minHeight:40,
+                                        minWidth:80
+                                    }}>
+                                    <span>{w.emoji}</span>
+                                    <span>{tConfig('stunden.wetter.' + w.key)}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Material-Frage (B7.1: nur Toggle, Funktion folgt in B7.2) */}
+                <div style={Object.assign({}, blockStyle, {
+                    padding:'12px 14px',
+                    background:'#F5F5F5',
+                    borderRadius:10,
+                    border:'1px dashed #BDBDBD'
+                })}>
+                    <label style={Object.assign({}, labelStyle, {marginBottom:10})}>
+                        {tConfig('stunden.formular.material.frage')}
+                    </label>
+                    <div style={{display:'flex', gap:8, marginBottom:8}}>
+                        <button onClick={function(){ setMaterialFrage(true); }} style={{
+                            flex:1, padding:'8px', borderRadius:8,
+                            border: materialFrage ? '2px solid #2E7D32' : '1px solid #DDD',
+                            background: materialFrage ? '#E8F5E9' : '#fff',
+                            color: materialFrage ? '#1B5E20' : '#666',
+                            fontWeight: materialFrage ? 700 : 500,
+                            cursor:'pointer', fontSize:'0.9rem', minHeight:40
+                        }}>
+                            {tConfig('stunden.formular.material.ja')}
+                        </button>
+                        <button onClick={function(){ setMaterialFrage(false); }} style={{
+                            flex:1, padding:'8px', borderRadius:8,
+                            border: !materialFrage ? '2px solid #2E7D32' : '1px solid #DDD',
+                            background: !materialFrage ? '#E8F5E9' : '#fff',
+                            color: !materialFrage ? '#1B5E20' : '#666',
+                            fontWeight: !materialFrage ? 700 : 500,
+                            cursor:'pointer', fontSize:'0.9rem', minHeight:40
+                        }}>
+                            {tConfig('stunden.formular.material.nein')}
+                        </button>
+                    </div>
+                    {materialFrage ? (
+                        <div style={{
+                            fontSize:'0.78rem',
+                            color:'#E65100',
+                            fontStyle:'italic',
+                            marginTop:6
+                        }}>
+                            {'\u{1F6A7} ' + tConfig('stunden.formular.material.hinweis.b71')}
+                        </div>
+                    ) : null}
+                </div>
+
+                {/* Fehler-Anzeige */}
+                {fehler ? (
+                    <div style={{
+                        padding:'10px 14px',
+                        background:'#FFEBEE',
+                        border:'1px solid #EF5350',
+                        borderRadius:8,
+                        color:'#C62828',
+                        fontSize:'0.88rem',
+                        marginBottom:14
+                    }}>
+                        {'\u26A0\uFE0F ' + fehler}
+                    </div>
+                ) : null}
+
+                {/* Speichern + Abbrechen */}
+                <div style={{display:'flex', gap:8, marginTop:20}}>
+                    <button onClick={onAbbrechen} disabled={speichert} style={{
+                        padding:'12px 18px',
+                        background:'transparent',
+                        color:'#666',
+                        border:'1px solid #BDBDBD',
+                        borderRadius:10,
+                        fontSize:'0.95rem',
+                        fontWeight:600,
+                        cursor: speichert ? 'not-allowed' : 'pointer',
+                        opacity: speichert ? 0.5 : 1,
+                        minHeight:48
+                    }}>
+                        {tConfig('stunden.btn.abbrechen')}
+                    </button>
+                    <button onClick={handleSpeichern} disabled={speichert || !alleOk} style={{
+                        flex:1,
+                        padding:'12px 18px',
+                        background: alleOk
+                            ? 'linear-gradient(135deg, #2E7D32, #1B5E20)'
+                            : '#BDBDBD',
+                        color:'#fff',
+                        border:'none',
+                        borderRadius:10,
+                        fontSize:'1rem',
+                        fontWeight:700,
+                        fontFamily:'var(--font-headline, Oswald)',
+                        cursor: (speichert || !alleOk) ? 'not-allowed' : 'pointer',
+                        boxShadow: alleOk ? '0 4px 12px rgba(46,125,50,0.3)' : 'none',
+                        minHeight:48,
+                        letterSpacing:'0.4px'
+                    }}>
+                        {speichert ? tConfig('stunden.btn.speichern.laeuft') : tConfig('stunden.btn.speichern')}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// MAStundenTab - Hauptmenue-Tab "Stunden"
+// ============================================================
+// Wenn der Mitarbeiter direkt auf den Tab "Stunden" klickt, kann er
+// entweder einen Stundenzettel ohne Baustellen-Vorauswahl anlegen
+// (Baustelle dann im Formular waehlen) oder erst eine Baustelle waehlen.
+
+function MAStundenTab() {
+    const lang = useSprache();
+    // Direkt MAStundenView ohne Baustellen-Vorauswahl - der Tab ist der Schnellzugang
+    const fakeKachel = { id: 'stunden', titel: tConfig('stunden.tab.titel') };
+    return (
+        <MAStundenView
+            baustelle={null}
+            kachel={fakeKachel}
+            onZurueck={function(){}}/>
+    );
+}
+
+// ENDE MODUL STUNDEN
 
 // ============================================================
 // MAFotosTab - Hauptmenue-Tab "Fotos" (Variante 3)

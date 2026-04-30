@@ -1504,6 +1504,124 @@
     });
 
     // ============================================================
+    // STUNDEN_LABELS: Stunden-Modul Etappe 7 (B7.1 - Grundgeruest)
+    // Vollstaendige UI-Texte fuer Tab-Navigation, Formular-Felder,
+    // Taetigkeits-Pickliste, Wetter-Optionen und Validierungen.
+    //
+    // DE ist vollstaendig. Andere Sprachen sind leere Stubs;
+    // t()-Funktion faellt automatisch auf DE zurueck.
+    // ============================================================
+
+    const STUNDEN_LABELS = {
+        de: {
+            // -------- Top-Level --------
+            'stunden.tab.titel':                'Stundenzettel',
+            'stunden.tab.untertitel':           'Arbeitszeit + Material dokumentieren',
+            'stunden.tab.heute':                'Heute',
+            'stunden.tab.woche':                'Diese Woche',
+            'stunden.tab.monat':                'Letzten 30 Tage',
+
+            // -------- Formular --------
+            'stunden.formular.titel':           'Neuer Stundenzettel',
+            'stunden.formular.bearbeiten':      'Stundenzettel bearbeiten',
+            'stunden.formular.datum':           'Datum',
+            'stunden.formular.baustelle':       'Baustelle',
+            'stunden.formular.baustelle.platzhalter': 'Baustelle waehlen ...',
+            'stunden.formular.baustelle.keine': 'Keine aktiven Baustellen verfuegbar.',
+            'stunden.formular.anfang':          'Arbeitsbeginn',
+            'stunden.formular.ende':            'Arbeitsende',
+            'stunden.formular.pause':           'Pause (Minuten)',
+            'stunden.formular.netto':           'Netto-Arbeitszeit',
+            'stunden.formular.netto.einheit':   'Stunden',
+            'stunden.formular.taetigkeit':      'Taetigkeit',
+            'stunden.formular.taetigkeit.hinweis': 'Mehrfach-Auswahl moeglich. Tippe zum An-/Abwaehlen.',
+            'stunden.formular.bemerkung':       'Bemerkung',
+            'stunden.formular.bemerkung.platzhalter': 'Optional - z.B. Besonderheiten, Verzoegerungen ...',
+            'stunden.formular.wetter':          'Wetter',
+            'stunden.formular.material.frage':  'Material verwendet?',
+            'stunden.formular.material.ja':     'Ja',
+            'stunden.formular.material.nein':   'Nein',
+            'stunden.formular.material.hinweis.b71': 'Material-Eingabe folgt im naechsten Update.',
+
+            // -------- Buttons --------
+            'stunden.btn.speichern':            'Speichern',
+            'stunden.btn.speichern.laeuft':     'Wird gespeichert ...',
+            'stunden.btn.abbrechen':            'Abbrechen',
+            'stunden.btn.bearbeiten':           'Bearbeiten',
+            'stunden.btn.loeschen':             'Loeschen',
+            'stunden.btn.neu':                  'Neuen Stundenzettel anlegen',
+            'stunden.btn.entwurf':              'Entwurf',
+
+            // -------- Status --------
+            'stunden.status.entwurf':           'Entwurf - noch nicht abgeschickt',
+            'stunden.status.fertig':            'Gespeichert',
+            'stunden.status.synchronisiert':    'Synchronisiert',
+            'stunden.status.fehler':            'Sync-Fehler',
+            'stunden.toast.entwurf':            'Entwurf gespeichert',
+            'stunden.toast.gespeichert':        'Stundenzettel gespeichert!',
+            'stunden.toast.geloescht':          'Stundenzettel geloescht.',
+            'stunden.toast.entwurf.geladen':    'Entwurf wiederhergestellt',
+
+            // -------- Validierung --------
+            'stunden.fehler.baustelle':         'Bitte eine Baustelle waehlen.',
+            'stunden.fehler.zeit':              'Arbeitsende muss nach Arbeitsbeginn liegen.',
+            'stunden.fehler.taetigkeit':        'Bitte mindestens eine Taetigkeit auswaehlen.',
+            'stunden.fehler.netto':             'Netto-Arbeitszeit muss groesser als 0 Stunden sein.',
+            'stunden.fehler.speichern':         'Stundenzettel konnte nicht gespeichert werden:',
+            'stunden.fehler.laden':             'Stundenzettel konnten nicht geladen werden.',
+            'stunden.fehler.loeschen':          'Stundenzettel konnte nicht geloescht werden.',
+            'stunden.fehler.storage':           'Speicher nicht verfuegbar.',
+            'stunden.loeschen.bestaetigen':     'Stundenzettel vom {datum} wirklich loeschen?',
+
+            // -------- Heute-Reiter --------
+            'stunden.heute.kein':               'Fuer heute noch kein Stundenzettel angelegt.',
+            'stunden.heute.kein.hinweis':       'Tippe unten auf "Neuer Stundenzettel", um zu beginnen.',
+            'stunden.heute.entwurf.titel':      'Du hast einen Entwurf fuer heute.',
+            'stunden.heute.entwurf.weiter':     'Entwurf fortsetzen',
+            'stunden.heute.entwurf.verwerfen':  'Entwurf verwerfen',
+            'stunden.heute.fertig.titel':       'Stundenzettel fuer heute ist fertig:',
+
+            // -------- Historie --------
+            'stunden.historie.leer.titel':      'Noch keine Stundenzettel',
+            'stunden.historie.leer.text':       'Sobald du Stundenzettel speicherst, erscheinen sie hier.',
+            'stunden.historie.lade':            'Lade Stundenzettel ...',
+
+            // -------- Taetigkeits-Pickliste --------
+            'stunden.tk.fliesen.wand':          'Fliesen Wand verlegen',
+            'stunden.tk.fliesen.boden':         'Fliesen Boden verlegen',
+            'stunden.tk.verfugen':              'Verfugen',
+            'stunden.tk.silikon':               'Silikon',
+            'stunden.tk.abdichtung':            'Abdichtung verlegen',
+            'stunden.tk.estrich':               'Estrich vorbereiten',
+            'stunden.tk.demontage':             'Demontage Altbestand',
+            'stunden.tk.material':              'Material liefern / einraeumen',
+            'stunden.tk.einrichtung':           'Vorbereitung / Einrichtung Baustelle',
+            'stunden.tk.endreinigung':          'Endreinigung',
+            'stunden.tk.aufmass':               'Kundengespraech / Aufmass',
+            'stunden.tk.fahrzeit':              'Fahrzeit',
+            'stunden.tk.sonstiges':             'Sonstiges',
+
+            // -------- Wetter-Optionen --------
+            'stunden.wetter.sonnig':            'Sonnig',
+            'stunden.wetter.bewoelkt':          'Bewoelkt',
+            'stunden.wetter.regen':             'Regen',
+            'stunden.wetter.schnee':            'Schnee',
+            'stunden.wetter.kein':              'Keine Angabe'
+        },
+
+        // Andere Sprachen leer - t() faellt auf DE zurueck
+        cs: {}, sk: {}, pl: {}, en: {}, ro: {}, uk: {}
+    };
+
+    // Merge STUNDEN-Labels in UI_LABELS pro Sprache
+    Object.keys(STUNDEN_LABELS).forEach(function (lang) {
+        if (!UI_LABELS[lang]) UI_LABELS[lang] = {};
+        Object.keys(STUNDEN_LABELS[lang]).forEach(function (k) {
+            UI_LABELS[lang][k] = STUNDEN_LABELS[lang][k];
+        });
+    });
+
+    // ============================================================
     // Helper: t(key, replacements) — Uebersetzungs-Funktion
     // replacements: Objekt wie {n: 5}, ersetzt {n} im Label
     // ============================================================
